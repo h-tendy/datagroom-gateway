@@ -64,7 +64,11 @@ async function pager (req, res, collectionName) {
     // Add a default sorter
     if (!sorters.length) {
         let f = []
-        f.push('_id'); f.push('desc');
+        f.push('_id'); 
+        if (req.query.chronology)
+            f.push(req.query.chronology);
+        else 
+            f.push('desc');
         sorters.push(f);
     }
     // XXX: Do lots of validation.
