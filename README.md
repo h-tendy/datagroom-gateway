@@ -35,7 +35,19 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
 1. Right-click menu for useful tools. 
 
+1. Per-column editable controls. Also allows you to hide some columns. Set a few formatting attribute on a per column basis. 
+
 1. Edit-log for every single edit by any user. No danger of losing data. 
+
+1. Hook it up to your company's active-directory for user authentication. Or use a single guest user account to start. 
+
+## Uses
+
+1. For quick bug lists, scrum todo lists, personal lists, code notes etc. 
+
+1. Light enough for personal use on a single computer. 
+
+1. Any table-like data that can be shared/edited. 
 
 ## Screenshots
 
