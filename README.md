@@ -31,8 +31,15 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
 ## Screenshots
 
+1. A sample table once populated:
+![](./img/2020-09-19-16-13-20.png)
 
+1. Markdown editing in progress
+![](./img/2020-09-19-16-16-44.png)
 
+1. Markdown rendered once editing is done
+![](./img/2020-09-19-16-17-42.png)
 
+1. 
 
 
