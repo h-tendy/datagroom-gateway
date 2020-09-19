@@ -29,6 +29,8 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
 1. Easy copy of rendered HTML to clipboard. 
 
+## Screenshots
+
 
 
 
