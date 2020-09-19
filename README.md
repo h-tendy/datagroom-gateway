@@ -29,6 +29,14 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
 1. Easy copy of rendered HTML to clipboard. 
 
+1. Configurable single or multiple selection of preset items on a column. 
+
+1. Configurable conditional values for a column based on other column values. 
+
+1. Right-click menu for useful tools. 
+
+1. Edit-log for every single edit by any user. No danger of losing data. 
+
 ## Screenshots
 
 1. A sample table once populated:
@@ -40,6 +48,13 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 1. Markdown rendered once editing is done
 ![](./img/2020-09-19-16-17-42.png)
 
-1. 
+1. Right-click menu
+![](./img/2020-09-19-16-26-43.png)
+
+1. Filters in action
+![](img/2020-09-19-16-28-22.png)
+
+1. Edit-log
+![](img/2020-09-19-16-31-38.png)
 
 
