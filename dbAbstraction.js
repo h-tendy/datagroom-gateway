@@ -158,25 +158,6 @@ class DbAbstraction {
         let dbs = await this.client.db().admin().listDatabases();        
         console.log("dbs: ", dbs.databases);
         return;
-        await this.update("dg_myFirstDb", "data", {"Name" : "Jayaram"}, {"Name" : "Jayaram"});
-        await this.update("dg_myFirstDb", "data", {"Name" : "Jayaram"}, {"Spouse" : "Savita"});
-        await this.update("dg_myFirstDb", "data", {"Name" : "Jayaram"}, {"Child" : "Gautami"});
-        await this.update("dg_myFirstDb", "data", {}, {"Name" : "Gautami"});
-        //await this.insertOne("dg_myFirstDb", "data", {"Jayaram" : "Hello world!"});
-        //await this.insertOne("dg_myFirstDb", "data", {"Jayaram" : "Hello world!", "Savita" : "How are you!"});
-        //await this.insertOne("dg_myFirstDb", "data", {"Jayaram" : "Hello world!", "Savita" : "How are you!", "Gautami" : "Voila!"});
-        let limit = 12;
-        let page = 2;
-        await this.pagedFind ("myDb", "data", {}, { projection: { _id: 0 } }, page, limit)
-
-        //let skip = limit * page;
-        //let data = await this.find ("myDb", "data", {}, { projection: { _id: 0 }, limit, skip });
-        //console.log(data);
-        //let total = await this.countDocuments ("myDb", "data", {}, { projection: { _id: 0 } });
-        //let totalPages = Math.ceil(total / limit);
-        //console.log(total, totalPages);
-        //let results = { page, per_page: limit, total, total_pages: totalPages, data }
-        //console.log(results);
     }
 }
 
