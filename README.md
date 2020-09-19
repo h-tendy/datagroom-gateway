@@ -64,9 +64,9 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 ![](./img/2020-09-19-16-26-43.png)
 
 1. Filters in action
-![](img/2020-09-19-16-28-22.png)
+![](./img/2020-09-19-16-28-22.png)
 
 1. Edit-log
-![](img/2020-09-19-16-31-38.png)
+![](./img/2020-09-19-16-31-38.png)
 
 
