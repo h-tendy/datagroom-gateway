@@ -2,6 +2,7 @@ const router = require('express').Router();
 const DbAbstraction = require('../dbAbstraction');
 const ExcelUtils = require('../excelUtils');
 const FS = require('fs');
+const Jira = require('../jira');
 
 router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
@@ -332,9 +333,15 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         // XXX: Do lots of validation.
         let dbAbstraction = new DbAbstraction();
         let dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: `view_${request.dsView}` }, { columnAttrs: request.viewDefs } );
-
+        if (request.jiraConfig) {
+            dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, { ...request.jiraConfig });
+            console.log("Add jiraConfig status: ", dbResponse.result);
+        } else {
+            dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "jiraConfig" });
+            console.log("Remove jiraConfig status: ", dbResponse);
+        }
         //let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", request.selectorObj);
-        console.log ('db update response: ', dbResponse);
+        //console.log ('db update response: ', dbResponse);
         let response = {};
         response.status = 'success';
         res.status(200).send(response);
@@ -343,5 +350,31 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         res.status(415).send(e);
     }
 });
+  
+router.post('/view/refreshJira', async (req, res, next) => {
+    let request = req.body;
+    console.log("In refreshJira: ", request);
+    let deletedObj = {};
+    try {
+        // XXX: Do lots of validation.
+        let dbAbstraction = new DbAbstraction();
+        let jiraConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraConfig` }, {} );
+        jiraConfig = jiraConfig[0]
+        let response = {};
+        if (jiraConfig.jira && jiraConfig.jql) {
+            //await Jira.refreshJiraQuery(request.dsName, "project = IQN AND status not in (Closed, Resolved) AND assignee in (membersOf(Digital_Control-Plane), membersOf(Digital-Platform)) ORDER BY Severity ASC, priority DESC");
+            await Jira.refreshJiraQuery(request.dsName, jiraConfig.jql);
+            response.status = 'success'
+        } else {
+            console.log('refreshJira Failed');
+            response.status = 'fail';
+        }
+        res.status(200).send(response);
+    } catch (e) {
+        console.log("Got exception: ", e);
+        res.status(415).send(e);
+    }
+});
+
 
 module.exports = router;

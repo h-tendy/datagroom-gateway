@@ -106,6 +106,14 @@ class DbAbstraction {
         return ret.result;
     }
 
+    async removeOneWithValidId (dbName, tableName, selector) {
+        if (! this.client ) await this.connect();
+        let db = this.client.db(dbName);
+        let collection = db.collection(tableName);
+        let ret = await collection.deleteOne(selector);
+        return ret.result;
+    }
+
     async countDocuments (dbName, tableName, query, options) {
         if (! this.client ) await this.connect();
         let db = this.client.db(dbName);
