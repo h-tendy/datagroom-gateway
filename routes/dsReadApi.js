@@ -15,12 +15,14 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     console.log(response[0].columns);
     let keys = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `keys` }, {} );
     console.log(keys[0]);
+    let jiraConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraConfig` }, {} );
+    jiraConfig = jiraConfig[0]
     try {
         if (Object.keys(response[0].columnAttrs).length == 0 || response[0].columnAttrs.length == 0) {
             // Do something here and set the columnAttrs?
         }
     } catch (e) {};
-    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys });
+    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig });
     return;
 });
 
