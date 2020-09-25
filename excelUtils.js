@@ -16,19 +16,16 @@ class ExcelUtils {
         this.workBook = [];
     }
     static async getExcelUtilsForFile (fileName) {
-        if ( !excelUtilsMap[fileName] ) {
-            try {
-                let newObj = new ExcelUtils (fileName);
-                console.log('About to call init..');
-                await newObj.init();
-                excelUtilsMap[fileName] = newObj;
-                return newObj
-            } catch (e) {
-                console.log("Exception in ExcelUtils...", e);
-            }
-            return null;
+        try {
+            let newObj = new ExcelUtils (fileName);
+            console.log('About to call init..');
+            await newObj.init();
+            excelUtilsMap[fileName] = newObj;
+            return newObj
+        } catch (e) {
+            console.log("Exception in ExcelUtils...", e);
         }
-        return excelUtilsMap[fileName];
+        return null;
     }
     async init () {
         this.wBook = new Excel.Workbook();
