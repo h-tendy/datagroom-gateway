@@ -189,6 +189,8 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
                         response._id = request.selectorObj._id;
                         response.column = request.column;
                         response.value = recs[0][request.column];
+                    } else {
+                        response.error = 'Row not found!';
                     }
                 }
             }
@@ -329,6 +331,38 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
         res.status(415).send(e);
     }
 });
+
+router.post('/view/deleteManyDocs', async (req, res, next) => {
+    let request = req.body;
+    console.log("In deleteManyDocs: ", request);
+    //res.status(200).send({status: 'success'});
+    //return;
+    let deletedObj = {};
+    try {
+        // XXX: Do lots of validation.
+        let dbAbstraction = new DbAbstraction();
+        for (let i = 0; i < request.objects.length; i++) {
+            // First get a copy of the object we are deleting. 
+            let _id = dbAbstraction.getObjectId(request.objects[i]);
+            let recs = await dbAbstraction.find(request.dsName, "data", { _id }, { });
+            deletedObj = recs[0];
+            console.log("Objecting getting deleted: ", deletedObj);
+            let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", { _id : request.objects[i] });
+            console.log (`deleteManyDocs response for ${request.objects[i]}: `, dbResponse);
+            let editLog = getDeleteLog({ selectorObj: { _id: request.objects[i] } }, deletedObj, "success");
+            let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
+            console.log(`editLog (delete) response for ${request.objects[i]}: `, editLogResp);
+        }
+
+        let response = {};
+        response.status = 'success';
+        res.status(200).send(response);
+    } catch (e) {
+        console.log("Got exception: ", e);
+        res.status(415).send(e);
+    }
+});
+
 
 router.post('/view/setViewDefinitions', async (req, res, next) => {
     let request = req.body;

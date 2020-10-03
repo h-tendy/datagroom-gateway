@@ -35,8 +35,14 @@ async function refreshJiraQuery (dsName, jql) {
             rec.assignee = issue.fields.assignee.name;
             rec.status = issue.fields.status.name;
             rec.priority = issue.fields.priority.name;
-            rec.severity = issue.fields.customfield_11504.value;
-            rec.foundInRls = issue.fields.customfield_25802.value;
+            if (issue.fields.customfield_11504)
+                rec.severity = issue.fields.customfield_11504.value;
+            else 
+                rec.severity = "NotSet";
+            if (issue.fields.customfield_25802)
+                rec.foundInRls = issue.fields.customfield_25802.value;
+            else 
+                rec.foundInRls = "NotSet";
             rec.created = issue.fields.created.split('T')[0];
             if (issue.fields.customfield_25907)
                 rec.rrtTargetRls = issue.fields.customfield_25907.value;
