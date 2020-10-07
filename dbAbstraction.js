@@ -53,16 +53,28 @@ class DbAbstraction {
         let collection = db.collection(tableName);
         return await collection.updateMany(selector, { $set: updateObj }, { upsert: true });
     }
-    async updateOne (dbName, tableName, selector, updateObj) {
+    async updateOne (dbName, tableName, selector, updateObj, convertId = true) {
         if (! this.client ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
-        if (selector["_id"]) {
+        if (selector["_id"] && convertId) {
             selector["_id"] = new ObjectId(selector["_id"]);
         }
         let ret = await collection.updateOne(selector, { $set: updateObj }, {});
         return ret.result;
     }
+
+    async unsetOne (dbName, tableName, selector, unsetObj, convertId = true) {
+        if (! this.client ) await this.connect();
+        let db = this.client.db(dbName);
+        let collection = db.collection(tableName);
+        if (selector["_id"] && convertId) {
+            selector["_id"] = new ObjectId(selector["_id"]);
+        }
+        let ret = await collection.updateOne(selector, { $unset: unsetObj }, {});
+        return ret.result;
+    }
+
     async updateOneKeyInTransaction (dbName, tableName, selector, updateObj) {
         if (! this.client ) await this.connect();
         let db = this.client.db(dbName);

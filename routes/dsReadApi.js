@@ -19,12 +19,15 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     jiraConfig = jiraConfig[0]
     let dsDescription = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `dsDescription` }, {} );
     dsDescription = dsDescription[0]
+    let filters = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `filters` }, {} );
+    console.log("Filters: ", filters);
+    filters = filters[0]
     try {
         if (Object.keys(response[0].columnAttrs).length == 0 || response[0].columnAttrs.length == 0) {
             // Do something here and set the columnAttrs?
         }
     } catch (e) {};
-    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription });
+    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters });
     return;
 });
 
@@ -409,6 +412,122 @@ router.post('/view/refreshJira', async (req, res, next) => {
             console.log('refreshJira Failed');
             response.status = 'fail';
         }
+        res.status(200).send(response);
+    } catch (e) {
+        console.log("Got exception: ", e);
+        res.status(415).send(e);
+    }
+});
+
+router.post('/view/addFilter', async (req, res, next) => {
+    let request = req.body;
+    console.log("In addFilter: ", request);
+    try {
+        // XXX: Do lots of validation.
+        // First check if a filters doc is present. If not, add one. 
+        let dbAbstraction = new DbAbstraction();
+        let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
+        console.log("Filters: ", filters);
+        if (!filters.length) {
+            await dbAbstraction.update(request.dsName, "metaData", { _id: "filters" }, { _id: "filters" });
+        }
+        // Add the new filter here
+        let selectorObj = {
+            _id: 'filters'
+        };
+        selectorObj[request.filter.name] = null;
+        let editObj = {};
+        editObj[request.filter.name] = request.filter;
+        console.log('SelectorObj: ', JSON.stringify(selectorObj, null, 4));
+        console.log('editObj: ', JSON.stringify(editObj, null, 4));
+        let dbResponse = await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, editObj, false);
+        console.log ('Edit response: ', dbResponse);
+        let response = {};
+        if (dbResponse.nModified == 1) {
+            response.status = 'success';
+        } else {
+            response.status = 'fail';
+        }
+        filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
+        console.log("Filters: ", filters);
+        // XXX: If response fails, do a 'find' query and return the updated attribute.
+        res.status(200).send(response);
+    } catch (e) {
+        console.log("Got exception: ", e);
+        res.status(415).send(e);
+    }
+});
+
+
+router.post('/view/editFilter', async (req, res, next) => {
+    let request = req.body;
+    console.log("In editFilter: ", request);
+    try {
+        // XXX: Do lots of validation.
+        // First check if a filters doc is present. If not, add one. 
+        let dbAbstraction = new DbAbstraction();
+        let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
+        console.log("Filters: ", filters);
+        if (!filters.length) {
+            await dbAbstraction.update(request.dsName, "metaData", { _id: "filters" }, { _id: "filters" });
+        }
+        // Add the new filter here
+        let selectorObj = {
+            _id: 'filters'
+        };
+        let editObj = {};
+        editObj[request.filter.name] = request.filter;
+        console.log('SelectorObj: ', JSON.stringify(selectorObj, null, 4));
+        console.log('editObj: ', JSON.stringify(editObj, null, 4));
+        let dbResponse = await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, editObj, false);
+        console.log ('Edit response: ', dbResponse);
+        let response = {};
+        if (dbResponse.nModified == 1) {
+            response.status = 'success';
+        } else {
+            response.status = 'fail';
+        }
+        filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
+        console.log("Filters: ", filters);
+        // XXX: If response fails, do a 'find' query and return the updated attribute.
+        res.status(200).send(response);
+    } catch (e) {
+        console.log("Got exception: ", e);
+        res.status(415).send(e);
+    }
+});
+
+router.post('/view/deleteFilter', async (req, res, next) => {
+    let request = req.body;
+    console.log("In deleteFilter: ", request);
+    try {
+        // XXX: Do lots of validation.
+        // First check if a filters doc is present. If not, add one. 
+        let dbAbstraction = new DbAbstraction();
+        let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
+        console.log("Filters: ", filters);
+        if (!filters.length) {
+            await dbAbstraction.update(request.dsName, "metaData", { _id: "filters" }, { _id: "filters" });
+        }
+        // delete the new filter here
+        let selectorObj = {
+            _id: 'filters'
+        };
+        let unsetObj = {};
+        unsetObj[request.filter.name] = "";
+        console.log('SelectorObj: ', JSON.stringify(selectorObj, null, 4));
+        console.log('unsetObj: ', JSON.stringify(unsetObj, null, 4));
+        let dbResponse = await dbAbstraction.unsetOne(request.dsName, "metaData", selectorObj, unsetObj, false);
+        console.log ('Unset response: ', dbResponse);
+        let response = {};
+        if (dbResponse.nModified == 1) {
+            response.status = 'success';
+        } else {
+            response.status = 'fail';
+        }
+        filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
+        console.log("Filters: ", filters);
+        // XXX: If response fails, do a 'find' query and return the updated attribute.
         res.status(200).send(response);
     } catch (e) {
         console.log("Got exception: ", e);
