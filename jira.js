@@ -21,6 +21,8 @@ async function refreshJiraQuery (dsName, jql) {
     let resultRecords = [];
     let jiraUrl = "https://" + host; 
     let names, results;
+
+    markAsStale(dsName);
     do {
         console.log("Fetching from: ", startAt);
         results = await jira.searchJira(jql, { startAt, fields, expand: ["names"] } );
@@ -100,6 +102,41 @@ async function refreshJiraQuery (dsName, jql) {
         if (names[key] === "DayOpened") console.log(key, names[key]);
     }*/
 }
+
+async function markAsStale (dsName) {
+    let jiraUrl = "https://" + host; 
+    let filters = {}; sorters = [];
+    try {
+        filters['Work-id'] = {$regex: `${jiraUrl + '/browse/'}`, $options: 'i'};
+    } catch (e) {}
+    // XXX: Do lots of validation.
+    //console.log("mongo filters: ", filters);
+    let dbAbstraction = new DbAbstraction();
+    let response = {};
+    let page = 1, perPage = 5;
+    try {
+        do {
+            response = await dbAbstraction.pagedFind(dsName, 'data', filters, {}, page, perPage);
+            //console.log("Response: ", response);
+            page += 1;
+
+            for (let i = 0; i < response.data.length; i++) {
+                let rec = response.data[i];
+                if (/ENTRY NO LONGER PRESENT IN/.test(rec.Description)) continue;
+                let selectorObj = {}, jiraColumns = {};
+                selectorObj._id = rec._id;
+                // Do something to all jira columns
+                jiraColumns['Description'] = '[ENTRY NO LONGER PRESENT IN JIRA QUERY]{.y}\n\n' + rec.Description
+                try {
+                    await dbAbstraction.update(dsName, "data", selectorObj, jiraColumns);
+                } catch (e) {
+                    console.log("Db update error: ", e);
+                }
+            }
+        } while (page <= response.total_pages)
+    } catch (e) {}
+}
+
 
 module.exports = {
     refreshJiraQuery
