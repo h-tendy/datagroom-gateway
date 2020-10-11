@@ -36,6 +36,7 @@ async function refreshJiraQuery (dsName, jiraConfig) {
             rec.assignee = issue.fields.assignee.name;
             rec.status = issue.fields.status.name;
             rec.priority = issue.fields.priority.name;
+            rec.reporter = issue.fields.reporter.name;
             if (issue.fields.customfield_11504)
                 rec.severity = issue.fields.customfield_11504.value;
             else 
@@ -69,8 +70,8 @@ async function refreshJiraQuery (dsName, jiraConfig) {
         } else {
             r = doJiraMapping(rec, jiraConfig.jiraFieldMapping);
         }
-        //console.log("selectorObj: ", r.selectorObj);
-        //console.log("FullRec: ", r.fullRec);
+        console.log("selectorObj: ", r.selectorObj);
+        console.log("FullRec: ", r.fullRec);
         try {
             await dbAbstraction.update(dsName, "data", r.selectorObj, r.fullRec);
         } catch (e) {
@@ -96,6 +97,7 @@ function doJiraMapping (rec, jiraFieldMapping) {
 
     let selectorObj = {}, fullRec = {};
     selectorObj[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
+    //selectorObj[jiraKeyMapping['key']] = {$regex: `${rec.key}$`, $options: 'i'};
     fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
 
     for (let key in jiraContentMapping) {
@@ -116,7 +118,7 @@ function doJiraMapping (rec, jiraFieldMapping) {
 function defaultJiraMapping (rec) {
     let jiraUrl = "https://" + host; 
     let jiraKeyMapping = {'key': 'Work-id'}
-    let jiraContentMapping = {'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'status' : 'Description'};
+    let jiraContentMapping = {'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'status' : 'Description'};
     let selectorObj = {}, fullRec = {};
     selectorObj[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
     fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -139,7 +141,7 @@ async function markAsStale (dsName, jiraConfig) {
     let jiraUrl = "https://" + host; 
     let jiraFieldMapping; 
     if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
-        jiraFieldMapping = {'key': 'Work-id', 'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'status' : 'Description'};
+        jiraFieldMapping = {'key': 'Work-id', 'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'status' : 'Description'};
     } else { 
         jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
     }
@@ -150,6 +152,7 @@ async function markAsStale (dsName, jiraConfig) {
     let filters = {}; sorters = [];
     try {
         filters[jiraKeyMapping['key']] = {$regex: `${jiraUrl + '/browse/'}`, $options: 'i'};
+        //filters[jiraKeyMapping['key']] = {$regex: `IQN-`, $options: 'i'};
     } catch (e) {}
     // XXX: Do lots of validation.
     //console.log("mongo filters: ", filters);
