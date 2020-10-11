@@ -16,16 +16,15 @@ let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfi
 // If you change 'Description', you'll lose it when it next updates. 
 // Make it possible for users to specify the jql. 
 
-async function refreshJiraQuery (dsName, jql) {
+async function refreshJiraQuery (dsName, jiraConfig) {
     let startAt = 0; let total = 0;
     let resultRecords = [];
-    let jiraUrl = "https://" + host; 
     let names, results;
 
-    markAsStale(dsName);
+    await markAsStale(dsName, jiraConfig);
     do {
         console.log("Fetching from: ", startAt);
-        results = await jira.searchJira(jql, { startAt, fields, expand: ["names"] } );
+        results = await jira.searchJira(jiraConfig.jql, { startAt, fields, expand: ["names"] } );
         startAt += results.issues.length;
         names = results.names;
         for (let i = 0; i < results.issues.length; i++) {
@@ -62,52 +61,95 @@ async function refreshJiraQuery (dsName, jql) {
     console.log("keys: ", keys[0]);
     keys = keys[0].keys; 
     let keysMapping = {'Work-id' : 'key'} */
-    let jiraContentMapping = {'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'status' : 'Description'};
     for (let i = 0; i < resultRecords.length; i++) {
-        let rec = resultRecords[i];
-        let selectorObj = {}, fullRec = {};
-        /*
-        for (let j = 0; j < keys.length; j++) {
-            let key = keys[j]
-            selectorObj[key] = `[${rec[keysMapping[key]]}](${jiraUrl + '/browse/' + rec[keysMapping[key]]})`;
-            fullRec[key] = `[${rec[keysMapping[key]]}](${jiraUrl + '/browse/' + rec[keysMapping[key]]})`;
-        } */
-        selectorObj['Work-id'] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
-        fullRec['Work-id'] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
+        let rec = resultRecords[i], r;
 
-        for (key in jiraContentMapping) {
-            recValue = `**${key}**: ${rec[key]}`;
-            if (!fullRec[jiraContentMapping[key]]) {
-                fullRec[jiraContentMapping[key]] = recValue;
-            } else {
-                let ws = " ";
-                // XXX: Yuk, better way to insert the newlines. 
-                if (key === "type") ws = "\n\n";
-                fullRec[jiraContentMapping[key]] += ws + recValue;
-            }
+        if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
+            r = defaultJiraMapping(rec);
+        } else {
+            r = doJiraMapping(rec, jiraConfig.jiraFieldMapping);
         }
-        console.log("selectorObj: ", selectorObj);
-        console.log("FullRec: ", fullRec);
+        //console.log("selectorObj: ", r.selectorObj);
+        //console.log("FullRec: ", r.fullRec);
         try {
-            await dbAbstraction.update(dsName, "data", selectorObj, fullRec);
+            await dbAbstraction.update(dsName, "data", r.selectorObj, r.fullRec);
         } catch (e) {
-            console.log("Db update error: ", e);
+            console.log("Db update error refreshJiraQuery: ", e);
         }
-        //console.log(rec.key, rec.summary);
-        //console.log("    ", rec.type, `"${rec.assignee}"`, `"${rec.status}"`);
     }
-    /*
-    console.log(names);
-    for (let key in names) {
-        if (names[key] === "DayOpened") console.log(key, names[key]);
-    }*/
 }
 
-async function markAsStale (dsName) {
+function doJiraMapping (rec, jiraFieldMapping) {
     let jiraUrl = "https://" + host; 
+    jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
+    let jiraKeyMapping = {'key': jiraFieldMapping['key']};
+    delete jiraFieldMapping.key;
+    let jiraContentMapping = jiraFieldMapping;
+    let revContentMap = {};
+    for (let key in jiraFieldMapping) {
+        let dsField = jiraFieldMapping[key];
+        if (!revContentMap[dsField]) 
+            revContentMap[dsField] = 1;
+        else 
+            revContentMap[dsField] = revContentMap[dsField] + 1;
+    }
+
+    let selectorObj = {}, fullRec = {};
+    selectorObj[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
+    fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
+
+    for (let key in jiraContentMapping) {
+        if (!fullRec[jiraContentMapping[key]]) {
+            if (revContentMap[jiraContentMapping[key]] > 1)
+                fullRec[jiraContentMapping[key]] = `**${key}**: ${rec[key]}`;
+            else 
+                fullRec[jiraContentMapping[key]] = rec[key];
+        } else {
+            let ws = " ";
+            let recValue = `**${key}**: ${rec[key]}`;
+            fullRec[jiraContentMapping[key]] += ws + recValue;
+        }
+    }
+    return { selectorObj, fullRec }
+}
+
+function defaultJiraMapping (rec) {
+    let jiraUrl = "https://" + host; 
+    let jiraKeyMapping = {'key': 'Work-id'}
+    let jiraContentMapping = {'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'status' : 'Description'};
+    let selectorObj = {}, fullRec = {};
+    selectorObj[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
+    fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
+
+    for (key in jiraContentMapping) {
+        recValue = `**${key}**: ${rec[key]}`;
+        if (!fullRec[jiraContentMapping[key]]) {
+            fullRec[jiraContentMapping[key]] = recValue;
+        } else {
+            let ws = " ";
+            // XXX: Yuk, better way to insert the newlines. 
+            if (key === "type") ws = "\n\n";
+            fullRec[jiraContentMapping[key]] += ws + recValue;
+        }
+    }
+    return { selectorObj, fullRec }
+}
+
+async function markAsStale (dsName, jiraConfig) {
+    let jiraUrl = "https://" + host; 
+    let jiraFieldMapping; 
+    if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
+        jiraFieldMapping = {'key': 'Work-id', 'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'status' : 'Description'};
+    } else { 
+        jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
+    }
+    let jiraKeyMapping = {'key': jiraFieldMapping['key']};
+    delete jiraFieldMapping.key;
+    let jiraContentMapping = jiraFieldMapping;
+
     let filters = {}; sorters = [];
     try {
-        filters['Work-id'] = {$regex: `${jiraUrl + '/browse/'}`, $options: 'i'};
+        filters[jiraKeyMapping['key']] = {$regex: `${jiraUrl + '/browse/'}`, $options: 'i'};
     } catch (e) {}
     // XXX: Do lots of validation.
     //console.log("mongo filters: ", filters);
@@ -122,15 +164,22 @@ async function markAsStale (dsName) {
 
             for (let i = 0; i < response.data.length; i++) {
                 let rec = response.data[i];
-                if (/ENTRY NO LONGER PRESENT IN/.test(rec.Description)) continue;
                 let selectorObj = {}, jiraColumns = {};
                 selectorObj._id = rec._id;
                 // Do something to all jira columns
-                jiraColumns['Description'] = '[ENTRY NO LONGER PRESENT IN JIRA QUERY]{.y}\n\n' + rec.Description
+                let alreadyStale = false;
+                for (let jiraKey in jiraContentMapping) {
+                    if (/ENTRY NO LONGER PRESENT IN/.test(rec[jiraContentMapping[jiraKey]])) {
+                        alreadyStale = true;
+                        break;
+                    }
+                    jiraColumns[jiraContentMapping[jiraKey]] = '[ENTRY NO LONGER PRESENT IN JIRA QUERY]{.y}\n\n' + rec[jiraContentMapping[jiraKey]];
+                }
+                if (alreadyStale) continue;
                 try {
                     await dbAbstraction.update(dsName, "data", selectorObj, jiraColumns);
                 } catch (e) {
-                    console.log("Db update error: ", e);
+                    console.log("Db update error in markAsStale : ", e);
                 }
             }
         } while (page <= response.total_pages)

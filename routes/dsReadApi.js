@@ -406,7 +406,7 @@ router.post('/view/refreshJira', async (req, res, next) => {
         let response = {};
         if (jiraConfig.jira && jiraConfig.jql) {
             //await Jira.refreshJiraQuery(request.dsName, "project = IQN AND status not in (Closed, Resolved) AND assignee in (membersOf(Digital_Control-Plane), membersOf(Digital-Platform)) ORDER BY Severity ASC, priority DESC");
-            await Jira.refreshJiraQuery(request.dsName, jiraConfig.jql);
+            await Jira.refreshJiraQuery(request.dsName, jiraConfig);
             response.status = 'success'
         } else {
             console.log('refreshJira Failed');
