@@ -171,6 +171,15 @@ async function markAsStale (dsName, jiraConfig) {
                 selectorObj._id = rec._id;
                 // Do something to all jira columns
                 let alreadyStale = false;
+
+                // Stale marking only in 'summary' column. 
+                if (/ENTRY NO LONGER PRESENT IN/.test(rec[jiraContentMapping['summary']])) {
+                    alreadyStale = true;
+                    continue;
+                }
+                jiraColumns[jiraContentMapping['summary']] = '[ENTRY NO LONGER PRESENT IN JIRA QUERY]{.y}\n\n' + rec[jiraContentMapping['summary']];
+
+                /* // Comment out stale marking in all fields.
                 for (let jiraKey in jiraContentMapping) {
                     if (/ENTRY NO LONGER PRESENT IN/.test(rec[jiraContentMapping[jiraKey]])) {
                         alreadyStale = true;
@@ -179,6 +188,7 @@ async function markAsStale (dsName, jiraConfig) {
                     jiraColumns[jiraContentMapping[jiraKey]] = '[ENTRY NO LONGER PRESENT IN JIRA QUERY]{.y}\n\n' + rec[jiraContentMapping[jiraKey]];
                 }
                 if (alreadyStale) continue;
+                */
                 try {
                     await dbAbstraction.update(dsName, "data", selectorObj, jiraColumns);
                 } catch (e) {
