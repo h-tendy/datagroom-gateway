@@ -101,6 +101,12 @@ function dgLock (lockReq, clientId) {
             // previous lock
             prevLockReq = clientLocks[clientId];
             dgUnlock(prevLockReq, clientId);
+            // dgUnlock might remove this object if there weren't any other locks
+            // on this same document. So, reinitialize an object for this document. 
+            if (!dsLocks[lockReq._id]) {
+                dsLocks[lockReq._id] = {};
+                docLocks = dsLocks[lockReq._id];
+            }
         }
         clientLocks[clientId] = lockReq;
         docLocks[lockReq.field] = clientId;
@@ -179,6 +185,8 @@ function dgUnlockForClient (clientId) {
             if (unlocked) {
                 client.broadcast.emit('unlocked', unlocked);
             }
+            let dsLocks = locks[lockReq.dsName];
+            console.log('active locks after lockReq:', JSON.stringify(dsLocks));
     
         });
         client.on('unlockReq', (unlockReq) => {
@@ -190,6 +198,8 @@ function dgUnlockForClient (clientId) {
             } else {
                 ; //console.log("Not emitting this unlock request. ")
             }
+            let dsLocks = locks[unlockReq.dsName];
+            console.log('active locks after unlockReq:', JSON.stringify(dsLocks));
         });
         client.on('getActiveLocks', (dsName) => {
             console.log(`${Date()}: getActiveLocks: `, dsName);
