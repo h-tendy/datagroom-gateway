@@ -19,6 +19,9 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     jiraConfig = jiraConfig[0]
     let dsDescription = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `dsDescription` }, {} );
     dsDescription = dsDescription[0]
+    let otherTableAttrs = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `otherTableAttrs` }, {} );
+    if (otherTableAttrs.length)
+        otherTableAttrs = otherTableAttrs[0];
     let filters = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `filters` }, {} );
     console.log("Filters: ", filters);
     filters = filters[0]
@@ -27,7 +30,7 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
             // Do something here and set the columnAttrs?
         }
     } catch (e) {};
-    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters });
+    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs });
     return;
 });
 
@@ -383,6 +386,10 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         }
         dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "dsDescription" }, { ...request.dsDescription });
         console.log("Update dsDescription status: ", dbResponse.result);
+        if (request.otherTableAttrs) {
+            dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "otherTableAttrs" }, { ...request.otherTableAttrs });
+            console.log("Add otherTableAttrs status: ", dbResponse.result);
+        }
         //let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", request.selectorObj);
         //console.log ('db update response: ', dbResponse);
         let response = {};
