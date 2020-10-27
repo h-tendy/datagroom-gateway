@@ -386,7 +386,7 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         }
         dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "dsDescription" }, { ...request.dsDescription });
         console.log("Update dsDescription status: ", dbResponse.result);
-        if (request.otherTableAttrs) {
+        if (request.otherTableAttrs && Object.keys(request.otherTableAttrs).length) {
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "otherTableAttrs" }, { ...request.otherTableAttrs });
             console.log("Add otherTableAttrs status: ", dbResponse.result);
         }
