@@ -7,7 +7,7 @@ let host = JiraSettings.host;
 var jira = new JiraApi(JiraSettings.settings);
 
 // Custom fields per installation
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013"];
+let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582"];
 
 // Must have 'Work-id' and 'Description' fields in the data-set. 
 // The keys for this dataset must include 'Work-id' for now. 
@@ -55,11 +55,11 @@ async function refreshJiraQuery (dsName, jiraConfig) {
                 rec.targetRls = issue.fields.customfield_22013.name;
             else 
                 rec.targetRls = "NotSet";
-            /* // Use this for new field explorations.
-            if (issue.fields.customfield_22013) {
-                console.log("\n\n\nGOT a non-null: ", issue.fields.customfield_22013);
+             // Use this for new field explorations.
+            if (issue.fields.customfield_25582) {
+                console.log("\n\n\nGOT a non-null: ", issue.fields.customfield_25582);
                 console.log("\n\n\n");
-            } */
+            }
             
             if (i == 0 ) { 
                 console.log(issue);

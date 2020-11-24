@@ -74,6 +74,8 @@ app.use('/upload', fileUpload);
 const dsReadApi = require('./routes/dsReadApi');
 const { unlock } = require('./routes/upload');
 app.use('/ds', dsReadApi);
+const csvUpload = require('./routes/uploadCsv');
+app.use('/uploadCsv', csvUpload);
 
 app.route('/login').post(loginAuthenticateForReact);
     
