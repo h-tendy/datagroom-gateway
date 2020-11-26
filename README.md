@@ -17,7 +17,7 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
     * Dynamic updates to edited cells. 
     * Guaranteed to not overwrite a more recent edit by someone else. 
 
-1. Supports markdown in cells. You edit markdown and the html is rendered in the table. 
+1. Supports markdown in cells. You edit markdown and the html is rendered in the table. Use of `codemirror` as an editor for markdown is enabled. 
 
 1. Export of all data to `xlsx` file format. 
 
@@ -56,6 +56,7 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
 1. Markdown editing in progress
 ![](./img/2020-09-19-16-16-44.png)
+![](img/2020-11-26-09-43-23.png)
 
 1. Markdown rendered once editing is done
 ![](./img/2020-09-19-16-17-42.png)
