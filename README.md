@@ -23,7 +23,7 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
 1. Paging, Filtering, Searching (regex), Sorting of data. All from the backend, enabling the tool to work with very large datasets. 
 
-1. Import your data from `xlsx`. 
+1. Import your data from `xlsx` and `csv` formats. 
 
 1. Adjust and set views that is visible for everyone. 
 
@@ -37,7 +37,7 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
 1. Per-column editable controls. Also allows you to hide some columns. Set a few formatting attribute on a per column basis. 
 
-1. Edit-log for every single edit by any user. No danger of losing data and every version of each cell is available.  
+1. Edit-log for every single edit by any user. No danger of losing data. 
 
 1. Hook it up to your company's active-directory for user authentication. Or use a single guest user account to start. 
 
