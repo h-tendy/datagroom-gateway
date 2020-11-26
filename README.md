@@ -41,6 +41,32 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
 1. Hook it up to your company's active-directory for user authentication. Or use a single guest user account to start. 
 
+## Filters
+
+1. Click on `Show filters` checkbox to see additional controls for filtering. With these controls, you can save various column filters (with regex support), column visibility and column widths as well. 
+
+    ![](img/2020-11-26-13-40-21.png)
+
+1. Select from the stored filters to immediately reset the view to the stored value. The URL also changes and is directly routable. 
+
+    ![](img/2020-11-26-13-41-38.png)
+
+
+## Installation
+
+1. Install `MongoDb` community edition.
+
+1. git clone the `datagroom-gateway` and `datagroom-ui` repos to the same machine where mongodb is installed. If that is on a different machine, take a look at `dbAbstraction.js` and tweak the `this.url` variable.
+
+1. Do `npm install` in both the repos. 
+
+1. Start server: `cd datagroom-gateway; node ./server.js disableAD=true`. If you want active-directory integration, update the configuration in `ldapSettings.js`. (`node ./server.js` if you have updated `ldapSettings.js`) If you want to use the JIRA plug-in, update the configuration in `jiraSettings.js`. 
+
+1. Build react-ui by doing `cd datagroom-ui; npm run build`. Note that `datagroom-gateway` and `datagroom-ui` should be at the same level because `datagroom-gateway` serves the files built in `datagroom-ui`. 
+
+1. Open a browser and navigate to `localhost:8887` 
+
+
 ## Uses
 
 1. For quick bug lists, scrum todo lists, personal lists, code notes etc. 
@@ -52,7 +78,7 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 ## Screenshots
 
 1. A sample table once populated:
-![](./img/2020-09-19-16-13-20.png)
+![](img/2020-11-26-13-44-24.png)
 
 1. Markdown editing in progress
 ![](./img/2020-09-19-16-16-44.png)
@@ -62,7 +88,7 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 ![](./img/2020-09-19-16-17-42.png)
 
 1. Right-click menu
-![](./img/2020-09-19-16-26-43.png)
+![](img/2020-11-26-13-43-06.png)
 
 1. Filters in action
 ![](./img/2020-09-19-16-28-22.png)

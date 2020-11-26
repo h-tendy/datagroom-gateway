@@ -18,7 +18,6 @@ const config = {
     express: {
         port: process.env.PORT || 8887,
     },
-    mongodbServer: "mongodb://server:port",
     jwtSecret: "_JWT_SECRET_"
 };
 
