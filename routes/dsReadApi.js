@@ -543,4 +543,230 @@ router.post('/view/deleteFilter', async (req, res, next) => {
 });
 
 
+// Dataset editing utilities triggered by bulk-editing. 
+
+
+router.post('/doBulkEdit', async (req, res, next) => {
+    let request = req.body;
+    console.log("In doBulkEdit: ", request);
+    try {
+        let excelUtils = await ExcelUtils.getExcelUtilsForFile("uploads/" + request.fileName);
+        let loadStatus = await excelUtils.loadHdrsFromRange(request.sheetName, request.selectedRange);
+        if (!loadStatus.loadStatus) {
+            res.status(200).send(loadStatus);
+            return;    
+        }
+        let dbAbstraction = new DbAbstraction();
+        let keys = await dbAbstraction.find(request.dsName, "metaData", { _id: `keys` }, {} );
+        keys = keys[0].keys;
+        let viewDefault = await dbAbstraction.find(request.dsName, "metaData", { _id: `view_default` }, {} );
+        let curCols = viewDefault[0].columns;
+        let curColsInRev = {};
+        Object.entries(curCols).map((kv) => {
+            curColsInRev[kv[1]] = kv[0];
+        })
+        /*
+            keys are:  [ 'Work-id' ]
+            loadStatus.hdrs are:  {
+            '1': 'Work-id',
+            '2': 'Description',
+            '3': 'Priority',
+            '4': 'Target',
+            '5': 'Owner',
+            '6': 'Status',
+            '7': 'Comments'
+            }
+        */
+        let colsInSheetInRev = {};
+        Object.entries(loadStatus.hdrs).map((kv) => {
+            colsInSheetInRev[kv[1]] = kv[0];
+        })
+        console.log("Current Keys are: ", keys);
+        console.log("Current columns: ", curColsInRev);
+        console.log("Sheet Hdrs are: ", colsInSheetInRev);
+
+        // Make sure all keys are present in the sheet. loadStatus.hdrs
+        for (let i = 0; i < keys.length; i++) {
+            let key = keys[i];
+            if (!colsInSheetInRev[key]) {
+                loadStatus.loadStatus = false;
+                loadStatus.error = `key: ${key} is not present in edit sheet`;
+                console.log(`Bulk edit error: ${loadStatus.error}`);
+                res.status(200).send(loadStatus);
+                return;
+            }
+        }
+        // Find out new columns
+        let newCols = {};
+        let colsInSheet = Object.keys(colsInSheetInRev);
+        for (let i = 0; i < colsInSheet.length; i++) {
+            let col = colsInSheet[i];
+            if (!curColsInRev[col]) {
+                newCols[col] = 1;
+            }
+        }
+        // Find out deleted columns 
+        let delCols = {};
+        if (request.setColsFrmSheet) {
+            let curCols = Object.keys(curColsInRev);
+            for (let i = 0; i < curCols.length; i++) {
+                let col = curCols[i];
+                if (!colsInSheetInRev[col]) {
+                    delCols[col] = 1;
+                }
+            }
+        }
+        // Add the new columns now. First 'column' and 'columnAttrs' needs updating.
+        {
+            let viewDefault = await dbAbstraction.find(request.dsName, "metaData", { _id: `view_default` }, {} );
+            let columns = viewDefault[0].columns;
+            let columnAttrs = viewDefault[0].columnAttrs;
+            let newColKeys = Object.keys(newCols);
+            let j = Object.keys(columns).length + 1;
+            for (let i = 0; i < newColKeys.length; i++) {
+                let newCol = newColKeys[i];
+                columns[j] = newCol;
+                j++;
+                columnAttrs.push({
+                    field: newCol,
+                    title: newCol,
+                    width: 150,
+                    editor: "textarea",
+                    editorParams: {},
+                    formatter: "textarea",
+                    headerFilterType: "input",
+                    hozAlign: "center",
+                    vertAlign: "middle",
+                    headerTooltip: true    
+                })
+            }
+            await dbAbstraction.update(request.dsName, "metaData", { _id: `view_default` }, { columns, columnAttrs, userColumnAttrs: viewDefault[0].userColumnAttrs } );
+        }
+        // Now add the new column to all filters
+        {
+            let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
+            filters = filters[0];
+            let filterKeys = Object.keys(filters);
+            for (let i = 0; i < filterKeys.length; i++) {
+                let filterKey = filterKeys[i];
+                if (filterKey === "_id") continue;
+                let filterObj = filters[filterKey];
+                let newColKeys = Object.keys(newCols);
+                for (let i = 0; i < newColKeys.length; i++) {
+                    let newCol = newColKeys[i];
+                    filterObj.filterColumnAttrs[newCol] = {hidden: true, width: 150};
+                }
+            }
+            let selectorObj = {
+                _id: 'filters'
+            };
+            await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, filters, false);                
+        }
+        // Nothing more to be done for addition of new columns. Jira config doesn't
+        // require any changes. 
+
+
+        // Now for column deletion. Delete from columns and columnAttrs
+        {
+            let viewDefault = await dbAbstraction.find(request.dsName, "metaData", { _id: `view_default` }, {} );
+            let columns = viewDefault[0].columns, newColumns = {};
+            let columnAttrs = viewDefault[0].columnAttrs, newColumnAttrs = [];
+            let j = 1;
+            for (let i = 1; i <= Object.keys(columns).length; i++) {
+                if (columns[i] in delCols) continue;
+                newColumns[j] = columns[i]; j++;
+                newColumnAttrs.push(columnAttrs[i - 1]);
+            }
+
+            let curColsInRev = {};
+            Object.entries(columns).map((kv) => {
+                curColsInRev[kv[1]] = kv[0];
+            })
+            await dbAbstraction.update(request.dsName, "metaData", { _id: `view_default` }, { columns: newColumns, columnAttrs: newColumnAttrs, userColumnAttrs: viewDefault[0].userColumnAttrs } );
+        }
+        // Now scrub from all the filters... 
+        {
+            let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
+            filters = filters[0];
+            function cleansedHdrFilters (delCol, filterObj) {
+                let newHdrFilters = [];
+                for (let i = 0; i < filterObj.hdrFilters.length; i++) {
+                    if (filterObj.hdrFilters[i].field === delCol) continue;
+                    newHdrFilters.push(filterObj.hdrFilters[i]);
+                }
+                return newHdrFilters;
+            }
+            function cleansedHdrSorters (delCol, filterObj) {
+                let newHdrSorters = [];
+                for (let i = 0; i < filterObj.hdrSorters.length; i++) {
+                    if (filterObj.hdrSorters[i].column === delCol) continue;
+                    newHdrSorters.push(filterObj.hdrSorters[i]);
+                }
+                return newHdrSorters;
+            }
+            let filterKeys = Object.keys(filters);
+            for (let i = 0; i < filterKeys.length; i++) {
+                let filterKey = filterKeys[i];
+                if (filterKey === "_id") continue;
+                let filterObj = filters[filterKey];
+                let delColKeys = Object.keys(delCols);
+                for (let i = 0; i < delColKeys.length; i++) {
+                    let delCol = delColKeys[i];
+                    delete filterObj.filterColumnAttrs[delCol];
+                    filterObj.hdrFilters = cleansedHdrFilters(delCol, filterObj);
+                    filterObj.hdrSorters = cleansedHdrSorters(delCol, filterObj);
+                }
+            }
+            let selectorObj = {
+                _id: 'filters'
+            };
+            await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, filters, false);
+        }
+        // Scrub jiraConfig now. 
+        {
+            let jiraConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraConfig` }, {} );
+            jiraConfig = jiraConfig[0]
+            let delColKeys = Object.keys(delCols);
+            for (let i = 0; i < delColKeys.length; i++) {
+                let delCol = delColKeys[i];
+                // key in jiraFieldMapping is the jira key. value is the
+                // column name.
+                let jiraKeys = Object.keys(jiraConfig.jiraFieldMapping);
+                for (let j = 0; j < jiraKeys.length; j++) {
+                    let jk = jiraKeys[j];
+                    if (jiraConfig.jiraFieldMapping[jk] === delCol) {
+                        delete jiraConfig.jiraFieldMapping[jk];
+                    }
+                }
+                delete jiraConfig.jiraFieldMapping[delCol];
+            }
+            await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, jiraConfig);
+        }
+        // Finally, scrub the data documents and rid them of all the deleted columns        
+        {
+            let delColKeys = Object.keys(delCols);
+            for (let i = 0; i < delColKeys.length; i++) {
+                let delCol = delColKeys[i];
+                await dbAbstraction.removeFieldFromAll(request.dsName, "data", delCol);
+            }
+        }
+        // Delete all rows if asked.
+        {
+            if (request.setRowsFrmSheet) {
+                await dbAbstraction.removeMany(request.dsName, "data", {});
+            }
+        }
+        // Finally update the rows as in the sheet. 
+        {
+            loadStatus = await excelUtils.bulkUpdateDataIntoDb(request.sheetName, request.selectedRange, loadStatus.hdrs, keys, request.dsName, request.dsUser)
+        }
+        res.status(200).send(loadStatus);
+    } catch (e) {
+        console.log("Got exception: ", e);
+        res.status(415).send(e);
+    }
+});
+
+
+
 module.exports = router;

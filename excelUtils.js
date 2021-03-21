@@ -280,6 +280,61 @@ class ExcelUtils {
         return { loadStatus: true, range, rangeIndices, hdrs }
     }
 
+    async bulkUpdateDataIntoDb (sheet, range, hdrs, keys, dsName, dsUser) {
+        await this.init();
+        if (!this.workBook[sheet])
+            return { loadStatus: false, error: 'Sheet not found' };
+        console.log(`Sheet is: ${sheet}, range is: ${range}`);
+        let rangeIndices = this.getRangeIndices(range);
+
+        if (!rangeIndices.status)
+            return { loadStatus: false, error: 'Bad range' };
+        if (rangeIndices.fromRow > rangeIndices.toRow || 
+            rangeIndices.fromCol > rangeIndices.toCol)
+            return { loadStatus: false, error: 'Invalid range' };
+        
+        let rowCount = this.workBook[sheet].rows.length;
+        let columnCount = this.workBook[sheet].columns.length;
+        if (rangeIndices.fromRow >= rowCount ||
+            rangeIndices.toRow >= rowCount)
+            return {loadStatus: false, error: `Max row count is ${rowCount}`};
+
+        // XXX: WHAT?
+        if (rangeIndices.fromCol > columnCount ||
+            rangeIndices.toCol > columnCount)
+            return {loadStatus: false, error: `Max column count is ${columnCount}`};
+    
+    
+        let dbAbstraction = new DbAbstraction();
+        // Construct reverse map. header string to column index.
+        let hdrsRev = {};
+        Object.entries(hdrs).map((kv) => {
+            hdrsRev[kv[1]] = kv[0];
+        })
+        for (let i = rangeIndices.fromRow + 1; i <= rangeIndices.toRow; i++) {
+            let rowObjForDb = {};
+            let row = this.workBook[sheet].rows[i];
+            for (let j = rangeIndices.fromCol; j <= rangeIndices.toCol; j++) {
+                rowObjForDb[hdrs[j]] = row[j];
+            }
+            let rowSelectorObj = {};
+            keys.map((k) => {
+                rowSelectorObj[k] = row[hdrsRev[k]];
+            })
+            console.log(`rowObjForDb: ${JSON.stringify(rowObjForDb, null, 4)}`)
+            console.log(`rowSelectorObj: ${JSON.stringify(rowSelectorObj, null, 4)}`);
+            try {
+                await dbAbstraction.update(dsName, "data", rowSelectorObj, rowObjForDb);
+            } catch (e) {
+                console.log("Db update error: ", e);
+            }
+        }
+
+        return { loadStatus: true, range, rangeIndices, hdrs }
+    }
+
+
+
 }
 
 module.exports = ExcelUtils;

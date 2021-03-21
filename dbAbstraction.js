@@ -126,6 +126,27 @@ class DbAbstraction {
         return ret.result;
     }
 
+    async removeMany (dbName, tableName, selector, convertId = true) {
+        if (! this.client ) await this.connect();
+        let db = this.client.db(dbName);
+        let collection = db.collection(tableName);
+        if (selector["_id"] && convertId) {
+            selector["_id"] = new ObjectId(selector["_id"]);
+        }
+        let ret = await collection.deleteMany(selector);
+        return ret.result;
+    }
+
+    async removeFieldFromAll (dbName, tableName, field) {
+        if (! this.client ) await this.connect();
+        let db = this.client.db(dbName);
+        let collection = db.collection(tableName);
+        let unsetObj = {};
+        unsetObj[field] = 1;
+        let ret = await collection.updateMany({}, {$unset: unsetObj}, {});
+        return ret.result;
+    }
+
     async countDocuments (dbName, tableName, query, options) {
         if (! this.client ) await this.connect();
         let db = this.client.db(dbName);
