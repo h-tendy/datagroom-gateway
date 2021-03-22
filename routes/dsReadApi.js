@@ -581,9 +581,6 @@ router.post('/doBulkEdit', async (req, res, next) => {
         Object.entries(loadStatus.hdrs).map((kv) => {
             colsInSheetInRev[kv[1]] = kv[0];
         })
-        console.log("Current Keys are: ", keys);
-        console.log("Current columns: ", curColsInRev);
-        console.log("Sheet Hdrs are: ", colsInSheetInRev);
 
         // Make sure all keys are present in the sheet. loadStatus.hdrs
         for (let i = 0; i < keys.length; i++) {
@@ -596,6 +593,8 @@ router.post('/doBulkEdit', async (req, res, next) => {
                 return;
             }
         }
+
+        let oprLog = [];
         // Find out new columns
         let newCols = {};
         let colsInSheet = Object.keys(colsInSheetInRev);
@@ -640,7 +639,9 @@ router.post('/doBulkEdit', async (req, res, next) => {
                     headerTooltip: true    
                 })
             }
-            await dbAbstraction.update(request.dsName, "metaData", { _id: `view_default` }, { columns, columnAttrs, userColumnAttrs: viewDefault[0].userColumnAttrs } );
+            if (newColKeys.length) oprLog.push(`Adding new columns: ${JSON.stringify(newColKeys)}`);
+            if (request.doIt)
+                await dbAbstraction.update(request.dsName, "metaData", { _id: `view_default` }, { columns, columnAttrs, userColumnAttrs: viewDefault[0].userColumnAttrs } );
         }
         // Now add the new column to all filters
         {
@@ -660,7 +661,8 @@ router.post('/doBulkEdit', async (req, res, next) => {
             let selectorObj = {
                 _id: 'filters'
             };
-            await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, filters, false);                
+            if (request.doIt)
+                await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, filters, false);                
         }
         // Nothing more to be done for addition of new columns. Jira config doesn't
         // require any changes. 
@@ -682,24 +684,35 @@ router.post('/doBulkEdit', async (req, res, next) => {
             Object.entries(columns).map((kv) => {
                 curColsInRev[kv[1]] = kv[0];
             })
-            await dbAbstraction.update(request.dsName, "metaData", { _id: `view_default` }, { columns: newColumns, columnAttrs: newColumnAttrs, userColumnAttrs: viewDefault[0].userColumnAttrs } );
+
+            let delColKeys = Object.keys(delCols);
+            if (delColKeys.length) oprLog.push(`Deleting columns: ${JSON.stringify(delColKeys)}`);
+
+            if (request.doIt)
+                await dbAbstraction.update(request.dsName, "metaData", { _id: `view_default` }, { columns: newColumns, columnAttrs: newColumnAttrs, userColumnAttrs: viewDefault[0].userColumnAttrs } );
         }
         // Now scrub from all the filters... 
         {
             let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
             filters = filters[0] || {};
-            function cleansedHdrFilters (delCol, filterObj) {
+            function cleansedHdrFilters (delCol, filterObj, filterKey) {
                 let newHdrFilters = [];
                 for (let i = 0; i < filterObj.hdrFilters.length; i++) {
-                    if (filterObj.hdrFilters[i].field === delCol) continue;
+                    if (filterObj.hdrFilters[i].field === delCol) {
+                        oprLog.push(`Dropped "${delCol}" from "${filterKey}" regex`);
+                        continue;
+                    }
                     newHdrFilters.push(filterObj.hdrFilters[i]);
                 }
                 return newHdrFilters;
             }
-            function cleansedHdrSorters (delCol, filterObj) {
+            function cleansedHdrSorters (delCol, filterObj, filterKey) {
                 let newHdrSorters = [];
                 for (let i = 0; i < filterObj.hdrSorters.length; i++) {
-                    if (filterObj.hdrSorters[i].column === delCol) continue;
+                    if (filterObj.hdrSorters[i].column === delCol) {
+                        oprLog.push(`Dropped "${delCol}" from "${filterKey}" sorting`);
+                        continue;
+                    }
                     newHdrSorters.push(filterObj.hdrSorters[i]);
                 }
                 return newHdrSorters;
@@ -713,14 +726,15 @@ router.post('/doBulkEdit', async (req, res, next) => {
                 for (let i = 0; i < delColKeys.length; i++) {
                     let delCol = delColKeys[i];
                     delete filterObj.filterColumnAttrs[delCol];
-                    filterObj.hdrFilters = cleansedHdrFilters(delCol, filterObj);
-                    filterObj.hdrSorters = cleansedHdrSorters(delCol, filterObj);
+                    filterObj.hdrFilters = cleansedHdrFilters(delCol, filterObj, filterKey);
+                    filterObj.hdrSorters = cleansedHdrSorters(delCol, filterObj, filterKey);
                 }
             }
             let selectorObj = {
                 _id: 'filters'
             };
-            await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, filters, false);
+            if (request.doIt)
+                await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, filters, false);
         }
         // Scrub jiraConfig now. 
         {
@@ -736,12 +750,13 @@ router.post('/doBulkEdit', async (req, res, next) => {
                     for (let j = 0; j < jiraKeys.length; j++) {
                         let jk = jiraKeys[j];
                         if (jiraConfig.jiraFieldMapping[jk] === delCol) {
+                            oprLog.push(`Dropped "${delCol}" from jira-mapping for jira-key: "${jk}"`);
                             delete jiraConfig.jiraFieldMapping[jk];
                         }
                     }
-                    delete jiraConfig.jiraFieldMapping[delCol];
                 }
-                await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, jiraConfig);
+                if (request.doIt)
+                    await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, jiraConfig);
             }
         }
         // Finally, scrub the data documents and rid them of all the deleted columns        
@@ -749,19 +764,25 @@ router.post('/doBulkEdit', async (req, res, next) => {
             let delColKeys = Object.keys(delCols);
             for (let i = 0; i < delColKeys.length; i++) {
                 let delCol = delColKeys[i];
-                await dbAbstraction.removeFieldFromAll(request.dsName, "data", delCol);
+                if (request.doIt)
+                    await dbAbstraction.removeFieldFromAll(request.dsName, "data", delCol);
             }
         }
         // Delete all rows if asked.
         {
             if (request.setRowsFrmSheet) {
-                await dbAbstraction.removeMany(request.dsName, "data", {});
+                oprLog.push(`Will purge existing rows first`);
+                if (request.doIt)
+                    await dbAbstraction.removeMany(request.dsName, "data", {});
             }
         }
         // Finally update the rows as in the sheet. 
         {
-            loadStatus = await excelUtils.bulkUpdateDataIntoDb(request.sheetName, request.selectedRange, loadStatus.hdrs, keys, request.dsName, request.dsUser)
+            oprLog.push(`Will update rows specified in sheet`);
+            if (request.doIt)
+                loadStatus = await excelUtils.bulkUpdateDataIntoDb(request.sheetName, request.selectedRange, loadStatus.hdrs, keys, request.dsName, request.dsUser)
         }
+        loadStatus.oprLog = oprLog;
         res.status(200).send(loadStatus);
     } catch (e) {
         console.log("Got exception: ", e);
