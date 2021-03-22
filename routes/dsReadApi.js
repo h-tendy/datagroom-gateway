@@ -645,7 +645,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
         // Now add the new column to all filters
         {
             let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
-            filters = filters[0];
+            filters = filters[0] || {};
             let filterKeys = Object.keys(filters);
             for (let i = 0; i < filterKeys.length; i++) {
                 let filterKey = filterKeys[i];
@@ -687,7 +687,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
         // Now scrub from all the filters... 
         {
             let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
-            filters = filters[0];
+            filters = filters[0] || {};
             function cleansedHdrFilters (delCol, filterObj) {
                 let newHdrFilters = [];
                 for (let i = 0; i < filterObj.hdrFilters.length; i++) {
@@ -727,20 +727,22 @@ router.post('/doBulkEdit', async (req, res, next) => {
             let jiraConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraConfig` }, {} );
             jiraConfig = jiraConfig[0]
             let delColKeys = Object.keys(delCols);
-            for (let i = 0; i < delColKeys.length; i++) {
-                let delCol = delColKeys[i];
-                // key in jiraFieldMapping is the jira key. value is the
-                // column name.
-                let jiraKeys = Object.keys(jiraConfig.jiraFieldMapping);
-                for (let j = 0; j < jiraKeys.length; j++) {
-                    let jk = jiraKeys[j];
-                    if (jiraConfig.jiraFieldMapping[jk] === delCol) {
-                        delete jiraConfig.jiraFieldMapping[jk];
+            if (jiraConfig && delColKeys) {
+                for (let i = 0; i < delColKeys.length; i++) {
+                    let delCol = delColKeys[i];
+                    // key in jiraFieldMapping is the jira key. value is the
+                    // column name.
+                    let jiraKeys = Object.keys(jiraConfig.jiraFieldMapping);
+                    for (let j = 0; j < jiraKeys.length; j++) {
+                        let jk = jiraKeys[j];
+                        if (jiraConfig.jiraFieldMapping[jk] === delCol) {
+                            delete jiraConfig.jiraFieldMapping[jk];
+                        }
                     }
+                    delete jiraConfig.jiraFieldMapping[delCol];
                 }
-                delete jiraConfig.jiraFieldMapping[delCol];
+                await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, jiraConfig);
             }
-            await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, jiraConfig);
         }
         // Finally, scrub the data documents and rid them of all the deleted columns        
         {
