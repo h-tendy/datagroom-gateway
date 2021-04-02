@@ -64,6 +64,7 @@ class CsvUtils {
                     try {
                         await dbAbstraction.update(dsName, "metaData", { _id: "perms" }, { owner: dsUser });
                         await dbAbstraction.update(dsName, "metaData", { _id: "keys" }, { keys });
+                        let columns = {};
                         let columnAttrs = [];
                         for (let i = 0; i < Object.keys(hdrs).length; i++) {
                             let attrs = {};
@@ -78,8 +79,9 @@ class CsvUtils {
                             attrs.vertAlign = "middle";
                             attrs.headerTooltip = true;
                             columnAttrs.push(attrs);
+                            columns[i + 1] = hdrs[i];
                         }
-                        await dbAbstraction.update(dsName, "metaData", { _id: `view_default` }, { columns: hdrs, columnAttrs, userColumnAttrs: { } } );
+                        await dbAbstraction.update(dsName, "metaData", { _id: `view_default` }, { columns, columnAttrs, userColumnAttrs: { } } );
                     } catch (e) {
                         console.log("Db metaData update error: ", e)
                     }            
