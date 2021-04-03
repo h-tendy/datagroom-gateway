@@ -51,6 +51,9 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
     ![](img/2020-11-26-13-41-38.png)
 
+## Bulk editing
+
+Bulk editing features are now available. Yet to be documented
 
 ## Installation
 
@@ -58,7 +61,7 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
 1. git clone the `datagroom-gateway` and `datagroom-ui` repos to the same machine where mongodb is installed. If that is on a different machine, take a look at `dbAbstraction.js` and tweak the `this.url` variable.
 
-1. Do `npm install` in both the repos. 
+1. Do `npm install` in both the repos. (XXX: Due to a bug, please run `npm install` two times in the `datagroom-ui` directory)
 
 1. Start server: `cd datagroom-gateway; node ./server.js disableAD=true`. If you want active-directory integration, update the configuration in `ldapSettings.js`. (`node ./server.js` if you have updated `ldapSettings.js`) If you want to use the JIRA plug-in, update the configuration in `jiraSettings.js`. 
 
