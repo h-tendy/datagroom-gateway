@@ -680,7 +680,28 @@ router.post('/doBulkEdit', async (req, res, next) => {
             for (let i = 1; i <= Object.keys(columns).length; i++) {
                 if (columns[i] in delCols) continue;
                 newColumns[j] = columns[i]; j++;
-                newColumnAttrs.push(columnAttrs[i - 1]);
+                // Explicitly make sure newColumnAttrs match the newColumns. 
+                // (helps in repairing any bugs here)
+                let found = false;
+                for (let k = 0; k < columnAttrs.length; k++) {
+                    if (columnAttrs[k].field !== columns[i]) continue;
+                    newColumnAttrs.push(columnAttrs[k]); found = true;
+                    break;
+                }
+                if (!found) {
+                    newColumnAttrs.push({                    
+                        field: columns[i],
+                        title: columns[i],
+                        width: 150,
+                        editor: "textarea",
+                        editorParams: {},
+                        formatter: "textarea",
+                        headerFilterType: "input",
+                        hozAlign: "center",
+                        vertAlign: "middle",
+                        headerTooltip: true    
+                    })
+                }
             }
 
             let curColsInRev = {};
