@@ -1,4 +1,3 @@
-const exec = require('child_process').exec;
 const express = require('express');
 const bodyParser = require('body-parser');
 const passport = require('passport');
@@ -11,7 +10,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken')
 const DbAbstraction = require('./dbAbstraction');
 const ExcelUtils = require('./excelUtils');
-
+const Utils = require('./utils');
 
 const reactuiDir = path.resolve(__dirname, '../datagroom-ui/build');
 const config = {
@@ -68,27 +67,7 @@ app.use(session({
     cookie: { httpOnly: true, maxAge: 2419200000 } /// maxAge in milliseconds
 }));
 
-async function execCmdExecutor (cmdStr, maxBuffer = 1024 * 1024 * 10) {
-    let p, f;
-    exec(cmdStr, { maxBuffer: maxBuffer }, (error, stdout, stderr) => {
-        if (error) {
-            //console.log(`\n${Date()}: execCmdExecutor failed!: ${cmdStr}: ${error}\n`);
-            //throw error;
-            //XXX: need to send error alert in a better way
-            //console.log(stdout);
-            f("err");
-            return;
-        }
-        f(stdout);
-    });
-    p = new Promise((resolve, reject) => {
-        f = (ret) => {
-            resolve(ret);
-        };
-    });
-    return p;
-}
-execCmdExecutor('mkdir uploads');
+Utils.execCmdExecutor('mkdir uploads');
 
 const fileUpload = require('./routes/upload');
 app.use('/upload', fileUpload);
@@ -97,6 +76,12 @@ const { unlock } = require('./routes/upload');
 app.use('/ds', dsReadApi);
 const csvUpload = require('./routes/uploadCsv');
 app.use('/uploadCsv', csvUpload);
+
+Utils.execCmdExecutor('mkdir attachments');
+const attachmentsDir = path.resolve(__dirname, './attachments');
+app.use('/attachments', express.static(attachmentsDir));
+const uploadAttachments = require('./routes/uploadAttachments');
+app.use('/uploadAttachments', uploadAttachments);
 
 app.route('/login').post(loginAuthenticateForReact);
     
