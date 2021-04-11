@@ -70,8 +70,11 @@ class ExcelUtils {
         function getVal(obj) {
             if(obj instanceof(Date)) return obj.toString();
             //else if(obj.formula || obj.sharedFormula) return obj.result.error || obj.result.toString();
-            else if(obj.formula || obj.sharedFormula) return obj.result.error || obj.result;
-            else if(obj.hyperlink) return obj.text;
+            else if(obj.formula || obj.sharedFormula) {
+                if (obj.result === null || obj.result === undefined) 
+                    return "";
+                return obj.result.error || obj.result;
+            } else if(obj.hyperlink) return obj.text;
             else if(obj.richText) return obj.richText[0].text;
             else if(obj.error) return obj.error;
             else return obj.toString();
