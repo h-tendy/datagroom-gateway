@@ -63,7 +63,7 @@ Bulk editing features are now available. Yet to be documented
 
 1. Do `npm install` in both the repos. (XXX: Due to a bug, please run `npm install` two times in the `datagroom-ui` directory)
 
-1. Start server: `cd datagroom-gateway; node ./server.js disableAD=true`. If you want active-directory integration, update the configuration in `ldapSettings.js`. (`node ./server.js` if you have updated `ldapSettings.js`) If you want to use the JIRA plug-in, update the configuration in `jiraSettings.js`. 
+1. Start server: `cd datagroom-gateway; node ./server.js disableAD=true`. Login as `guest` with `guest` as password. If you want active-directory integration, update the configuration in `ldapSettings.js`. (`node ./server.js` if you have updated `ldapSettings.js`) If you want to use the JIRA plug-in, update the configuration in `jiraSettings.js`. 
 
 1. Build react-ui by doing `cd datagroom-ui; npm run build`. Note that `datagroom-gateway` and `datagroom-ui` should be at the same level because `datagroom-gateway` serves the files built in `datagroom-ui`. 
 
