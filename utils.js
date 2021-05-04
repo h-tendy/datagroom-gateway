@@ -4,7 +4,7 @@ async function execCmdExecutor (cmdStr, maxBuffer = 1024 * 1024 * 10) {
     let p, f;
     exec(cmdStr, { maxBuffer: maxBuffer }, (error, stdout, stderr) => {
         if (error) {
-            console.log(`\n${Date()}: execCmdExecutor failed!: ${cmdStr}: ${error}\n`);
+            //console.log(`\n${Date()}: execCmdExecutor failed!: ${cmdStr}: ${error}\n`);
             //throw error;
             //XXX: need to send error alert in a better way
             //console.log(stdout);

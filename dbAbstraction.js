@@ -22,6 +22,14 @@ class DbAbstraction {
         let db = this.client.db(dbName);
         return await db.dropDatabase();
     }
+    async deleteTable (dbName, tableName) {
+        if (! this.client ) await this.connect();
+        let db = this.client.db(dbName);
+        let collection = db.collection(tableName);
+        let ret = await collection.drop();
+        return ret.result;
+
+    }
     async createTable (dbName, tableName) {
         if (! this.client ) await this.connect();
         let db = this.client.db(dbName);

@@ -11,6 +11,7 @@ const jwt = require('jsonwebtoken')
 const DbAbstraction = require('./dbAbstraction');
 const ExcelUtils = require('./excelUtils');
 const Utils = require('./utils');
+const PrepAttachments = require('./prepAttachments');
 
 const reactuiDir = path.resolve(__dirname, '../datagroom-ui/build');
 const config = {
@@ -276,5 +277,6 @@ function loginAuthenticateForReact(req, res, next) {
 let dbAbstraction = new DbAbstraction();
 dbAbstraction.hello();
 
+PrepAttachments.refreshAttachmentsIntoDb();
 
 //ExcelUtils.exportDataFromDbIntoXlsx('myDb2', 'default', 'jhanu', 'export.xlsx');

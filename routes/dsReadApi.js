@@ -104,6 +104,10 @@ router.get('/view/editLog/:dsName', async (req, res, next) => {
     await pager(req, res, "editlog");
 });
 
+router.get('/view/attachments/:dsName', async (req, res, next) => {
+    await pager(req, res, "attachments");
+});
+
 function getSingleEditLog (req, isKey, status) {
     let selectorObj = JSON.parse(JSON.stringify(req.selectorObj));
     let editObj = JSON.parse(JSON.stringify(req.editObj));

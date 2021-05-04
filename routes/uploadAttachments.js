@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const multer = require('multer');
 const fs = require("fs");
+const PrepAttachments = require('../prepAttachments');
 
 var upload = multer({
     storage: multer.diskStorage({
@@ -50,9 +51,24 @@ router.post('/', (req, res, next) => {
         console.log("Req body.dsName: ", req.body.dsName);
         console.log("Upload complete. File: ", JSON.stringify(req.file, null, 4));
         let fileName = `/attachments/${dsName}/${req.file.filename}`;
+        await PrepAttachments.refreshAttachmentsIntoDb();
         res.status(200).send({status: "ok", filename: fileName});
     });    
 });
 
+router.post('/deleteAttachment', async (req, res, next) => {
+    let request = req.body;
+    console.log("In deleteAttachment: ", request);
+    try {
+        let dsName = request.dsName;
+        let _id = request._id;
+        await fs.promises.rm(`${_id}`)
+        await PrepAttachments.refreshAttachmentsIntoDb();
+        res.status(200).send({status: "ok"});
+    } catch (e) {
+        console.log("Got exception: ", e);
+        res.status(415).send(e);
+    }
+});
 
 module.exports = router;
