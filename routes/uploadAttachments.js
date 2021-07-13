@@ -62,7 +62,7 @@ router.post('/deleteAttachment', async (req, res, next) => {
     try {
         let dsName = request.dsName;
         let _id = request._id;
-        await fs.promises.rm(`${_id}`)
+        await fs.promises.unlink(`${_id}`)
         await PrepAttachments.refreshAttachmentsIntoDb();
         res.status(200).send({status: "ok"});
     } catch (e) {

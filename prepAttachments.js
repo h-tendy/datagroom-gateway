@@ -26,7 +26,9 @@ async function refreshAttachmentsIntoDb() {
             let dir = `attachments/${dbList[i].name}`;
             let files = await getFiles(dir);
             console.log(`Files under: ${dir}`);
-            await dbAbstraction.deleteTable(dbList[i].name, "attachments");
+            try {
+                await dbAbstraction.deleteTable(dbList[i].name, "attachments");
+            } catch (e) {}
             for (let j = 0; j < files.length; j++) {
                 let stats = await stat(files[j]);
                 let rec = {};
@@ -38,7 +40,7 @@ async function refreshAttachmentsIntoDb() {
                 console.log('attachment insert response: ', insertResp);
                 //console.log(`  ${files[j]}, ${stats.size}, ${stats.ctimeMs}`);
             }
-        } catch (e) {}
+        } catch (e) { console.log(e) }
     }
 }
 
