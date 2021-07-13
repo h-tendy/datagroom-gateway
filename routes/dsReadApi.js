@@ -253,6 +253,45 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
 });
 
 
+router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
+    let request = req.body;
+    console.log("In insertOrUpdateOneDoc: ", request);
+    //res.status(200).send({status: 'success'});
+    //return;
+    try {
+        // XXX: Do lots of validation.
+        let dbAbstraction = new DbAbstraction();
+        let dbResponse = await dbAbstraction.update(request.dsName, "data", request.selectorObj, request.doc);
+        console.log ('insertOrUpdateOneDoc response: ', dbResponse);
+        let response = {};
+        if (dbResponse.result.ok == 1) {
+            response.status = 'success';
+            if (dbResponse.upserted)
+                response._id = dbResponse.upserted[0]._id;
+        } else {
+            response.status = 'fail';
+            // Assumes that selector definitely has the '_id' field. 
+            if (request.selectorObj._id) {
+                let recs = await dbAbstraction.find(request.dsName, "data", { _id: request.selectorObj._id }, { } );
+                if (recs.length == 1) {
+                    response._id = request.selectorObj._id;
+                    response.column = request.column;
+                    response.value = recs[0][request.column];
+                }
+            }
+        }
+        //let editLog = getInsertLog(request, response.status);
+        //let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
+        //console.log('editLog (insert) response: ', editLogResp);
+        // XXX: If response fails, do a 'find' query and return the updated attribute.
+        res.status(200).send(response);
+    } catch (e) {
+        console.log("Got exception: ", e);
+        res.status(415).send(e);
+    }
+});
+
+
 router.get('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
     console.log("In downloadXlsx: ", req.params);
