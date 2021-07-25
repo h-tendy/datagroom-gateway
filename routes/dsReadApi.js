@@ -36,12 +36,18 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
 
 async function pager (req, res, collectionName) {
     let request = req.body;
+    let query;
+    if (req.method === 'GET')
+        query = req.query;
+    else
+        query = request;
+    //console.log("In pager, req:", req);
     console.log("In pager: ", req.params);
-    console.log("In pager: ", req.query);
+    console.log("In pager: ", query);
     console.log("In pager, collectionName:", collectionName)
     let filters = {}; sorters = [];
     try {
-        req.query.filters.map((v) => {
+        query.filters.map((v) => {
             if (v.type === 'like') {
                 let regex = v.value, negate = false;
                 let m = regex.match(/^\s*!(.*)$/);
@@ -57,6 +63,8 @@ async function pager (req, res, collectionName) {
             } else if (v.type === '=') {
                 let numVal = Number(v.value);
                 filters[v.field] = {$eq: numVal};
+            } else if (v.type === 'eq') {
+                filters[v.field] = {$eq: v.value};
             }
             /*
             if (v.value !== '' && !Number.isNaN(Number(v.value))) {
@@ -66,7 +74,7 @@ async function pager (req, res, collectionName) {
         })
     } catch (e) {}
     try {
-        req.query.sorters.map((v) => {
+        query.sorters.map((v) => {
             let f = [];
             f.push(v.field); f.push(v.dir);
             sorters.push(f);
@@ -76,8 +84,8 @@ async function pager (req, res, collectionName) {
     if (!sorters.length) {
         let f = []
         f.push('_id'); 
-        if (req.query.chronology)
-            f.push(req.query.chronology);
+        if (query.chronology)
+            f.push(query.chronology);
         else 
             f.push('desc');
         sorters.push(f);
@@ -91,7 +99,7 @@ async function pager (req, res, collectionName) {
     let dbAbstraction = new DbAbstraction();
     let response = {};
     try {
-        response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(req.query.page), parseInt(req.query.per_page) );
+        response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(query.page), parseInt(query.per_page) );
     } catch (e) {}
     res.status(200).json(response);
 }
@@ -100,11 +108,23 @@ router.get('/view/:dsName', async (req, res, next) => {
     await pager(req, res, "data");
 });
 
+router.post('/view/:dsName', async (req, res, next) => {
+    await pager(req, res, "data");
+});
+
 router.get('/view/editLog/:dsName', async (req, res, next) => {
     await pager(req, res, "editlog");
 });
 
+router.post('/view/editLog/:dsName', async (req, res, next) => {
+    await pager(req, res, "editlog");
+});
+
 router.get('/view/attachments/:dsName', async (req, res, next) => {
+    await pager(req, res, "attachments");
+});
+
+router.post('/view/attachments/:dsName', async (req, res, next) => {
     await pager(req, res, "attachments");
 });
 
