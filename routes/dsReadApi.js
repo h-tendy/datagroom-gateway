@@ -108,7 +108,8 @@ router.get('/view/:dsName', async (req, res, next) => {
     await pager(req, res, "data");
 });
 
-router.post('/view/:dsName', async (req, res, next) => {
+// To ensure no conflicts
+router.post('/viewViaPost/:dsName', async (req, res, next) => {
     await pager(req, res, "data");
 });
 
@@ -116,7 +117,8 @@ router.get('/view/editLog/:dsName', async (req, res, next) => {
     await pager(req, res, "editlog");
 });
 
-router.post('/view/editLog/:dsName', async (req, res, next) => {
+// To ensure no conflicts
+router.post('/viewViaPost/editLog/:dsName', async (req, res, next) => {
     await pager(req, res, "editlog");
 });
 
@@ -124,7 +126,8 @@ router.get('/view/attachments/:dsName', async (req, res, next) => {
     await pager(req, res, "attachments");
 });
 
-router.post('/view/attachments/:dsName', async (req, res, next) => {
+// To ensure no conflicts
+router.post('/viewViaPost/attachments/:dsName', async (req, res, next) => {
     await pager(req, res, "attachments");
 });
 
