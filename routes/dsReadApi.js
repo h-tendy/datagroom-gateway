@@ -164,6 +164,7 @@ function getInsertLog (req, status) {
 
 function getDeleteLog (req, _doc, status) {
     let selectorObj = JSON.parse(JSON.stringify(req.selectorObj));
+    console.log(`In getDeleteLog: `, _doc);
     let doc = JSON.parse(JSON.stringify(_doc));
     let deleteDoc = {};
     deleteDoc.opr = "delete";
@@ -287,6 +288,11 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     try {
         // XXX: Do lots of validation.
         let dbAbstraction = new DbAbstraction();
+        if (request.selectorObj._id) {
+            console.log(`In insertOrUpdateOneDoc: fixing _id to ObjectId format`);
+            request.selectorObj._id = dbAbstraction.getObjectId(request.selectorObj._id);
+            request.doc._id = request.selectorObj._id;
+        }
         let dbResponse = await dbAbstraction.update(request.dsName, "data", request.selectorObj, request.doc);
         console.log ('insertOrUpdateOneDoc response: ', dbResponse);
         let response = {};
