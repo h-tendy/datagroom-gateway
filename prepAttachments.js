@@ -13,6 +13,28 @@ async function getFiles(dir) {
   return Array.prototype.concat(...files);
 }
 
+async function refreshAttachmentsIntoDbForOne(dsName) {
+    let dbAbstraction = new DbAbstraction();
+    try {
+        //let dir = path.resolve(__dirname, `./attachments/${dbList[i].name}`);
+        let dir = `attachments/${dsName}`;
+        let files = await getFiles(dir);
+        console.log(`Files under: ${dir}`);
+        for (let j = 0; j < files.length; j++) {
+            let stats = await stat(files[j]);
+            let rec = {};
+            //rec._id = files[j].replace(`${dir}/`, "");
+            rec._id = files[j];
+            rec.size = stats.size;
+            rec.time = stats.ctimeMs;
+            let insertResp = await dbAbstraction.insertOne(dsName, "attachments", rec);
+            console.log('attachment insert response: ', insertResp);
+            //console.log(`  ${files[j]}, ${stats.size}, ${stats.ctimeMs}`);
+        }
+    } catch (e) { console.log(e) }
+
+}
+
 async function refreshAttachmentsIntoDb() {
     let dbAbstraction = new DbAbstraction();
     let dbList = await dbAbstraction.listDatabases();
@@ -22,28 +44,13 @@ async function refreshAttachmentsIntoDb() {
         if (j > -1)
             continue;
         try {
-            //let dir = path.resolve(__dirname, `./attachments/${dbList[i].name}`);
-            let dir = `attachments/${dbList[i].name}`;
-            let files = await getFiles(dir);
-            console.log(`Files under: ${dir}`);
-            try {
-                await dbAbstraction.deleteTable(dbList[i].name, "attachments");
-            } catch (e) {}
-            for (let j = 0; j < files.length; j++) {
-                let stats = await stat(files[j]);
-                let rec = {};
-                //rec._id = files[j].replace(`${dir}/`, "");
-                rec._id = files[j];
-                rec.size = stats.size;
-                rec.time = stats.ctimeMs;
-                let insertResp = await dbAbstraction.insertOne(dbList[i].name, "attachments", rec);
-                console.log('attachment insert response: ', insertResp);
-                //console.log(`  ${files[j]}, ${stats.size}, ${stats.ctimeMs}`);
-            }
-        } catch (e) { console.log(e) }
+            await dbAbstraction.deleteTable(dbList[i].name, "attachments");
+        } catch (e) {}
+        await refreshAttachmentsIntoDbForOne(dbList[i].name);
     }
 }
 
 module.exports = {
-    refreshAttachmentsIntoDb
+    refreshAttachmentsIntoDb,
+    refreshAttachmentsIntoDbForOne
 }

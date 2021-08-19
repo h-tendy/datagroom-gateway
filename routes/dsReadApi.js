@@ -1,8 +1,11 @@
 const router = require('express').Router();
 const DbAbstraction = require('../dbAbstraction');
 const ExcelUtils = require('../excelUtils');
-const FS = require('fs');
+const fs = require('fs');
 const Jira = require('../jira');
+const Utils = require('../utils');
+const PrepAttachments = require('../prepAttachments');
+const { ObjectId } = require('mongodb');
 
 router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
@@ -323,11 +326,11 @@ router.get('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let fileName = `export_${req.params.dsName}_${req.params.dsView}_${req.params.dsUser}.xlsx`
     await ExcelUtils.exportDataFromDbIntoXlsx(req.params.dsName, req.params.dsView, req.params.dsUser, fileName);
     try {
-        let bits = FS.readFileSync(fileName);
+        let bits = fs.readFileSync(fileName);
         // convert binary data to base64 encoded string
         let base64Str = new Buffer(bits).toString('base64');
         res.json({output: base64Str});
-        FS.unlinkSync(fileName);
+        fs.unlinkSync(fileName);
     } catch (e) {
         console.log("downloadXlsx exception: ", e)
     }
@@ -365,6 +368,7 @@ router.post('/deleteDs', async (req, res, next) => {
         let dbAbstraction = new DbAbstraction();
         let dbResponse = await dbAbstraction.deleteDb(request.dsName);
         console.log ('DeleteDs response: ', dbResponse);
+        fs.rmdirSync(`attachments/${request.dsName}`, { recursive: true });
         let response = {};
         response.status = 'success';
         res.status(200).send(response);
@@ -892,6 +896,53 @@ router.post('/doBulkEdit', async (req, res, next) => {
     }
 });
 
+router.post('/createDsFromDs', async (req, res, next) => {
+    let request = req.body;
+    console.log("In createDsFromDs:", request);
+    try {
+        // XXX: Do lots of validation.
+        // Check for existing db!
+        let dbAbstraction = new DbAbstraction();
+        let dbList = await dbAbstraction.listDatabases();
+        for (let i = 0; i < dbList.length; i++) {
+            if (dbList[i].name === request.toDsName) {
+                console.log('createDsFromDs: Dataset name conflict');
+                res.status(200).send({ createStatus: false, error: 'Dataset name conflict' });
+                return;
+            }
+        }
+
+        let dbResponse = await dbAbstraction.copy(request.fromDsName, "metaData", request.toDsName, "metaData");
+        if (request.retainData) {
+            dbResponse = await dbAbstraction.copy(request.fromDsName, "data", request.toDsName, "data", (doc) => {
+                let r = new RegExp(`/attachments/${request.fromDsName}/`, 'g');
+                let t = `/attachments/${request.toDsName}/`;
+                doc = JSON.stringify(doc).replace(r, t);
+                doc = JSON.parse(doc);
+                doc._id = new ObjectId(doc._id);
+                return doc;
+            });
+            dbResponse = await dbAbstraction.copy(request.fromDsName, "editlog", request.toDsName, "editlog", (doc) => {
+                let r = new RegExp(`/attachments/${request.fromDsName}/`, 'g');
+                let t = `/attachments/${request.toDsName}/`;
+                doc = JSON.stringify(doc).replace(r, t);
+                doc = JSON.parse(doc);
+                doc._id = new ObjectId(doc._id);
+                return doc;
+            });
+            // copy the attachments directory, generate attachments table-cache. 
+            Utils.copyRecursiveSync(`attachments/${request.fromDsName}`, `attachments/${request.toDsName}`)
+            await PrepAttachments.refreshAttachmentsIntoDbForOne(request.toDsName);
+        }
+        // Change owner to current user...
+        await dbAbstraction.update(request.toDsName, "metaData", { _id: "perms" }, { owner: request.dsUser });
+
+        res.status(200).send({createStatus: true});
+    } catch (e) {
+        console.log("Got exception: ", e);
+        res.status(415).send(e);
+    }
+});
 
 
 module.exports = router;

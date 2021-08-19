@@ -201,6 +201,26 @@ class DbAbstraction {
         return dbs.databases;
     }
 
+    async copy (fromDsName, fromTable, toDsName, toTable, fn) {
+        if (! this.client ) await this.connect();
+        let fromDb = this.client.db(fromDsName);
+        let toDb = this.client.db(toDsName);
+        let fromCollection = fromDb.collection(fromTable);
+        let toCollection = toDb.collection(toTable);
+
+        const cursor = fromCollection.find();
+        for await (let doc of cursor) {
+            //console.log(`Found record: ${JSON.stringify(doc, null, 4)}`);
+            if (fn) {
+                doc = fn(doc);
+            }
+            let ret = await toCollection.insertOne(doc);
+            if (ret.result.ok !== 1) {
+                console.log(`InsertOne failed: ${ret.result}`);
+            }
+        }
+    }
+
     async hello () {
         console.log("Hello from DbAbstraction!");
         if (! this.client ) await this.connect();
