@@ -42,6 +42,9 @@ async function refreshJiraQuery (dsName, jiraConfig) {
                 rec.severity = issue.fields.customfield_11504.value;
             else 
                 rec.severity = "NotSet";
+            // This is an idiosyncracy in our jira installation
+            if (rec.type === 'Feature')
+                rec.severity = '';
             if (issue.fields.customfield_25802)
                 rec.foundInRls = issue.fields.customfield_25802.value;
             else 
