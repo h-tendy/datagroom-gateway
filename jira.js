@@ -103,6 +103,7 @@ async function refreshJiraQuery (dsName, jiraConfig) {
             console.log("Db update error refreshJiraQuery: ", e);
         }
     }
+    await dbAbstraction.destroy();
 }
 
 function doJiraMapping (rec, jiraFieldMapping) {
@@ -222,6 +223,7 @@ async function markAsStale (dsName, jiraConfig) {
             }
         } while (page <= response.total_pages)
     } catch (e) {}
+    await dbAbstraction.destroy();
 }
 
 

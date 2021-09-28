@@ -32,7 +32,7 @@ async function refreshAttachmentsIntoDbForOne(dsName) {
             //console.log(`  ${files[j]}, ${stats.size}, ${stats.ctimeMs}`);
         }
     } catch (e) { console.log(e) }
-
+    await dbAbstraction.destroy();
 }
 
 async function refreshAttachmentsIntoDb() {
@@ -48,6 +48,7 @@ async function refreshAttachmentsIntoDb() {
         } catch (e) {}
         await refreshAttachmentsIntoDbForOne(dbList[i].name);
     }
+    await dbAbstraction.destroy();
 }
 
 module.exports = {

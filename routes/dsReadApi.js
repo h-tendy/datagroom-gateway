@@ -33,6 +33,7 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
             // Do something here and set the columnAttrs?
         }
     } catch (e) {};
+    await dbAbstraction.destroy();
     res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs });
     return;
 });
@@ -104,6 +105,7 @@ async function pager (req, res, collectionName) {
     try {
         response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(query.page), parseInt(query.per_page) );
     } catch (e) {}
+    await dbAbstraction.destroy();
     res.status(200).json(response);
 }
 
@@ -181,9 +183,9 @@ function getDeleteLog (req, _doc, status) {
 router.post('/view/editSingleAttribute', async (req, res, next) => {
     let request = req.body;
     console.log("In editSingleAttribute: ", request);
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
-        let dbAbstraction = new DbAbstraction();
         let keys = await dbAbstraction.find(request.dsName, "metaData", { _id: `keys` }, {} );
         console.log(keys[0]);
         let keyBeingEdited = false;
@@ -241,15 +243,16 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 
 router.post('/view/insertOneDoc', async (req, res, next) => {
     let request = req.body;
     console.log("In insertOneDoc: ", request);
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
-        let dbAbstraction = new DbAbstraction();
         let dbResponse = await dbAbstraction.insertOneUniquely(request.dsName, "data", request.selectorObj, request.doc);
         console.log ('insertOneUniquely response: ', dbResponse);
         let response = {};
@@ -277,6 +280,7 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 
@@ -285,9 +289,9 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     console.log("In insertOrUpdateOneDoc: ", request);
     //res.status(200).send({status: 'success'});
     //return;
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
-        let dbAbstraction = new DbAbstraction();
         if (request.selectorObj._id) {
             console.log(`In insertOrUpdateOneDoc: fixing _id to ObjectId format`);
             request.selectorObj._id = dbAbstraction.getObjectId(request.selectorObj._id);
@@ -321,6 +325,7 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 
@@ -364,14 +369,15 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
     }
     console.log("Returning: ", pruned);
     res.json({ dbList: pruned });
+    await dbAbstraction.destroy();
 });
 
 router.post('/deleteDs', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteDs: ", request);
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
-        let dbAbstraction = new DbAbstraction();
         let dbResponse = await dbAbstraction.deleteDb(request.dsName);
         console.log ('DeleteDs response: ', dbResponse);
         fs.rmdirSync(`attachments/${request.dsName}`, { recursive: true });
@@ -382,15 +388,16 @@ router.post('/deleteDs', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 router.post('/view/deleteOneDoc', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteOneDoc: ", request);
     let deletedObj = {};
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
-        let dbAbstraction = new DbAbstraction();
         // First get a copy of the object we are deleting. 
         if (request.selectorObj._id) {
             let _id = dbAbstraction.getObjectId(request.selectorObj._id);
@@ -412,6 +419,7 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 router.post('/view/deleteManyDocs', async (req, res, next) => {
@@ -420,9 +428,9 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
     //res.status(200).send({status: 'success'});
     //return;
     let deletedObj = {};
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
-        let dbAbstraction = new DbAbstraction();
         for (let i = 0; i < request.objects.length; i++) {
             // First get a copy of the object we are deleting. 
             let _id = dbAbstraction.getObjectId(request.objects[i]);
@@ -443,15 +451,16 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 
 router.post('/view/setViewDefinitions', async (req, res, next) => {
     let request = req.body;
     console.log("In setViewDefinitions: ", request);
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
-        let dbAbstraction = new DbAbstraction();
         let dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: `view_${request.dsView}` }, { columnAttrs: request.viewDefs } );
         if (request.jiraConfig) {
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, { ...request.jiraConfig });
@@ -475,15 +484,16 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
   
 router.post('/view/refreshJira', async (req, res, next) => {
     let request = req.body;
     console.log("In refreshJira: ", request);
     let deletedObj = {};
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
-        let dbAbstraction = new DbAbstraction();
         let jiraConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraConfig` }, {} );
         jiraConfig = jiraConfig[0]
         let response = {};
@@ -500,15 +510,16 @@ router.post('/view/refreshJira', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 router.post('/view/addFilter', async (req, res, next) => {
     let request = req.body;
     console.log("In addFilter: ", request);
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
         // First check if a filters doc is present. If not, add one. 
-        let dbAbstraction = new DbAbstraction();
         let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
         console.log("Filters: ", filters);
         if (!filters.length) {
@@ -539,16 +550,17 @@ router.post('/view/addFilter', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 
 router.post('/view/editFilter', async (req, res, next) => {
     let request = req.body;
     console.log("In editFilter: ", request);
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
         // First check if a filters doc is present. If not, add one. 
-        let dbAbstraction = new DbAbstraction();
         let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
         console.log("Filters: ", filters);
         if (!filters.length) {
@@ -578,15 +590,16 @@ router.post('/view/editFilter', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 router.post('/view/deleteFilter', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteFilter: ", request);
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
         // First check if a filters doc is present. If not, add one. 
-        let dbAbstraction = new DbAbstraction();
         let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
         console.log("Filters: ", filters);
         if (!filters.length) {
@@ -616,6 +629,7 @@ router.post('/view/deleteFilter', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 
@@ -625,6 +639,7 @@ router.post('/view/deleteFilter', async (req, res, next) => {
 router.post('/doBulkEdit', async (req, res, next) => {
     let request = req.body;
     console.log("In doBulkEdit: ", request);
+    let dbAbstraction = new DbAbstraction();
     try {
         let excelUtils = await ExcelUtils.getExcelUtilsForFile("uploads/" + request.fileName);
         let loadStatus = await excelUtils.loadHdrsFromRange(request.sheetName, request.selectedRange);
@@ -632,7 +647,6 @@ router.post('/doBulkEdit', async (req, res, next) => {
             res.status(200).send(loadStatus);
             return;    
         }
-        let dbAbstraction = new DbAbstraction();
         let keys = await dbAbstraction.find(request.dsName, "metaData", { _id: `keys` }, {} );
         keys = keys[0].keys;
         let viewDefault = await dbAbstraction.find(request.dsName, "metaData", { _id: `view_default` }, {} );
@@ -900,15 +914,16 @@ router.post('/doBulkEdit', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 router.post('/createDsFromDs', async (req, res, next) => {
     let request = req.body;
     console.log("In createDsFromDs:", request);
+    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
         // Check for existing db!
-        let dbAbstraction = new DbAbstraction();
         let dbList = await dbAbstraction.listDatabases();
         for (let i = 0; i < dbList.length; i++) {
             if (dbList[i].name === request.toDsName) {
@@ -948,6 +963,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
         console.log("Got exception: ", e);
         res.status(415).send(e);
     }
+    await dbAbstraction.destroy();
 });
 
 

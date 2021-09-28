@@ -197,6 +197,7 @@ class ExcelUtils {
         worksheet.autoFilter = hdrRange;
         worksheet.getRow(1).font = { name: 'Calibri', family: 4, size: 11, bold: true };
         await workbook.xlsx.writeFile(fileName);
+        await dbAbstraction.destroy();
     }
 
     async loadDataIntoDb (sheet, range, hdrs, keys, dsName, dsUser) {
@@ -279,7 +280,7 @@ class ExcelUtils {
         } catch (e) {
             console.log("Db metaData update error: ", e)
         }
-
+        await dbAbstraction.destroy();
         return { loadStatus: true, range, rangeIndices, hdrs }
     }
 
@@ -332,7 +333,7 @@ class ExcelUtils {
                 console.log("Db update error: ", e);
             }
         }
-
+        await dbAbstraction.destroy();
         return { loadStatus: true, range, rangeIndices, hdrs }
     }
 

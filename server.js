@@ -223,6 +223,8 @@ function dgUnlockForClient (clientId) {
             if (status) {
                 client.broadcast.emit('unlocked', unlocked);
             } // else, it is a stale 'unlock' !
+            client.removeAllListeners();
+            client.disconnect(true);
         });
 
     })
@@ -276,6 +278,8 @@ function loginAuthenticateForReact(req, res, next) {
 
 let dbAbstraction = new DbAbstraction();
 dbAbstraction.hello();
+
+//setTimeout(dbAbstraction.destroy, 5000);
 
 PrepAttachments.refreshAttachmentsIntoDb();
 

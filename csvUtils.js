@@ -86,6 +86,7 @@ class CsvUtils {
                         console.log("Db metaData update error: ", e)
                     }            
                     resolve ({ loadStatus: true, hdrs })
+                    await dbAbstraction.destroy();
                 });
 
         });   

@@ -9,6 +9,10 @@ class DbAbstraction {
         this.url = 'mongodb://localhost:27017';
         this.client = null;
     }
+    async destroy () {
+        await this.client.close(true);
+        this.client = null;
+    }
     async connect () {
         this.client = await MongoClient.connect(this.url, { useNewUrlParser: true, useUnifiedTopology: true })
             .catch(err => { console.log(err); this.client = null; });
