@@ -34,6 +34,7 @@ class CsvUtils {
                 if (dbList[i].name === dsName) {
                     console.log('Dataset name conflict');
                     reject ({ loadStatus: false, error: 'Dataset name conflict' });
+                    dbAbstraction.destroy();
                     return;
                 }
             }

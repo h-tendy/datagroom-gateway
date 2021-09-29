@@ -10,8 +10,10 @@ class DbAbstraction {
         this.client = null;
     }
     async destroy () {
-        await this.client.close(true);
-        this.client = null;
+        if (this.client) {
+            await this.client.close(true);
+            this.client = null;
+        }
     }
     async connect () {
         this.client = await MongoClient.connect(this.url, { useNewUrlParser: true, useUnifiedTopology: true })
