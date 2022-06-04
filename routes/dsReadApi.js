@@ -286,7 +286,7 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
 
 router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     let request = req.body;
-    console.log("In insertOrUpdateOneDoc: ", request);
+    //console.log("In insertOrUpdateOneDoc: ", request);
     //res.status(200).send({status: 'success'});
     //return;
     let dbAbstraction = new DbAbstraction();
@@ -298,7 +298,7 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
             request.doc._id = request.selectorObj._id;
         }
         let dbResponse = await dbAbstraction.update(request.dsName, "data", request.selectorObj, request.doc);
-        console.log ('insertOrUpdateOneDoc response: ', dbResponse);
+        //console.log ('insertOrUpdateOneDoc response: ', dbResponse);
         let response = {};
         if (dbResponse.result.ok == 1) {
             response.status = 'success';
