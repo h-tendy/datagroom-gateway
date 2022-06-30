@@ -7,7 +7,7 @@ let host = JiraSettings.host;
 var jira = new JiraApi(JiraSettings.settings);
 
 // Custom fields per installation
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791"];
+let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions"];
 
 // Must have 'Work-id' and 'Description' fields in the data-set. 
 // The keys for this dataset must include 'Work-id' for now. 
@@ -66,6 +66,12 @@ async function refreshJiraQuery (dsName, jiraConfig) {
                 rec.rzFeature = issue.fields.customfield_25791.value;
             else 
                 rec.rzFeature = "NotSet";
+            if (issue.fields.versions && issue.fields.versions.length) {
+                rec.versions = ""; 
+                for (let i = 0; i < issue.fields.versions.length; i++) {
+                    rec.versions += issue.fields.versions[i].name + ' ';
+                }
+            }
              // Use this for new field explorations.
             if (issue.fields.customfield_25588) {
                 console.log("\n\n\nGOT a non-null: ", issue.fields.customfield_25588);
@@ -73,7 +79,7 @@ async function refreshJiraQuery (dsName, jiraConfig) {
             }
             
             if (i == 0 ) { 
-                console.log(issue);
+                console.log(JSON.stringify(issue, null, 4));
                 console.log("Do figure out jira names: ", names)
             }
             resultRecords.push(rec);
@@ -144,7 +150,7 @@ function doJiraMapping (rec, jiraFieldMapping) {
 function defaultJiraMapping (rec) {
     let jiraUrl = "https://" + host; 
     let jiraKeyMapping = {'key': 'Work-id'}
-    let jiraContentMapping = {'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description'};
+    let jiraContentMapping = {'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description'};
     let selectorObj = {}, fullRec = {};
     selectorObj[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
     fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -167,7 +173,7 @@ async function markAsStale (dsName, jiraConfig) {
     let jiraUrl = "https://" + host; 
     let jiraFieldMapping; 
     if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
-        jiraFieldMapping = {'key': 'Work-id', 'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description'};
+        jiraFieldMapping = {'key': 'Work-id', 'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description'};
     } else { 
         jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
     }
