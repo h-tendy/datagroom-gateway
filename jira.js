@@ -7,7 +7,7 @@ let host = JiraSettings.host;
 var jira = new JiraApi(JiraSettings.settings);
 
 // Custom fields per installation
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions"];
+let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks"];
 
 // Must have 'Work-id' and 'Description' fields in the data-set. 
 // The keys for this dataset must include 'Work-id' for now. 
@@ -72,6 +72,110 @@ async function refreshJiraQuery (dsName, jiraConfig) {
                     rec.versions += issue.fields.versions[i].name + ' ';
                 }
             }
+            if (issue.fields.parent) {
+                rec.parent = issue.fields.parent.key;
+            } else {
+                rec.parent = "NotSet";
+            }
+            if (issue.fields.subtasks && issue.fields.subtasks.length) {
+                rec.subtasks = "[";
+                for (let i = 0; i < issue.fields.subtasks.length; i++) {
+                    rec.subtasks += issue.fields.subtasks[i].key;
+                    if (i + 1 < issue.fields.subtasks.length)
+                        rec.subtasks += ", ";
+                }
+                rec.subtasks += "]";
+            }
+            if (issue.fields.subtasks && issue.fields.subtasks.length) {
+                //rec.subtasksDetails = getSubTasksDetailsInTable(issue);
+                rec.subtasksDetails = getSubTasksDetailsInList(issue);
+            }
+            if (issue.fields.issuelinks && issue.fields.issuelinks.length) {
+                let name, details;
+
+                // Depends links
+                let dependsLinks = "";
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Depends", "inward");
+                if (name) {
+                    dependsLinks += details;
+                }
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Depends", "outward");
+                if (name) {
+                    dependsLinks += details;
+                }
+                if (dependsLinks !== "") 
+                    rec.dependsLinks = dependsLinks;
+
+                // Implement links
+                let implementLinks = "";
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Implement", "inward");
+                if (name) {
+                    implementLinks += details;
+                }
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Implement", "outward");
+                if (name) {
+                    implementLinks += details;
+                }
+                if (implementLinks !== "") 
+                    rec.implementLinks = implementLinks;
+
+                // Package links
+                let packageLinks = "";
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Package", "inward");
+                if (name) {
+                    packageLinks += details;
+                }
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Package", "outward");
+                if (name) {
+                    packageLinks += details;
+                }
+                if (packageLinks !== "") 
+                    rec.packageLinks = packageLinks;
+
+
+                // Relates links
+                let relatesLinks = "";
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Relates", "inward");
+                if (name) {
+                    relatesLinks += details;
+                }
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Relates", "outward");
+                if (name) {
+                    relatesLinks += details;
+                }
+                if (relatesLinks !== "") 
+                    rec.relatesLinks = relatesLinks;
+
+
+                // Test links
+                let testLinks = "";
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Test", "inward");
+                if (name) {
+                    testLinks += details;
+                }
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Test", "outward");
+                if (name) {
+                    testLinks += details;
+                }
+                if (testLinks !== "") 
+                    rec.testLinks = testLinks;
+
+
+                // Covers links
+                let coversLinks = "";
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Covers", "inward");
+                if (name) {
+                    coversLinks += details;
+                }
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Covers", "outward");
+                if (name) {
+                    coversLinks += details;
+                }
+                if (coversLinks !== "") 
+                    rec.coversLinks = coversLinks;
+
+
+            }
              // Use this for new field explorations.
             if (issue.fields.customfield_25588) {
                 console.log("\n\n\nGOT a non-null: ", issue.fields.customfield_25588);
@@ -79,6 +183,7 @@ async function refreshJiraQuery (dsName, jiraConfig) {
             }
             
             if (i == 0 ) { 
+            //if (true) {
                 console.log(JSON.stringify(issue, null, 4));
                 console.log("Do figure out jira names: ", names)
             }
@@ -133,13 +238,14 @@ function doJiraMapping (rec, jiraFieldMapping) {
     fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
 
     for (let key in jiraContentMapping) {
+        if (!rec[key]) continue;
         if (!fullRec[jiraContentMapping[key]]) {
             if (revContentMap[jiraContentMapping[key]] > 1)
                 fullRec[jiraContentMapping[key]] = `**${key}**: ${rec[key]}`;
             else 
                 fullRec[jiraContentMapping[key]] = rec[key];
         } else {
-            let ws = " ";
+            let ws = "<br>";
             let recValue = `**${key}**: ${rec[key]}`;
             fullRec[jiraContentMapping[key]] += ws + recValue;
         }
@@ -150,7 +256,8 @@ function doJiraMapping (rec, jiraFieldMapping) {
 function defaultJiraMapping (rec) {
     let jiraUrl = "https://" + host; 
     let jiraKeyMapping = {'key': 'Work-id'}
-    let jiraContentMapping = {'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description'};
+    // No need for "Details" links to appear here. 
+    let jiraContentMapping = {'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parent': 'Description', 'subtasks' : 'Description'};
     let selectorObj = {}, fullRec = {};
     selectorObj[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
     fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -161,6 +268,7 @@ function defaultJiraMapping (rec) {
             fullRec[jiraContentMapping[key]] = recValue;
         } else {
             let ws = " ";
+            ws = "\n\n";
             // XXX: Yuk, better way to insert the newlines. 
             if (key === "type") ws = "\n\n";
             fullRec[jiraContentMapping[key]] += ws + recValue;
@@ -173,7 +281,8 @@ async function markAsStale (dsName, jiraConfig) {
     let jiraUrl = "https://" + host; 
     let jiraFieldMapping; 
     if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
-        jiraFieldMapping = {'key': 'Work-id', 'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description'};
+        // No need for "Details" links to appear here. 
+        jiraFieldMapping = {'key': 'Work-id', 'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parent': 'Description', 'subtasks': 'Description'};
     } else { 
         jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
     }
@@ -232,6 +341,78 @@ async function markAsStale (dsName, jiraConfig) {
     await dbAbstraction.destroy();
 }
 
+
+function getSubTasksDetailsInTable (issue) {
+    let subtasksDetails = "";
+    if (issue.fields.subtasks && issue.fields.subtasks.length) {
+        subtasksDetails = "<table>";
+        subtasksDetails += "<tr>";
+        subtasksDetails += "<th>Key</th> <th>Type</th> <th>Summary</th> <th>Status</th> <th>Priority</th>"
+        subtasksDetails += "</tr>";
+        for (let i = 0; i < issue.fields.subtasks.length; i++) {
+            subtasksDetails += "<tr>";
+            subtasksDetails += "<td>" + issue.fields.subtasks[i].key + "</td>";
+            subtasksDetails += "<td>" + issue.fields.subtasks[i].fields.issuetype.name + "</td>";
+            subtasksDetails += "<td>" + issue.fields.subtasks[i].fields.summary + "</td>";
+            subtasksDetails += "<td>" + issue.fields.subtasks[i].fields.status.name + "</td>";
+            subtasksDetails += "<td>" + issue.fields.subtasks[i].fields.priority.name + "</td>";
+            subtasksDetails += "</tr>";
+        }
+        subtasksDetails += "</table>";
+    }
+    return subtasksDetails;
+}
+
+function getSubTasksDetailsInList (issue) {
+    let jiraUrl = "https://" + host; 
+    let subtasksDetails = "\n";
+    if (issue.fields.subtasks && issue.fields.subtasks.length) {
+        for (let i = 0; i < issue.fields.subtasks.length; i++) {
+            subtasksDetails += "1. [";
+            //subtasksDetails += issue.fields.subtasks[i].key + ", ";
+            subtasksDetails += `[${issue.fields.subtasks[i].key}](${jiraUrl + '/browse/' + issue.fields.subtasks[i].key}), `;
+            subtasksDetails += issue.fields.subtasks[i].fields.issuetype.name + ", ";
+            //subtasksDetails += `<span style="color: ${issue.fields.subtasks[i].fields.status.statusCategory.colorName}; background-color: lightgrey">${issue.fields.subtasks[i].fields.status.name}</span>` + ", ";
+            subtasksDetails += issue.fields.subtasks[i].fields.status.name + ", ";
+            subtasksDetails += issue.fields.subtasks[i].fields.priority.name + "] ";
+            subtasksDetails += issue.fields.subtasks[i].fields.summary + "\n";
+        }
+    }
+    return subtasksDetails + "\n";
+}
+
+function getIssueLinksInList (issueLinks, type, dir) {
+    let jiraUrl = "https://" + host; 
+    let details = "\n"; let dirName = "";
+    for (let i = 0; i < issueLinks.length; i++) {
+        if (issueLinks[i].type.name !== type)
+            continue;
+        if (dir == "inward" && !issueLinks[i].inwardIssue)
+            continue;
+        if (dir == "outward" && !issueLinks[i].outwardIssue)
+            continue;
+        let issue = null;
+        if (dir == "inward") {
+            dirName = issueLinks[i].type.inward;
+            issue = issueLinks[i].inwardIssue;
+        } else {
+            dirName = issueLinks[i].type.outward;
+            issue = issueLinks[i].outwardIssue;
+        }
+        details += "1. [";
+        details += `[${issue.key}](${jiraUrl + '/browse/' + issue.key}), `;
+        details += issue.fields.issuetype.name + ", ";
+        details += issue.fields.status.name + ", ";
+        details += issue.fields.priority.name + "] ";
+        details += issue.fields.summary + "\n";
+    }
+    if (details == "\n") {
+        details = "";
+    } else {
+        details = `<u>${dirName}</u>` + ":\n" + details + '\n\n';
+    }
+    return [dirName, details];
+}
 
 module.exports = {
     refreshJiraQuery
