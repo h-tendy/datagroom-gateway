@@ -20,6 +20,7 @@ async function refreshJiraQuery (dsName, jiraConfig) {
     let startAt = 0; let total = 0;
     let resultRecords = [];
     let names, results;
+    let jiraUrl = "https://" + host; 
 
     await markAsStale(dsName, jiraConfig);
     do {
@@ -34,7 +35,7 @@ async function refreshJiraQuery (dsName, jiraConfig) {
             rec.key = issue.key;
             rec.summary = issue.fields.summary;
             rec.type = issue.fields.issuetype.name;
-            rec.assignee = issue.fields.assignee.name;
+            rec.assignee = issue.fields.assignee ? issue.fields.assignee.name : "NotSet";
             rec.status = issue.fields.status.name;
             rec.priority = issue.fields.priority.name;
             rec.reporter = issue.fields.reporter.name;
@@ -73,7 +74,7 @@ async function refreshJiraQuery (dsName, jiraConfig) {
                 }
             }
             if (issue.fields.parent) {
-                rec.parent = issue.fields.parent.key;
+                rec.parent = `[${issue.fields.parent.key}](${jiraUrl + '/browse/' + issue.fields.parent.key})`
             } else {
                 rec.parent = "NotSet";
             }
@@ -174,6 +175,33 @@ async function refreshJiraQuery (dsName, jiraConfig) {
                 if (coversLinks !== "") 
                     rec.coversLinks = coversLinks;
 
+
+                // Defect links
+                let defectLinks = "";
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Defect", "inward");
+                if (name) {
+                    defectLinks += details;
+                }
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Defect", "outward");
+                if (name) {
+                    defectLinks += details;
+                }
+                if (defectLinks !== "") 
+                    rec.defectLinks = defectLinks;
+
+
+                // Automates links
+                let automatesLinks = "";
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Automates", "inward");
+                if (name) {
+                    automatesLinks += details;
+                }
+                [name, details] = getIssueLinksInList(issue.fields.issuelinks, "Automates", "outward");
+                if (name) {
+                    automatesLinks += details;
+                }
+                if (automatesLinks !== "") 
+                    rec.automatesLinks = automatesLinks;
 
             }
              // Use this for new field explorations.
