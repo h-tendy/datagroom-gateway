@@ -399,10 +399,19 @@ function getSubTasksDetailsInList (issue) {
             subtasksDetails += "1. [";
             //subtasksDetails += issue.fields.subtasks[i].key + ", ";
             subtasksDetails += `[${issue.fields.subtasks[i].key}](${jiraUrl + '/browse/' + issue.fields.subtasks[i].key}), `;
-            subtasksDetails += issue.fields.subtasks[i].fields.issuetype.name + ", ";
+            if (issue.fields.subtasks[i].fields.issuetype)
+                subtasksDetails += issue.fields.subtasks[i].fields.issuetype.name + ", ";
+            else 
+                subtasksDetails += ", ";
             //subtasksDetails += `<span style="color: ${issue.fields.subtasks[i].fields.status.statusCategory.colorName}; background-color: lightgrey">${issue.fields.subtasks[i].fields.status.name}</span>` + ", ";
-            subtasksDetails += issue.fields.subtasks[i].fields.status.name + ", ";
-            subtasksDetails += issue.fields.subtasks[i].fields.priority.name + "] ";
+            if (issue.fields.subtasks[i].fields.status)
+                subtasksDetails += issue.fields.subtasks[i].fields.status.name + ", ";
+            else 
+                subtasksDetails += ", ";
+            if (issue.fields.subtasks[i].fields.priority)
+                subtasksDetails += issue.fields.subtasks[i].fields.priority.name + "] ";
+            else 
+                subtasksDetails += ", ";
             subtasksDetails += issue.fields.subtasks[i].fields.summary + "\n";
         }
     }
@@ -429,9 +438,18 @@ function getIssueLinksInList (issueLinks, type, dir) {
         }
         details += "1. [";
         details += `[${issue.key}](${jiraUrl + '/browse/' + issue.key}), `;
-        details += issue.fields.issuetype.name + ", ";
-        details += issue.fields.status.name + ", ";
-        details += issue.fields.priority.name + "] ";
+        if (issue.fields.issuetype)
+            details += issue.fields.issuetype.name + ", ";
+        else 
+            detail += ", ";
+        if (issue.fields.status)
+            details += issue.fields.status.name + ", ";
+        else 
+            details += ", ";
+        if (issue.fields.priority)
+            details += issue.fields.priority.name + "] ";
+        else 
+            details += ", ";
         details += issue.fields.summary + "\n";
     }
     if (details == "\n") {
