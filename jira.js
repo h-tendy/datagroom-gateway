@@ -7,7 +7,7 @@ let host = JiraSettings.host;
 var jira = new JiraApi(JiraSettings.settings);
 
 // Custom fields per installation
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks"];
+let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570"];
 
 // Must have 'Work-id' and 'Description' fields in the data-set. 
 // The keys for this dataset must include 'Work-id' for now. 
@@ -39,6 +39,13 @@ async function refreshJiraQuery (dsName, jiraConfig) {
             rec.status = issue.fields.status.name;
             rec.priority = issue.fields.priority.name;
             rec.reporter = issue.fields.reporter.name;
+            if (issue.fields.votes)
+                rec.votes = issue.fields.votes.votes;
+            rec.updated = issue.fields.updated.split('T')[0];
+            if (issue.fields.customfield_25570)
+                rec.systemFeature = issue.fields.customfield_25570.value;
+            else 
+                rec.systemFeature = "NotSet";            
             if (issue.fields.customfield_11504)
                 rec.severity = issue.fields.customfield_11504.value;
             else 
