@@ -7,7 +7,7 @@ let host = JiraSettings.host;
 var jira = new JiraApi(JiraSettings.settings);
 
 // Custom fields per installation
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570"];
+let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels"];
 
 // Must have 'Work-id' and 'Description' fields in the data-set. 
 // The keys for this dataset must include 'Work-id' for now. 
@@ -74,6 +74,13 @@ async function refreshJiraQuery (dsName, jiraConfig) {
                 rec.rzFeature = issue.fields.customfield_25791.value;
             else 
                 rec.rzFeature = "NotSet";
+            if (issue.fields.labels && issue.fields.labels.length) {
+                rec.labels = ""; 
+                for (let i = 0; i < issue.fields.labels.length; i++) {
+                    rec.labels += issue.fields.labels[i];
+                    if (i + 1 < issue.fields.labels.length) rec.labels += ', '
+                }
+            }
             if (issue.fields.versions && issue.fields.versions.length) {
                 rec.versions = ""; 
                 for (let i = 0; i < issue.fields.versions.length; i++) {
