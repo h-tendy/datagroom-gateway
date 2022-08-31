@@ -16,7 +16,7 @@ class DbAbstraction {
         }
     }
     async connect () {
-        this.client = await MongoClient.connect(this.url, { useNewUrlParser: true, useUnifiedTopology: true })
+        this.client = await MongoClient.connect(this.url, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 5000 })
             .catch(err => { console.log(err); this.client = null; });
     }
     async createDb (dbName) {

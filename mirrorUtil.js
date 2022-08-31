@@ -83,11 +83,12 @@ async function doIt(fromUrl, toUrl) {
 // First, make sure no dbs are there in the destination. Use the below
 // if needed. Run this from in-debbld-33:~/datagroom-gateway
 // ~/nodejs/node-v14.17.3-linux-x64/bin/node mirrorUtil.js
+(async () => {
+    await deleteAll('mongodb://in-datagroom-vd:27017');
+    // Now copy everything. 
+    doIt('mongodb://in-mvlb52:27017', 'mongodb://in-datagroom-vd:27017');
+})()
 
-deleteAll('mongodb://in-datagroom-vd:27017');
-
-// Now copy everything. 
-doIt('mongodb://in-mvlb52:27017', 'mongodb://in-datagroom-vd:27017');
 
 // After this, do an 'scp' to copy all attachments. Do this as 'root' from 
 // in-mvlb52
