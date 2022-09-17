@@ -12,6 +12,7 @@ const DbAbstraction = require('./dbAbstraction');
 const ExcelUtils = require('./excelUtils');
 const Utils = require('./utils');
 const PrepAttachments = require('./prepAttachments');
+let fs = require('fs');
 
 const reactuiDir = path.resolve(__dirname, '../datagroom-ui/build');
 const config = {
@@ -36,8 +37,24 @@ if (process.argv.length >= 2) {
 
 
 const app = express();
-var httpServer = require('http').createServer(app);
-var io = require('socket.io')(httpServer, { pingTimeout: 60000 });
+var httpServer, io;
+try {
+    const dirPath = path.join(__dirname, '/ssl');
+    options = {
+        key: fs.readFileSync(dirPath + '/datagroom.key'),
+        cert: fs.readFileSync(dirPath + '/datagroom.pem')
+    };
+    httpServer = require('https').createServer(options, app);
+    io = require('socket.io')(httpServer, { pingTimeout: 60000 });
+    httpServer.listen(443);
+    console.log('https server listening on port : 443');
+} catch (e) {
+    console.log("Trouble with cert reading: ", e);
+    httpServer = require('http').createServer(app);
+    io = require('socket.io')(httpServer, { pingTimeout: 60000 });
+    httpServer.listen(config.express.port);
+    console.log('http server listening on port : ', config.express.port);    
+}
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(function (req, res, next) {
@@ -177,8 +194,6 @@ function dgUnlockForClient (clientId) {
         srv.timeout = 60 * 60 * 1000;
     })
     */
-    httpServer.listen(config.express.port);
-    console.log('Listening on port : ', config.express.port);
     io.on('connection', (client) => {
         console.log(`${Date()}: Client connected...`, client.id);
         client.on('Hello', function (helloObj) {
