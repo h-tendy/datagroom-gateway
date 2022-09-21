@@ -40,10 +40,16 @@ const app = express();
 var httpServer, io;
 try {
     const dirPath = path.join(__dirname, '/ssl');
-    options = {
+    let options = {
         key: fs.readFileSync(dirPath + '/datagroom.key'),
         cert: fs.readFileSync(dirPath + '/datagroom.pem')
     };
+    let ca = "";
+    try {
+        ca = fs.readFileSync(dirPath + '/ca.pem')
+    } catch (e) {}
+    if (ca) options.ca = ca;
+
     httpServer = require('https').createServer(options, app);
     io = require('socket.io')(httpServer, { pingTimeout: 60000 });
     httpServer.listen(443);
@@ -90,7 +96,7 @@ Utils.execCmdExecutor('mkdir uploads');
 const fileUpload = require('./routes/upload');
 app.use('/upload', fileUpload);
 const dsReadApi = require('./routes/dsReadApi');
-const { unlock } = require('./routes/upload');
+const { unlock, options } = require('./routes/upload');
 app.use('/ds', dsReadApi);
 const csvUpload = require('./routes/uploadCsv');
 app.use('/uploadCsv', csvUpload);
