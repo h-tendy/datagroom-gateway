@@ -61,6 +61,7 @@ try {
     httpServer.listen(config.express.port);
     console.log('http server listening on port : ', config.express.port);    
 }
+httpServer.timeout = 60 * 60 * 1000;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(function (req, res, next) {

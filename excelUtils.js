@@ -144,6 +144,7 @@ class ExcelUtils {
             return {loadStatus: false, error: `Max column count is ${columnCount}`};
             
         let hdrRow = this.workBook[sheet].rows[rangeIndices.fromRow];
+        console.log("hdrRow: ", JSON.stringify(hdrRow, null, 4));
         let hdrs = {}, hdrErrors = {}, loadStatus = true;
         for (let j = rangeIndices.fromCol; j <= rangeIndices.toCol; j++) {
             //hdrs[hdrRow[j]] = j;
@@ -262,7 +263,7 @@ class ExcelUtils {
             await dbAbstraction.update(dsName, "metaData", { _id: "perms" }, { owner: dsUser });
             await dbAbstraction.update(dsName, "metaData", { _id: "keys" }, { keys });
             let columnAttrs = [];
-            for (let i = 1; i <= Object.keys(hdrs).length; i++) {
+            for (let i = rangeIndices.fromCol; i <= rangeIndices.toCol; i++) {
                 let attrs = {};
                 attrs.field = hdrs[i];
                 attrs.title = hdrs[i];
