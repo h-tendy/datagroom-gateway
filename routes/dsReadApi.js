@@ -767,21 +767,31 @@ router.post('/doBulkEdit', async (req, res, next) => {
             let columns = viewDefault[0].columns, newColumns = {};
             let columnAttrs = viewDefault[0].columnAttrs, newColumnAttrs = [];
             let j = 1;
-            for (let i = 1; i <= Object.keys(columns).length; i++) {
-                if (columns[i] in delCols) continue;
-                newColumns[j] = columns[i]; j++;
+            /*
+                columns can be like this. Note that it doesn't start with '1'. 
+                This can happen when the table in xlsx is not in column 1. The names are 
+                what is important. newColumns will ensure that it starts with '1'. 
+                    {
+                    '2': 'Testcase_No',
+                    '3': 'Test case',
+                    }
+            */
+            let columnsKeys = Object.keys(columns);
+            for (let i = 0; i < columnsKeys.length; i++) {
+                if (columns[columnsKeys[i]] in delCols) continue;
+                newColumns[j] = columns[columnsKeys[i]]; j++;
                 // Explicitly make sure newColumnAttrs match the newColumns. 
                 // (helps in repairing any bugs here)
                 let found = false;
                 for (let k = 0; k < columnAttrs.length; k++) {
-                    if (columnAttrs[k].field !== columns[i]) continue;
+                    if (columnAttrs[k].field !== columns[columnsKeys[i]]) continue;
                     newColumnAttrs.push(columnAttrs[k]); found = true;
                     break;
                 }
                 if (!found) {
                     newColumnAttrs.push({                    
-                        field: columns[i],
-                        title: columns[i],
+                        field: columns[columnsKeys[i]],
+                        title: columns[columnsKeys[i]],
                         width: 150,
                         editor: "textarea",
                         editorParams: {},
@@ -801,7 +811,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
 
             let delColKeys = Object.keys(delCols);
             if (delColKeys.length) oprLog.push(`Deleting columns: ${JSON.stringify(delColKeys)}`);
-
+            console.log("New columns: ", JSON.stringify(newColumns, null, 4));
             if (request.doIt)
                 await dbAbstraction.update(request.dsName, "metaData", { _id: `view_default` }, { columns: newColumns, columnAttrs: newColumnAttrs, userColumnAttrs: viewDefault[0].userColumnAttrs } );
         }
