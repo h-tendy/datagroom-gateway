@@ -5,6 +5,8 @@ const fs = require('fs');
 const Jira = require('../jira');
 const Utils = require('../utils');
 const PrepAttachments = require('../prepAttachments');
+const AclCheck = require('../acl');
+const MongoFilters = require('./mongoFilters');
 const { ObjectId } = require('mongodb');
 
 router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
@@ -12,6 +14,11 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     console.log("In columns: ", req.params);
     console.log("In columns: ", req.query);
 
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser);
+    if (!allowed) {
+        res.status(200).json({ });
+        return
+    }
     // XXX: Do lots of validation.
     let dbAbstraction = new DbAbstraction();
     let response = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `view_${req.params.dsView}` }, {} );
@@ -28,13 +35,17 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let filters = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `filters` }, {} );
     console.log("Filters: ", filters);
     filters = filters[0]
+    let aclConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `aclConfig` }, {} );
+    console.log("aclConfig: ", aclConfig);
+    if (aclConfig.length)
+        aclConfig = aclConfig[0]
     try {
         if (Object.keys(response[0].columnAttrs).length == 0 || response[0].columnAttrs.length == 0) {
             // Do something here and set the columnAttrs?
         }
     } catch (e) {};
     await dbAbstraction.destroy();
-    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs });
+    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig });
     return;
 });
 
@@ -49,20 +60,22 @@ async function pager (req, res, collectionName) {
     console.log("In pager: ", req.params);
     console.log("In pager: ", query);
     console.log("In pager, collectionName:", collectionName)
-    let filters = {}; sorters = [];
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser);
+    if (!allowed) {
+        res.status(200).json({ });
+        return
+    }
+    let filters = {}, orFilters = [], andFilters = [], sorters = [];
     try {
         query.filters.map((v) => {
             if (v.type === 'like') {
-                let regex = v.value, negate = false;
-                let m = regex.match(/^\s*!(.*)$/);
-                if (m && m.length >= 1) {
-                    negate = true;
-                    regex = m[1];
-                }
-                if (negate) {
-                    filters[v.field] = { $not: {$regex: `${regex}`, $options: 'i'} };
+                let filter = MongoFilters.getFilters(v.value, v.field);
+                if (filter["$or"]) {
+                    orFilters.push(...filter["$or"]);
+                } else if (filter["$and"]) {
+                    andFilters.push(...filter["$and"]);
                 } else {
-                    filters[v.field] = {$regex: `${regex}`, $options: 'i'};
+                    filters[v.field] = MongoFilters.getFilters(v.value, v.field);
                 }
             } else if (v.type === '=') {
                 let numVal = Number(v.value);
@@ -77,6 +90,10 @@ async function pager (req, res, collectionName) {
             }*/
         })
     } catch (e) {}
+    if (orFilters.length)
+        filters["$or"] = orFilters; 
+    if (andFilters.length) 
+        filters["$and"] = andFilters;
     try {
         query.sorters.map((v) => {
             let f = [];
@@ -95,7 +112,7 @@ async function pager (req, res, collectionName) {
         sorters.push(f);
     }
     // XXX: Do lots of validation.
-    console.log("mongo filters: ", filters);
+    console.log("mongo filters: ", JSON.stringify(filters, null, 4));
     console.log("mongo sorters: ", sorters)
     let options = {};
     if (sorters.length)
@@ -104,37 +121,60 @@ async function pager (req, res, collectionName) {
     let response = {};
     try {
         response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(query.page), parseInt(query.per_page) );
-    } catch (e) {}
+    } catch (e) {
+        console.log("Exception in pager: ", e);
+    }
     await dbAbstraction.destroy();
     res.status(200).json(response);
 }
 
-router.get('/view/:dsName', async (req, res, next) => {
+router.get('/view/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "data");
 });
 
-// To ensure no conflicts
+// To ensure no conflicts. Retaining this for backward compatibility for APIs. 
+// This will only work when there is no ACL for the dataset. 
 router.post('/viewViaPost/:dsName', async (req, res, next) => {
     await pager(req, res, "data");
 });
 
-router.get('/view/editLog/:dsName', async (req, res, next) => {
+// Use this for ACL enabled dataset via APIs. 
+router.post('/viewViaPost/:dsName/:dsView/:dsUser', async (req, res, next) => {
+    await pager(req, res, "data");
+});
+
+
+router.get('/view/editLog/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "editlog");
 });
 
-// To ensure no conflicts
+// To ensure no conflicts. Retaining this for backward compatibility for APIs. 
+// This will only work when there is no ACL for the dataset. 
 router.post('/viewViaPost/editLog/:dsName', async (req, res, next) => {
     await pager(req, res, "editlog");
 });
 
-router.get('/view/attachments/:dsName', async (req, res, next) => {
+// Use this for ACL enabled dataset via APIs. 
+router.post('/viewViaPost/editLog/:dsName/:dsView/:dsUser', async (req, res, next) => {
+    await pager(req, res, "editlog");
+});
+
+
+router.get('/view/attachments/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "attachments");
 });
 
-// To ensure no conflicts
+// To ensure no conflicts. Retaining this for backward compatibility for APIs. 
+// This will only work when there is no ACL for the dataset. 
 router.post('/viewViaPost/attachments/:dsName', async (req, res, next) => {
     await pager(req, res, "attachments");
 });
+
+// Use this for ACL enabled dataset via APIs. 
+router.post('/viewViaPost/attachments/:dsName/:dsView/:dsUser', async (req, res, next) => {
+    await pager(req, res, "attachments");
+});
+
 
 function getSingleEditLog (req, isKey, status) {
     let selectorObj = JSON.parse(JSON.stringify(req.selectorObj));
@@ -183,6 +223,11 @@ function getDeleteLog (req, _doc, status) {
 router.post('/view/editSingleAttribute', async (req, res, next) => {
     let request = req.body;
     console.log("In editSingleAttribute: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
@@ -250,6 +295,11 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
 router.post('/view/insertOneDoc', async (req, res, next) => {
     let request = req.body;
     console.log("In insertOneDoc: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
@@ -289,6 +339,11 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     //console.log("In insertOrUpdateOneDoc: ", request);
     //res.status(200).send({status: 'success'});
     //return;
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
@@ -334,6 +389,12 @@ router.get('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
     console.log("In downloadXlsx: ", req.params);
     console.log("In downloadXlsx: ", req.query);
 
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
+
     let fileName = `export_${req.params.dsName}_${req.params.dsView}_${req.params.dsUser}.xlsx`
     await ExcelUtils.exportDataFromDbIntoXlsx(req.params.dsName, req.params.dsView, req.params.dsUser, fileName);
     try {
@@ -361,6 +422,12 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
         let j = sysDbs.indexOf(dbList[i].name);
         if (j > -1)
             continue;
+
+        let aclConfig = await dbAbstraction.find(dbList[i].name, 'metaData', { _id: "aclConfig" });
+        aclConfig = aclConfig[0];
+        if (aclConfig && aclConfig.accessCtrl && !aclConfig.acl.includes(req.params.dsUser)) {
+            continue;
+        }
         pruned.push(dbList[i]);
     }
     for (let i = 0; i < pruned.length; i++) {
@@ -375,6 +442,11 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
 router.post('/deleteDs', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteDs: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
@@ -394,6 +466,12 @@ router.post('/deleteDs', async (req, res, next) => {
 router.post('/view/deleteOneDoc', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteOneDoc: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
+
     let deletedObj = {};
     let dbAbstraction = new DbAbstraction();
     try {
@@ -427,6 +505,11 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
     console.log("In deleteManyDocs: ", request);
     //res.status(200).send({status: 'success'});
     //return;
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let deletedObj = {};
     let dbAbstraction = new DbAbstraction();
     try {
@@ -458,6 +541,11 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
 router.post('/view/setViewDefinitions', async (req, res, next) => {
     let request = req.body;
     console.log("In setViewDefinitions: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
@@ -475,6 +563,17 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "otherTableAttrs" }, { ...request.otherTableAttrs });
             console.log("Add otherTableAttrs status: ", dbResponse.result);
         }
+        if (request.aclConfig) {
+            if (!request.aclConfig.acl.includes(request.dsUser)) {
+                console.log("dsUser is not present in aclConfig, adding: ", request.dsUser);
+                request.aclConfig.acl.push(request.dsUser);
+            }
+            dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "aclConfig" }, { ...request.aclConfig });
+            console.log("Add aclConfig status: ", dbResponse.result);
+        } else {
+            dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "aclConfig" });
+            console.log("Remove aclConfig status: ", dbResponse);
+        }
         //let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", request.selectorObj);
         //console.log ('db update response: ', dbResponse);
         let response = {};
@@ -490,6 +589,11 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
 router.post('/view/refreshJira', async (req, res, next) => {
     let request = req.body;
     console.log("In refreshJira: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let deletedObj = {};
     let dbAbstraction = new DbAbstraction();
     try {
@@ -516,6 +620,11 @@ router.post('/view/refreshJira', async (req, res, next) => {
 router.post('/view/addFilter', async (req, res, next) => {
     let request = req.body;
     console.log("In addFilter: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
@@ -557,6 +666,11 @@ router.post('/view/addFilter', async (req, res, next) => {
 router.post('/view/editFilter', async (req, res, next) => {
     let request = req.body;
     console.log("In editFilter: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
@@ -596,6 +710,11 @@ router.post('/view/editFilter', async (req, res, next) => {
 router.post('/view/deleteFilter', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteFilter: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
@@ -639,6 +758,11 @@ router.post('/view/deleteFilter', async (req, res, next) => {
 router.post('/doBulkEdit', async (req, res, next) => {
     let request = req.body;
     console.log("In doBulkEdit: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         let excelUtils = await ExcelUtils.getExcelUtilsForFile("uploads/" + request.fileName);
@@ -930,6 +1054,11 @@ router.post('/doBulkEdit', async (req, res, next) => {
 router.post('/createDsFromDs', async (req, res, next) => {
     let request = req.body;
     console.log("In createDsFromDs:", request);
+    let allowed = await AclCheck.aclCheck(request.fromDsName, "", request.dsUser);
+    if (!allowed) {
+        res.status(415).json({ });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
@@ -967,6 +1096,12 @@ router.post('/createDsFromDs', async (req, res, next) => {
         }
         // Change owner to current user...
         await dbAbstraction.update(request.toDsName, "metaData", { _id: "perms" }, { owner: request.dsUser });
+        let aclConfig = await dbAbstraction.find(request.toDsName, "metaData", { _id: `aclConfig` }, {} );
+        aclConfig = aclConfig[0];
+        if (!aclConfig.acl.includes(request.dsUser)) {
+            aclConfig.acl.push(dsUser);
+            dbResponse = await dbAbstraction.update(request.toDsName, "metaData", { _id: "aclConfig" }, { ...aclConfig });
+        }
 
         res.status(200).send({createStatus: true});
     } catch (e) {
