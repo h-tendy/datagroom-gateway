@@ -1098,7 +1098,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
         await dbAbstraction.update(request.toDsName, "metaData", { _id: "perms" }, { owner: request.dsUser });
         let aclConfig = await dbAbstraction.find(request.toDsName, "metaData", { _id: `aclConfig` }, {} );
         aclConfig = aclConfig[0];
-        if (!aclConfig.acl.includes(request.dsUser)) {
+        if (aclConfig && !aclConfig.acl.includes(request.dsUser)) {
             aclConfig.acl.push(dsUser);
             dbResponse = await dbAbstraction.update(request.toDsName, "metaData", { _id: "aclConfig" }, { ...aclConfig });
         }
