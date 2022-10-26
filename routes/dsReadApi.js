@@ -49,25 +49,10 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     return;
 });
 
-async function pager (req, res, collectionName) {
-    let request = req.body;
-    let query;
-    if (req.method === 'GET')
-        query = req.query;
-    else
-        query = request;
-    //console.log("In pager, req:", req);
-    console.log("In pager: ", req.params);
-    console.log("In pager: ", query);
-    console.log("In pager, collectionName:", collectionName)
-    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser);
-    if (!allowed) {
-        res.status(200).json({ });
-        return
-    }
+function getMongoFiltersAndSorters (qFilters, qSorters, qChronology) {
     let filters = {}, orFilters = [], andFilters = [], sorters = [];
     try {
-        query.filters.map((v) => {
+        qFilters.map((v) => {
             if (v.type === 'like') {
                 let filter = MongoFilters.getFilters(v.value, v.field);
                 if (filter["$or"]) {
@@ -95,7 +80,7 @@ async function pager (req, res, collectionName) {
     if (andFilters.length) 
         filters["$and"] = andFilters;
     try {
-        query.sorters.map((v) => {
+        qSorters.map((v) => {
             let f = [];
             f.push(v.field); f.push(v.dir);
             sorters.push(f);
@@ -105,12 +90,34 @@ async function pager (req, res, collectionName) {
     if (!sorters.length) {
         let f = []
         f.push('_id'); 
-        if (query.chronology)
-            f.push(query.chronology);
+        if (qChronology)
+            f.push(qChronology);
         else 
             f.push('desc');
         sorters.push(f);
     }
+
+    return [filters, sorters]
+}
+
+async function pager (req, res, collectionName) {
+    let request = req.body;
+    let query;
+    if (req.method === 'GET')
+        query = req.query;
+    else
+        query = request;
+    //console.log("In pager, req:", req);
+    console.log("In pager: ", req.params);
+    console.log("In pager: ", query);
+    console.log("In pager, collectionName:", collectionName)
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser);
+    if (!allowed) {
+        res.status(200).json({ });
+        return
+    }
+    let [filters, sorters] = getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
+
     // XXX: Do lots of validation.
     console.log("mongo filters: ", JSON.stringify(filters, null, 4));
     console.log("mongo sorters: ", sorters)
@@ -174,6 +181,42 @@ router.post('/viewViaPost/attachments/:dsName', async (req, res, next) => {
 router.post('/viewViaPost/attachments/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "attachments");
 });
+
+router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) => {
+    let request = req.body;
+    let query = req.query;
+    console.log("In deleteFromQuery: ", req.params);
+    console.log("In deleteFromQuery: ", query);
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser);
+    if (!allowed) {
+        res.status(200).json({ });
+        return
+    }
+    let [filters, sorters] = getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
+    console.log("mongo filters in deleteFromQuery: ", JSON.stringify(filters, null, 4));
+    console.log("mongo sorters in deleteFromQuery: ", sorters)
+    let options = {};
+    if (sorters.length)
+        options.sort = sorters;
+    let dbAbstraction = new DbAbstraction();
+    let response = {};
+    try {
+        response = await dbAbstraction.pagedFind(req.params.dsName, "data", filters, options, parseInt(1), parseInt(25) );
+    } catch (e) {
+        console.log("Exception in pager: ", e);
+    }
+    if (query.pretend == 'false' || query.pretend == false) {
+        let count = 0;
+        count = await dbAbstraction.removeFromQuery(req.params.dsName, "data", filters, options);
+        response = {};
+        response.count = count;
+    }
+
+    await dbAbstraction.destroy();
+    console.log("Response in deleteFromQuery: ", response);
+    res.status(200).json(response);
+});
+
 
 
 function getSingleEditLog (req, isKey, status) {

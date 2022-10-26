@@ -187,6 +187,21 @@ class DbAbstraction {
         })
     }
 
+    async removeFromQuery(dbName, tableName, query, options) {
+        if (! this.client ) await this.connect();
+        let db = this.client.db(dbName);
+        let collection = db.collection(tableName);
+        let count = 0;
+        const cursor = collection.find(query, options);
+        for await (let doc of cursor) {
+            let selector = {};
+            selector._id = doc._id;
+            await collection.deleteOne(selector);
+            count++
+        }
+        return count;
+    }
+
     async pagedFind (dbName, tableName, query, options, page, limit) {
         let skip = limit * (page - 1);
         let findOptions = { ...options, limit, skip };
