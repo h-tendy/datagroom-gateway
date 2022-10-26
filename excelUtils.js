@@ -161,11 +161,13 @@ class ExcelUtils {
     static async exportDataFromDbIntoXlsx (dsName, dsView, dsUser, fileName) {
         let dbAbstraction = new DbAbstraction();
         let dbRes = await dbAbstraction.find(dsName, "metaData", { _id: `view_${dsView}` }, {} );
-        //console.log(dbRes[0].columns);
-        let projection = {}, hdrs = [];
-        for (let i = 0; i < Object.keys(dbRes[0].columns).length; i++) {
-            projection[dbRes[0].columns[i+1]] = 1;
-            let hdr = { header: dbRes[0].columns[i+1], key: dbRes[0].columns[i+1], width: 15 };
+        dbRes = dbRes[0];
+        //console.log(dbRes.columns);
+        let projection = {}, hdrs = [], columnKeys = Object.keys(dbRes.columns);
+        for (let i = 0; i < columnKeys.length; i++) {
+            let column = dbRes.columns[columnKeys[i]]; 
+            projection[ column ] = 1;
+            let hdr = { header: column, key: column, width: 15 };
             hdrs.push(hdr);
         }
         console.log("Hdrs: ", hdrs, "Projection: ", projection);
@@ -189,14 +191,38 @@ class ExcelUtils {
             return code;
         }
         let cellAddr;
-        for (let i = 0; i < Object.keys(dbRes[0].columns).length; i++) {
-            cellAddr = translateIdToColumn(i+1);
+        for (let i = 0; i < columnKeys.length; i++) {
+            cellAddr = translateIdToColumn(columnKeys[i]);
             cellAddr += "1"
             worksheet.getCell(cellAddr).fill = { type: 'pattern', pattern: 'solid', fgColor: {argb: 'FF8b8b00'}, /*bgColor: {argb: '800000FF'}*/};
         }
         let hdrRange = `A1:${cellAddr}`
         worksheet.autoFilter = hdrRange;
         worksheet.getRow(1).font = { name: 'Calibri', family: 4, size: 11, bold: true };
+
+        const viewSheet = workbook.addWorksheet(`view_${dsView}`);
+        viewSheet.getCell("A1").value = JSON.stringify(dbRes, null, 4);
+
+        const descSheet = workbook.addWorksheet(`dsDescription`);
+        let dsDesc = await dbAbstraction.find(dsName, "metaData", { _id: `dsDescription` }, {} );
+        dsDesc = dsDesc[0];
+        descSheet.getCell("A1").value = JSON.stringify(dsDesc, null, 4);
+
+        const otherSheet = workbook.addWorksheet(`otherTableAttrs`);
+        let other = await dbAbstraction.find(dsName, "metaData", { _id: `otherTableAttrs` }, {} );
+        other = other[0];
+        otherSheet.getCell("A1").value = JSON.stringify(other, null, 4);
+
+        const filterSheet = workbook.addWorksheet(`filters`);
+        let filters = await dbAbstraction.find(dsName, "metaData", { _id: `filters` }, {} );
+        filters = filters[0];
+        filterSheet.getCell("A1").value = JSON.stringify(filters, null, 4);
+
+        const aclSheet = workbook.addWorksheet(`aclConfig`);
+        let aclConfig = await dbAbstraction.find(dsName, "metaData", { _id: `aclConfig` }, {} );
+        aclConfig = aclConfig[0];
+        aclSheet.getCell("A1").value = JSON.stringify(aclConfig, null, 4);
+
         await workbook.xlsx.writeFile(fileName);
         await dbAbstraction.destroy();
     }
@@ -262,22 +288,53 @@ class ExcelUtils {
         try {
             await dbAbstraction.update(dsName, "metaData", { _id: "perms" }, { owner: dsUser });
             await dbAbstraction.update(dsName, "metaData", { _id: "keys" }, { keys });
-            let columnAttrs = [];
-            for (let i = rangeIndices.fromCol; i <= rangeIndices.toCol; i++) {
-                let attrs = {};
-                attrs.field = hdrs[i];
-                attrs.title = hdrs[i];
-                attrs.width = 150;
-                attrs.editor = "textarea";
-                attrs.editorParams = {};
-                attrs.formatter = "textarea";
-                attrs.headerFilterType = "input";
-                attrs.hozAlign = "center";
-                attrs.vertAlign = "middle";
-                attrs.headerTooltip = true;
-                columnAttrs.push(attrs);
+            if (this.wBook.getWorksheet("view_default")) {
+                let value = this.wBook.getWorksheet("view_default").getCell("A1").value;
+                value = JSON.parse(value);
+                delete value._id;
+                await dbAbstraction.update(dsName, "metaData", { _id: "view_default" }, value);
+            } else {
+                let columnAttrs = [];
+                for (let i = rangeIndices.fromCol; i <= rangeIndices.toCol; i++) {
+                    let attrs = {};
+                    attrs.field = hdrs[i];
+                    attrs.title = hdrs[i];
+                    attrs.width = 150;
+                    attrs.editor = "textarea";
+                    attrs.editorParams = {};
+                    attrs.formatter = "textarea";
+                    attrs.headerFilterType = "input";
+                    attrs.hozAlign = "center";
+                    attrs.vertAlign = "middle";
+                    attrs.headerTooltip = true;
+                    columnAttrs.push(attrs);
+                }
+                await dbAbstraction.update(dsName, "metaData", { _id: `view_default` }, { columns: hdrs, columnAttrs, userColumnAttrs: { } } );
             }
-            await dbAbstraction.update(dsName, "metaData", { _id: `view_default` }, { columns: hdrs, columnAttrs, userColumnAttrs: { } } );
+            if (this.wBook.getWorksheet("dsDescription")) {
+                let value = this.wBook.getWorksheet("dsDescription").getCell("A1").value;
+                value = JSON.parse(value);
+                delete value._id;
+                await dbAbstraction.update(dsName, "metaData", { _id: "dsDescription" }, value);
+            }
+            if (this.wBook.getWorksheet("otherTableAttrs")) {
+                let value = this.wBook.getWorksheet("otherTableAttrs").getCell("A1").value;
+                value = JSON.parse(value);
+                delete value._id;
+                await dbAbstraction.update(dsName, "metaData", { _id: "otherTableAttrs" }, value);
+            }
+            if (this.wBook.getWorksheet("filters")) {
+                let value = this.wBook.getWorksheet("filters").getCell("A1").value;
+                value = JSON.parse(value);
+                delete value._id;
+                await dbAbstraction.update(dsName, "metaData", { _id: "filters" }, value);
+            }
+            if (this.wBook.getWorksheet("aclConfig")) {
+                let value = this.wBook.getWorksheet("aclConfig").getCell("A1").value;
+                value = JSON.parse(value);
+                delete value._id;
+                await dbAbstraction.update(dsName, "metaData", { _id: "aclConfig" }, value);
+            }
         } catch (e) {
             console.log("Db metaData update error: ", e)
         }
