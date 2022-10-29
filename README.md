@@ -57,13 +57,17 @@ Bulk editing features are now available. Yet to be documented
 
 ## Installation
 
-1. Install `MongoDb` community edition.
+1. Install `MongoDb` community edition, if you want local installation. In case of cloud `MongoDb` installation. Follow the following steps:-
+    * Make a new `project` and a new empty `cluster` inside that project on mongodb atlas.
+    * For the newly connected `cluster`. Click on `connect -> connect your application` and copy the url. Sample url:- mongodb+srv://<username>:<password>@<clusterName>.onvfm2f.mongodb.net/?retryWrites=true&w=majority
+    * Now go to `database access` option and add new user with the same username which will be used for login to datagroom. (In case of ldap server, it will be org username. For others, create a `guest` user.). Give the user `readWriteAnyDatabase` permission.
+    * Now go to `network access` option and add the ip address of the server where datagroom-gateway will run. Or, otherwise allow access from anywhere.
 
-1. git clone the `datagroom-gateway` and `datagroom-ui` repos to the same machine where mongodb is installed. If that is on a different machine, take a look at `dbAbstraction.js` and tweak the `this.url` variable.
-
-1. Start server: `cd datagroom-gateway; node ./server.js disableAD=true`. Login as `guest` with `guest` as password. If you want active-directory integration, update the configuration in `ldapSettings.js`. (`node ./server.js` if you have updated `ldapSettings.js`) If you want to use the JIRA plug-in, update the configuration in `jiraSettings.js`. 
+1. git clone the `datagroom-gateway` and `datagroom-ui` repos. If all of the repos and the mongodb installation is on the same machine, go to next step. Otherwise, in `datagroom-gateway`, add one .env file and update it with key `DATABASE` and value as the the mongodb server url.
 
 1. Build react-ui by doing `cd datagroom-ui; npm run build`. Note that `datagroom-gateway` and `datagroom-ui` should be at the same level because `datagroom-gateway` serves the files built in `datagroom-ui`. 
+
+1. Start server: `cd datagroom-gateway; node ./server.js disableAD=true`. Login as `guest` with `guest` as password. If you want active-directory integration, update the configuration in `ldapSettings.js`. (`node ./server.js` if you have updated `ldapSettings.js`) If you want to use the JIRA plug-in, update the configuration in `jiraSettings.js`. 
 
 1. Open a browser and navigate to `localhost:8887` 
 
