@@ -63,7 +63,7 @@ Bulk editing features are now available. Yet to be documented
     * Now go to `database access` option and add new user with the same username which will be used for login to datagroom. (In case of ldap server, it will be org username. For others, create a `guest` user.). Give the user `readWriteAnyDatabase` permission.
     * Now go to `network access` option and add the ip address of the server where datagroom-gateway will run. Or, otherwise allow access from anywhere.
 
-1. git clone the `datagroom-gateway` and `datagroom-ui` repos. If all of the repos and the mongodb installation is on the same machine, go to next step. Otherwise, in `datagroom-gateway`, add one .env file and update it with key `DATABASE` and value as the the mongodb server url.
+1. git clone the `datagroom-gateway` and `datagroom-ui` repos. If all of the repos and the mongodb installation is on the same machine, go to next step. Otherwise, in `datagroom-gateway`, add one .env file and update it with key `DATABASE` and value as the the mongodb server url. Alternatively, you can tweak `this.url` in `dbAbstraction.js` directly if url doesn't consist any sensitive information.
 
 1. Build react-ui by doing `cd datagroom-ui; npm run build`. Note that `datagroom-gateway` and `datagroom-ui` should be at the same level because `datagroom-gateway` serves the files built in `datagroom-ui`. 
 
