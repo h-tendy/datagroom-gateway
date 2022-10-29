@@ -6,7 +6,7 @@ var ObjectId = require('mongodb').ObjectId;
 
 class DbAbstraction {
     constructor () {
-        this.url = 'mongodb://localhost:27017';
+        this.url = process.env.DATABASE;
         this.client = null;
     }
     async destroy () {
