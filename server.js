@@ -13,6 +13,9 @@ const ExcelUtils = require('./excelUtils');
 const Utils = require('./utils');
 const PrepAttachments = require('./prepAttachments');
 let fs = require('fs');
+const dotenv = require('dotenv')
+
+dotenv.config({ path: './.env' })
 
 const reactuiDir = path.resolve(__dirname, '../datagroom-ui/build');
 const config = {
