@@ -320,14 +320,18 @@ class ExcelUtils {
             if (this.wBook.getWorksheet("otherTableAttrs")) {
                 let value = this.wBook.getWorksheet("otherTableAttrs").getCell("A1").value;
                 value = JSON.parse(value);
-                delete value._id;
-                await dbAbstraction.update(dsName, "metaData", { _id: "otherTableAttrs" }, value);
+                if (value) {
+                    delete value._id;
+                    await dbAbstraction.update(dsName, "metaData", { _id: "otherTableAttrs" }, value);
+                }
             }
             if (this.wBook.getWorksheet("filters")) {
                 let value = this.wBook.getWorksheet("filters").getCell("A1").value;
                 value = JSON.parse(value);
-                delete value._id;
-                await dbAbstraction.update(dsName, "metaData", { _id: "filters" }, value);
+                if (value) {
+                    delete value._id;
+                    await dbAbstraction.update(dsName, "metaData", { _id: "filters" }, value);
+                }
             }
             if (this.wBook.getWorksheet("aclConfig")) {
                 let value = this.wBook.getWorksheet("aclConfig").getCell("A1").value;
