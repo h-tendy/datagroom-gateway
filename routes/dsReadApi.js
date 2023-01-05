@@ -128,6 +128,7 @@ async function pager (req, res, collectionName) {
     let response = {};
     try {
         response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(query.page), parseInt(query.per_page) );
+        response.reqCount = query.reqCount || 0;
     } catch (e) {
         console.log("Exception in pager: ", e);
     }
