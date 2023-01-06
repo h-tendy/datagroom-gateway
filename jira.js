@@ -7,7 +7,7 @@ let host = JiraSettings.host;
 var jira = new JiraApi(JiraSettings.settings);
 
 // Custom fields per installation
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels"];
+let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created",  "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518"];
 
 // Must have 'Work-id' and 'Description' fields in the data-set. 
 // The keys for this dataset must include 'Work-id' for now. 
@@ -74,6 +74,14 @@ async function refreshJiraQuery (dsName, jiraConfig) {
                 rec.rzFeature = issue.fields.customfield_25791.value;
             else 
                 rec.rzFeature = "NotSet";
+            if (issue.fields.customfield_25693)
+                rec.phaseBugIntroduced = issue.fields.customfield_25693.value;
+            else 
+                rec.phaseBugIntroduced = "NotSet";
+            if (issue.fields.customfield_25518)
+                rec.phaseBugFound = issue.fields.customfield_25518.value;
+            else 
+                rec.phaseBugFound = "NotSet";
             if (issue.fields.labels && issue.fields.labels.length) {
                 rec.labels = ""; 
                 for (let i = 0; i < issue.fields.labels.length; i++) {
@@ -299,7 +307,7 @@ function defaultJiraMapping (rec) {
     let jiraUrl = "https://" + host; 
     let jiraKeyMapping = {'key': 'Work-id'}
     // No need for "Details" links to appear here. 
-    let jiraContentMapping = {'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parent': 'Description', 'subtasks' : 'Description'};
+    let jiraContentMapping = {'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parent': 'Description', 'subtasks' : 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description'};
     let selectorObj = {}, fullRec = {};
     selectorObj[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
     fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -324,7 +332,7 @@ async function markAsStale (dsName, jiraConfig) {
     let jiraFieldMapping; 
     if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
         // No need for "Details" links to appear here. 
-        jiraFieldMapping = {'key': 'Work-id', 'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parent': 'Description', 'subtasks': 'Description'};
+        jiraFieldMapping = {'key': 'Work-id', 'summary' : 'Description', 'type' : 'Description', 'assignee' : 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status' : 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description'};
     } else { 
         jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
     }

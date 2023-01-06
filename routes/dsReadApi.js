@@ -608,7 +608,7 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
             console.log("Add otherTableAttrs status: ", dbResponse.result);
         }
         if (request.aclConfig) {
-            if (request.aclConfig.acl == "") {
+            if (typeof request.aclConfig.acl === "string") {
                 request.aclConfig.acl = [];
             }
             if (!request.aclConfig.acl.includes(request.dsUser)) {
