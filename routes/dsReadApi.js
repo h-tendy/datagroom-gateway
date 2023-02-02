@@ -27,6 +27,8 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     console.log(keys[0]);
     let jiraConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraConfig` }, {} );
     jiraConfig = jiraConfig[0]
+    let jiraAgileConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraAgileConfig` }, {});
+    jiraAgileConfig = jiraAgileConfig[0]
     let dsDescription = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `dsDescription` }, {} );
     dsDescription = dsDescription[0]
     let otherTableAttrs = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `otherTableAttrs` }, {} );
@@ -45,7 +47,7 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
         }
     } catch (e) {};
     await dbAbstraction.destroy();
-    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig });
+    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig, jiraAgileConfig });
     return;
 });
 
@@ -600,6 +602,13 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         } else {
             dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "jiraConfig" });
             console.log("Remove jiraConfig status: ", dbResponse);
+        }
+        if (request.jiraAgileConfig) {
+            dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraAgileConfig" }, { ...request.jiraAgileConfig });
+            console.log("Add jiraAgileConfig status: ", dbResponse.result);
+        } else {
+            dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "jiraAgileConfig" });
+            console.log("Remove jiraAgileConfig status: ", dbResponse);
         }
         dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "dsDescription" }, { ...request.dsDescription });
         console.log("Update dsDescription status: ", dbResponse.result);
