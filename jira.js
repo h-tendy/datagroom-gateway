@@ -7,7 +7,7 @@ let host = JiraSettings.host;
 var jira = new JiraApi(JiraSettings.settings);
 
 // Custom fields per installation
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parentKey", "parentSummary", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "epic"];
+let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790"];
 
 // Must have 'Work-id' and 'Description' fields in the data-set. 
 // The keys for this dataset must include 'Work-id' for now. 
@@ -101,27 +101,31 @@ async function refreshJiraQuery (dsName, jiraConfig) {
                     if (issue.fields.parent.fields.summary) {
                         rec.parentSummary = `${issue.fields.parent.fields.summary}`
                     } else {
-                        rec.parentSummary = "NotSet"
+                        rec.parentSummary = ""
                     }
-                } catch (e) { rec.parentSummary = "NotSet" }
+                } catch (e) { rec.parentSummary = "" }
             } else {
-                rec.parentKey = "NotSet";
-                rec.parentSummary = "NotSet"
+                rec.parentKey = "";
+                rec.parentSummary = ""
             }
-            if (rec.parentKey != "NotSet") {
-                if (rec.parentSummary != "NotSet") {
+            if (rec.parentKey != "") {
+                if (rec.parentSummary != "") {
                     rec.parent = `${rec.parentKey} (${rec.parentSummary})`
                 } else {
                     rec.parent = `${rec.parentKey}`
                 }
             } else {
-                rec.parent = "NotSet"
+                rec.parent = ""
             }
             if (issue.fields.customfield_12790) {
                 rec.epic = `[${issue.fields.customfield_12790}](${jiraUrl + '/browse/' + issue.fields.customfield_12790})`
             } else {
-                rec.epic = "NotSet"
+                rec.epic = ""
             }
+            if (issue.fields.description)
+                rec.description = issue.fields.description;
+            else
+                rec.description = "";
             if (issue.fields.subtasks && issue.fields.subtasks.length) {
                 rec.subtasks = "[";
                 for (let i = 0; i < issue.fields.subtasks.length; i++) {
@@ -329,7 +333,7 @@ function defaultJiraMapping (rec) {
     let jiraUrl = "https://" + host; 
     let jiraKeyMapping = {'key': 'Work-id'}
     // No need for "Details" links to appear here. 
-    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description' };
+    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description' };
     let selectorObj = {}, fullRec = {};
     selectorObj[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
     fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -354,7 +358,7 @@ async function markAsStale (dsName, jiraConfig) {
     let jiraFieldMapping; 
     if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
         // No need for "Details" links to appear here. 
-        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description' };
+        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description' };
     } else { 
         jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
     }

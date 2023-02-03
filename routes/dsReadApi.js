@@ -654,14 +654,21 @@ router.post('/view/refreshJira', async (req, res, next) => {
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
-        let jiraConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraConfig` }, {} );
+        let jiraConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraConfig` }, {});
+        let jiraAgileConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraAgileConfig` }, {});
         jiraConfig = jiraConfig[0]
+        jiraAgileConfig = jiraAgileConfig[0]
         let response = {};
-        if (jiraConfig.jira && jiraConfig.jql) {
+        if (jiraConfig && jiraConfig.jira && jiraConfig.jql) {
             //await Jira.refreshJiraQuery(request.dsName, "project = IQN AND status not in (Closed, Resolved) AND assignee in (membersOf(Digital_Control-Plane), membersOf(Digital-Platform)) ORDER BY Severity ASC, priority DESC");
             await Jira.refreshJiraQuery(request.dsName, jiraConfig);
             response.status = 'success'
-        } else {
+        }
+        if (jiraAgileConfig && jiraAgileConfig.jira && jiraAgileConfig.jql) {
+            await Jira.refreshJiraQuery(request.dsName, jiraAgileConfig);
+            response.status = 'success'
+        }
+        if (!response.status) {
             console.log('refreshJira Failed');
             response.status = 'fail';
         }
