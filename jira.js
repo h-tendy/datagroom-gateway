@@ -312,8 +312,8 @@ function doJiraMapping(rec, jiraConfig) {
     let selectorObj = {}, fullRec = {};
     //selectorObj[jiraKeyMapping['key']] = {$regex: `${rec.key}$`, $options: 'i'};
     if (jiraConfig._id == "jiraAgileConfig") {
-        fullRec[jiraKeyMapping['key']] = `JIRA_AGILE-[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
-        selectorObj[jiraKeyMapping['key']] = `JIRA_AGILE-[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
+        fullRec[jiraKeyMapping['key']] = `[JIRA_AGILE-${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
+        selectorObj[jiraKeyMapping['key']] = `[JIRA_AGILE-${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
     } else {
         fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
         selectorObj[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -342,8 +342,8 @@ function defaultJiraMapping(rec, jiraConfig) {
     let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description' };
     let selectorObj = {}, fullRec = {};
     if (jiraConfig._id == "jiraAgileConfig") {
-        selectorObj[jiraKeyMapping['key']] = `JIRA_AGILE-[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
-        fullRec[jiraKeyMapping['key']] = `JIRA_AGILE-[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
+        selectorObj[jiraKeyMapping['key']] = `[JIRA_AGILE-${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
+        fullRec[jiraKeyMapping['key']] = `[JIRA_AGILE-${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
     } else {
         selectorObj[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
         fullRec[jiraKeyMapping['key']] = `[${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -382,7 +382,7 @@ async function markAsStale (dsName, jiraConfig) {
         if (jiraConfig._id == "jiraAgileConfig") {
             filters[jiraKeyMapping['key']] = { $regex: `JIRA_AGILE.*${jiraUrl + '/browse/'}`, $options: 'i' };
         } else {
-            filters[jiraKeyMapping['key']] = { $regex: `^\\[.*${jiraUrl + '/browse/'}`, $options: 'im' };
+            filters[jiraKeyMapping['key']] = { $regex: `^((?!JIRA_AGILE).)*${jiraUrl + '/browse/'}.*`, $options: 'im' };
         }
         //filters[jiraKeyMapping['key']] = {$regex: `IQN-`, $options: 'i'};
     } catch (e) {}
