@@ -27,6 +27,8 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     console.log(keys[0]);
     let jiraConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraConfig` }, {} );
     jiraConfig = jiraConfig[0]
+    let jiraAgileConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraAgileConfig` }, {});
+    jiraAgileConfig = jiraAgileConfig[0]
     let dsDescription = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `dsDescription` }, {} );
     dsDescription = dsDescription[0]
     let otherTableAttrs = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `otherTableAttrs` }, {} );
@@ -45,7 +47,7 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
         }
     } catch (e) {};
     await dbAbstraction.destroy();
-    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig });
+    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig, jiraAgileConfig });
     return;
 });
 
@@ -601,6 +603,13 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
             dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "jiraConfig" });
             console.log("Remove jiraConfig status: ", dbResponse);
         }
+        if (request.jiraAgileConfig) {
+            dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraAgileConfig" }, { ...request.jiraAgileConfig });
+            console.log("Add jiraAgileConfig status: ", dbResponse.result);
+        } else {
+            dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "jiraAgileConfig" });
+            console.log("Remove jiraAgileConfig status: ", dbResponse);
+        }
         dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "dsDescription" }, { ...request.dsDescription });
         console.log("Update dsDescription status: ", dbResponse.result);
         if (request.otherTableAttrs && Object.keys(request.otherTableAttrs).length) {
@@ -645,14 +654,21 @@ router.post('/view/refreshJira', async (req, res, next) => {
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
-        let jiraConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraConfig` }, {} );
+        let jiraConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraConfig` }, {});
+        let jiraAgileConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraAgileConfig` }, {});
         jiraConfig = jiraConfig[0]
+        jiraAgileConfig = jiraAgileConfig[0]
         let response = {};
-        if (jiraConfig.jira && jiraConfig.jql) {
+        if (jiraConfig && jiraConfig.jira && jiraConfig.jql) {
             //await Jira.refreshJiraQuery(request.dsName, "project = IQN AND status not in (Closed, Resolved) AND assignee in (membersOf(Digital_Control-Plane), membersOf(Digital-Platform)) ORDER BY Severity ASC, priority DESC");
             await Jira.refreshJiraQuery(request.dsName, jiraConfig);
             response.status = 'success'
-        } else {
+        }
+        if (jiraAgileConfig && jiraAgileConfig.jira && jiraAgileConfig.jql) {
+            await Jira.refreshJiraQuery(request.dsName, jiraAgileConfig);
+            response.status = 'success'
+        }
+        if (!response.status) {
             console.log('refreshJira Failed');
             response.status = 'fail';
         }
