@@ -51,7 +51,7 @@ function isFieldEditable(requestedColumn, jiraConfig) {
     }
     if (!revContentMap[requestedColumn]) {
         response.status = 'fail'
-        response.error = 'Column doesn\'t exist'
+        response.error = `${requestedColumn} Column doesn't exist`
         return response
     }
     if (revContentMap[requestedColumn] == 1) {
@@ -61,11 +61,11 @@ function isFieldEditable(requestedColumn, jiraConfig) {
                 response.status = 'pass'
             } else {
                 response.status = 'fail'
-                response.error = 'Field is not editable'
+                response.error = `${requestedColumn} field is not supported for edit for JIRA_AGILE row`
             }
         } else {
             response.status = 'fail'
-            response.error = 'Field is not present'
+            response.error = `${requestedColumn} field mapping is not present`
         }
         return response
     }
