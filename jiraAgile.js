@@ -16,16 +16,58 @@ async function editSingleAttribute(req) {
     let response = {}
     let request = req.body
     let jiraAgileConfig = request.jiraAgileConfig
+    let dbAbstraction = new DbAbstraction();
+
+    let revContentMap = getRevContentMap(jiraAgileConfig)
+
+    /**Get the incoming edited record parsed */
+    let ret = parseRecord(request.editObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
+    if (!ret.parseSuccess) {
+        response.status = 'fail'
+        response.error = 'unable to parse the incoming edited record according to given mapping'
+        return response
+    }
+    let newUiRec = ret.rec
+
+    /**Get the old existing UI record parsed */
+    ret = parseRecord(request.selectorObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
+    if (!ret.parseSuccess) {
+        response.status = 'fail'
+        response.error = 'unable to parse the current record according to given mapping'
+        return response
+    }
+    let oldUiRec = ret.rec
+
+    /**Compare which of the fields are edited by comparing oldUI and new UI rec and determine whether we support edit of those fields */
+    let { isEditable, errorMsg } = isFieldEditable(oldUiRec, newUiRec)
+    if (!isEditable) {
+        response.status = 'fail'
+        response.error = errorMsg
+        return response
+    }
+
+    /**Get record from db and parse it accordingly */
+    let recs = await dbAbstraction.find(request.dsName, "data", { _id: dbAbstraction.getObjectId(request.selectorObj._id) }, {});
+    let record = recs[0]
+    dbAbstraction.destroy()
+    ret = parseRecord(record, revContentMap, jiraAgileConfig.jiraFieldMapping)
+    if (!ret.parseSuccess) {
+        response.status = 'fail'
+        response.error = 'unable to parse the dbrecord according to given mapping'
+        return response
+    }
+    let dbRec = ret.rec
+
     if (jiraAgileConfig && jiraAgileConfig.jira) {
         //TODO:
         // Check the mapping of the jira keys and validate the edit is supported for that field.
         // If not supported, return with error in response.
-        let res = isFieldEditable(request.column, jiraAgileConfig)
-        if (res.error) {
-            response.status = res.status
-            response.error = res.error
-            return response
-        }
+        // let res = isFieldEditable(dbRec, request.column, jiraAgileConfig)
+        // if (res.error) {
+        //     response.status = res.status
+        //     response.error = res.error
+        //     return response
+        // }
         // Then call an api to write it to jira
         console.log("abc")
     }
@@ -33,14 +75,10 @@ async function editSingleAttribute(req) {
     return response
 }
 
-function isFieldEditable(requestedColumn, jiraConfig) {
-    let response = {}
+function getRevContentMap(jiraConfig) {
     let jiraFieldMapping = jiraConfig.jiraFieldMapping
-    let jiraUrl = "https://" + host;
     jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
-    let jiraKeyMapping = { 'key': jiraFieldMapping['key'] };
     delete jiraFieldMapping.key;
-    let jiraContentMapping = jiraFieldMapping;
     let revContentMap = {};
     for (let key in jiraFieldMapping) {
         let dsField = jiraFieldMapping[key];
@@ -49,27 +87,69 @@ function isFieldEditable(requestedColumn, jiraConfig) {
         else
             revContentMap[dsField] = revContentMap[dsField] + 1;
     }
-    if (!revContentMap[requestedColumn]) {
-        response.status = 'fail'
-        response.error = `${requestedColumn} Column doesn't exist`
-        return response
-    }
-    if (revContentMap[requestedColumn] == 1) {
-        let jiraKey = getKeyByValue(jiraFieldMapping, requestedColumn)
-        if (jiraKey) {
-            if (editableFields.includes(jiraKey)) {
-                response.status = 'pass'
-            } else {
-                response.status = 'fail'
-                response.error = `${requestedColumn} field is not supported for edit for JIRA_AGILE row`
-            }
-        } else {
-            response.status = 'fail'
-            response.error = `${requestedColumn} field mapping is not present`
+    return revContentMap
+}
+
+function isFieldEditable(oldUiParsedRec, newUiParsedRec) {
+    let isEditable = true
+    let errorMsg = ''
+    for (let oldKeys of Object.keys(oldUiParsedRec)) {
+        if (!newUiParsedRec[oldKeys]) continue
+        if (newUiParsedRec[oldKeys] == oldUiParsedRec[oldKeys]) continue
+        if (!editableFields.includes(oldKeys)) {
+            isEditable = false
+            errorMsg = `Jira key - ${oldKeys} is not supported for edit`
+            break
         }
-        return response
     }
-    return response
+    return { isEditable, errorMsg }
+}
+
+function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
+    let dbKeys = Object.keys(dbRecord)
+    let rec = {}
+    let parseSuccess = true;
+    let jiraUrl = "https://" + host;
+    for (let dbKey of dbKeys) {
+        let recKey = getKeyByValue(jiraFieldMapping, dbKey)
+        if (!recKey) continue
+        if (!revContentMap[dbKey]) {
+            rec[recKey] = dbRecord[dbKey]
+            continue
+        }
+        if (revContentMap[dbKey] == 1) {
+            let recVal = dbRecord[dbKey]
+            if (typeof recVal == 'string') {
+                let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
+                let jiraIssueIdMatchArr = recVal.match(regex)
+                if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
+                    recVal = jiraIssueIdMatchArr[1]
+                }
+            }
+            rec[recKey] = recVal
+        } else {
+            let dbVal = dbRecord[dbKey]
+            let dbValArr = dbVal.split("<br>")
+            for (let eachEntry of dbValArr) {
+                let eachEntryKeyMatchArr = eachEntry.match(/\*\*(.*)\*\*:(.*)/s)
+                if (eachEntryKeyMatchArr && eachEntryKeyMatchArr.length >= 3) {
+                    let recKey = eachEntryKeyMatchArr[1]
+                    let recVal = eachEntryKeyMatchArr[2].trim()
+                    if (recKey == "subtasksDetails") {
+                        rec[recKey] = recVal
+                        continue
+                    }
+                    let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
+                    let jiraIssueIdMatchArr = recVal.match(regex)
+                    if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
+                        recVal = jiraIssueIdMatchArr[1]
+                    }
+                    rec[recKey] = recVal
+                }
+            }
+        }
+    }
+    return { rec, parseSuccess }
 }
 
 async function writeToJira(request) {
