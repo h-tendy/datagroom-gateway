@@ -3,6 +3,7 @@ var JiraApi = require('jira-client');
 const { async } = require('regenerator-runtime');
 const DbAbstraction = require('./dbAbstraction');
 const JiraSettings = require('./jiraSettings');
+const utils = require('./utils')
 // Initialize
 
 let host = JiraSettings.host;
@@ -28,6 +29,12 @@ async function editSingleAttribute(req) {
         return response
     }
     let newUiRec = ret.rec
+
+    if (Object.keys(newUiRec).includes('key')) {
+        response.status = 'fail'
+        response.error = `Key for the JIRA_AGILE row can't be edited`
+        return response
+    }
 
     /**Get the old existing UI record parsed */
     ret = parseRecord(request.selectorObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
@@ -58,20 +65,52 @@ async function editSingleAttribute(req) {
     }
     let dbRec = ret.rec
 
+    /**Get the latest record from JIRA if jira is enabled */
+    let jiraIssueName = dbRec.key
+    let latestJiraRec = null
     if (jiraAgileConfig && jiraAgileConfig.jira) {
-        //TODO:
-        // Check the mapping of the jira keys and validate the edit is supported for that field.
-        // If not supported, return with error in response.
-        // let res = isFieldEditable(dbRec, request.column, jiraAgileConfig)
-        // if (res.error) {
-        //     response.status = res.status
-        //     response.error = res.error
-        //     return response
-        // }
-        // Then call an api to write it to jira
-        console.log("abc")
+        try {
+            let issue = await jira.findIssue(jiraIssueName)
+            latestJiraRec = utils.getRecFromJiraIssue(issue)
+        } catch (e) {
+            response.status = 'fail'
+            response.error = 'unable to fetch the record from JIRA to update'
+            return response
+        }
     }
-    let dbResponse = await writeToDb(request)
+
+    if (latestJiraRec) {
+        let isUpdated = isRecordUpdated(dbRec, latestJiraRec)
+        if (!isUpdated) {
+            response.status = 'fail'
+            response.error = 'Stale JIRA entry found. Please refresh again.'
+            return response
+        }
+    }
+
+    let isUpdated = isRecordUpdated(oldUiRec, dbRec)
+    if (!isUpdated) {
+        response.status = 'fail'
+        response.error = 'Stale JIRA entry found. Please refresh again.'
+        return response
+    }
+
+    /**Compare the latest jira with that in db. If db is not updated send the message to the UI and cancel the edit operation */
+    if (latestJiraRec) {
+        let editedObj = getEditedFieldsObj(oldUiRec, newUiRec)
+        if (Object.keys(editedObj).length != 0) {
+            try {
+                let ret = await jira.updateIssue(jiraIssueName, { "fields": editedObj })
+                console.log(ret)
+            } catch (e) {
+                response.status = 'fail'
+                response.error = 'unable to update the record to JIRA'
+                return response
+            }
+        }
+    }
+
+    response = await writeToDb(request)
     return response
 }
 
@@ -105,6 +144,33 @@ function isFieldEditable(oldUiParsedRec, newUiParsedRec) {
     return { isEditable, errorMsg }
 }
 
+function isRecordUpdated(oldRec, newRec) {
+    let isUpdated = true
+    for (let oldKeys of Object.keys(oldRec)) {
+        if (!newRec[oldKeys]) continue
+        if (newRec[oldKeys] == oldRec[oldKeys]) {
+            continue
+        } else if (typeof (newRec[oldKeys]) == 'string' && typeof (oldRec[oldKeys]) == 'string' && newRec[oldKeys].trim() == oldRec[oldKeys].trim()) {
+            continue
+        } else {
+            isUpdated = false
+            break
+        }
+    }
+    return isUpdated
+}
+
+function getEditedFieldsObj(oldRec, newRec) {
+    let editedJiraObj = {}
+    for (let newKey of Object.keys(newRec)) {
+        if (!oldRec[newKey]) continue
+        if (oldRec[newKey] == newRec[newKey]) continue
+        if (!fields.includes(newKey)) continue
+        editedJiraObj[newKey] = newRec[newKey]
+    }
+    return editedJiraObj
+}
+
 function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
     let dbKeys = Object.keys(dbRecord)
     let rec = {}
@@ -114,7 +180,15 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
         let recKey = getKeyByValue(jiraFieldMapping, dbKey)
         if (!recKey) continue
         if (!revContentMap[dbKey]) {
-            rec[recKey] = dbRecord[dbKey]
+            let recVal = dbRecord[dbKey]
+            if (typeof recVal == 'string') {
+                let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
+                let jiraIssueIdMatchArr = recVal.match(regex)
+                if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
+                    recVal = jiraIssueIdMatchArr[1]
+                }
+            }
+            rec[recKey] = recVal
             continue
         }
         if (revContentMap[dbKey] == 1) {
@@ -135,13 +209,9 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
                 if (eachEntryKeyMatchArr && eachEntryKeyMatchArr.length >= 3) {
                     let recKey = eachEntryKeyMatchArr[1]
                     let recVal = eachEntryKeyMatchArr[2].trim()
-                    if (recKey == "subtasksDetails") {
-                        rec[recKey] = recVal
-                        continue
-                    }
                     let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
                     let jiraIssueIdMatchArr = recVal.match(regex)
-                    if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
+                    if (recKey == 'key' && jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
                         recVal = jiraIssueIdMatchArr[1]
                     }
                     rec[recKey] = recVal
@@ -150,10 +220,6 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
         }
     }
     return { rec, parseSuccess }
-}
-
-async function writeToJira(request) {
-
 }
 
 async function writeToDb(request) {
