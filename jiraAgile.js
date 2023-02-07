@@ -11,7 +11,11 @@ var jira = new JiraApi(JiraSettings.settings);
 
 let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990"];
 
-let editableFields = ["description", "estimate", "summary"]
+let editableFieldsTypeAndMapping = {
+    "description": 'string',
+    "estimate": 'number',
+    "summary": 'string'
+}
 
 let customFieldMapping = {
     "estimate": "customfield_11890"
@@ -111,7 +115,14 @@ async function editSingleAttribute(req) {
 
     /**Compare the latest jira with that in db. If db is not updated send the message to the UI and cancel the edit operation */
     if (latestJiraRec) {
-        let editedObj = getEditedFieldsObj(oldUiRec, newUiRec)
+        let ret = getEditedFieldsObj(oldUiRec, newUiRec)
+        if (ret.errorMsg != '') {
+            response.status = 'fail'
+            response.error = ret.errorMsg
+            await insertInEditLog(request, keyBeingEdited, response.status)
+            return response
+        }
+        let editedObj = ret.editedJiraObj
         if (Object.keys(editedObj).length != 0) {
             try {
                 let ret = await jira.updateIssue(jiraIssueName, { "fields": editedObj })
@@ -148,6 +159,7 @@ function getRevContentMap(jiraConfig) {
 function isFieldEditable(oldUiParsedRec, newUiParsedRec) {
     let isEditable = true
     let errorMsg = ''
+    let editableFields = Object.keys(editableFieldsTypeAndMapping)
     for (let oldKeys of Object.keys(oldUiParsedRec)) {
         if (!newUiParsedRec[oldKeys]) continue
         if (newUiParsedRec[oldKeys] == oldUiParsedRec[oldKeys]) continue
@@ -178,6 +190,7 @@ function isRecordUpdated(oldRec, newRec) {
 
 function getEditedFieldsObj(oldRec, newRec) {
     let editedJiraObj = {}
+    let errorMsg = ''
     for (let newKey of Object.keys(newRec)) {
         let jiraKey = newKey
         if (!oldRec[newKey]) continue
@@ -186,9 +199,19 @@ function getEditedFieldsObj(oldRec, newRec) {
             jiraKey = customFieldMapping[newKey]
         }
         if (!fields.includes(jiraKey)) continue
-        editedJiraObj[jiraKey] = newRec[newKey]
+        if (typeof newRec[newKey] != editableFieldsTypeAndMapping[newKey]) {
+            if (editableFieldsTypeAndMapping[newKey] == 'number' && typeof newRec[newKey] == 'string') {
+                editedJiraObj[jiraKey] = parseInt(newRec[newKey])
+            } else if (editableFieldsTypeAndMapping[newKey] == 'string' && typeof newRec[newKey] == 'number') {
+                editedJiraObj[jiraKey] = newRec[newKey].toString()
+            } else {
+                errorMsg = `${newKey} should be ${editableFieldsTypeAndMapping[newKey]} type`
+            }
+        } else {
+            editedJiraObj[jiraKey] = newRec[newKey]
+        }
     }
-    return editedJiraObj
+    return { editedJiraObj, errorMsg }
 }
 
 function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
