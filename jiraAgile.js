@@ -11,7 +11,7 @@ var jira = new JiraApi(JiraSettings.settings);
 
 let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990"];
 
-let editableFieldsTypeAndMapping = {
+let editableFieldsAndTypeMapping = {
     "description": 'string',
     "estimate": 'number',
     "summary": 'string'
@@ -159,7 +159,7 @@ function getRevContentMap(jiraConfig) {
 function isFieldEditable(oldUiParsedRec, newUiParsedRec) {
     let isEditable = true
     let errorMsg = ''
-    let editableFields = Object.keys(editableFieldsTypeAndMapping)
+    let editableFields = Object.keys(editableFieldsAndTypeMapping)
     for (let oldKeys of Object.keys(oldUiParsedRec)) {
         if (!newUiParsedRec[oldKeys]) continue
         if (newUiParsedRec[oldKeys] == oldUiParsedRec[oldKeys]) continue
@@ -199,13 +199,13 @@ function getEditedFieldsObj(oldRec, newRec) {
             jiraKey = customFieldMapping[newKey]
         }
         if (!fields.includes(jiraKey)) continue
-        if (typeof newRec[newKey] != editableFieldsTypeAndMapping[newKey]) {
-            if (editableFieldsTypeAndMapping[newKey] == 'number' && typeof newRec[newKey] == 'string') {
+        if (typeof newRec[newKey] != editableFieldsAndTypeMapping[newKey]) {
+            if (editableFieldsAndTypeMapping[newKey] == 'number' && typeof newRec[newKey] == 'string') {
                 editedJiraObj[jiraKey] = parseInt(newRec[newKey])
-            } else if (editableFieldsTypeAndMapping[newKey] == 'string' && typeof newRec[newKey] == 'number') {
+            } else if (editableFieldsAndTypeMapping[newKey] == 'string' && typeof newRec[newKey] == 'number') {
                 editedJiraObj[jiraKey] = newRec[newKey].toString()
             } else {
-                errorMsg = `${newKey} should be ${editableFieldsTypeAndMapping[newKey]} type`
+                errorMsg = `${newKey} should be ${editableFieldsAndTypeMapping[newKey]} type`
             }
         } else {
             editedJiraObj[jiraKey] = newRec[newKey]
