@@ -3,11 +3,15 @@ const DbAbstraction = require('../dbAbstraction');
 const ExcelUtils = require('../excelUtils');
 const fs = require('fs');
 const Jira = require('../jira');
+const JiraAgile = require('../jiraAgile')
+const JiraSettings = require('../jiraSettings');
 const Utils = require('../utils');
 const PrepAttachments = require('../prepAttachments');
 const AclCheck = require('../acl');
 const MongoFilters = require('./mongoFilters');
 const { ObjectId } = require('mongodb');
+
+let host = JiraSettings.host;
 
 router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
@@ -277,6 +281,20 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
+        let response = {}
+        let recs = await dbAbstraction.find(request.dsName, "data", { _id: dbAbstraction.getObjectId(request.selectorObj._id) }, {});
+        if (recs.length == 1) {
+            if (isJiraAgileRec(recs[0])) {
+                let resp = await JiraAgile.editSingleAttribute(req)
+                response.status = resp.status
+                response.error = resp.error
+                res.status(200).send(response);
+                await dbAbstraction.destroy();
+                return
+            }
+        } else {
+            response.error = 'Row not found!';
+        }
         let keys = await dbAbstraction.find(request.dsName, "metaData", { _id: `keys` }, {} );
         console.log(keys[0]);
         let keyBeingEdited = false;
@@ -290,7 +308,6 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
                 }
             }
         }
-        let response = {};
         if (keyBeingEdited) {
             console.log("A key is being edited: Do in transaction");
             // Selector obj must contain all the keys for this case. Send this from the UI. 
@@ -337,6 +354,19 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
     await dbAbstraction.destroy();
 });
 
+async function isJiraAgileRec(rec) {
+    let isJiraAgileRec = false
+    let jiraUrl = "https://" + host;
+    for (let [key, value] of Object.entries(rec)) {
+        let regex = new RegExp(`JIRA_AGILE.*${jiraUrl + '/browse/'}`)
+        if (typeof value == "string") {
+            if (regex.test(value)) {
+                isJiraAgileRec = true
+            }
+        }
+    }
+    return isJiraAgileRec
+}
 
 router.post('/view/insertOneDoc', async (req, res, next) => {
     let request = req.body;
