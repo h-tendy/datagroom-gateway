@@ -21,11 +21,14 @@ async function editSingleAttribute(req) {
 
     let revContentMap = getRevContentMap(jiraAgileConfig)
 
+    let keyBeingEdited = await ifKeyBeingEdited(request)
+
     /**Get the incoming edited record parsed */
     let ret = parseRecord(request.editObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
     if (!ret.parseSuccess) {
         response.status = 'fail'
         response.error = 'unable to parse the incoming edited record according to given mapping'
+        await insertInEditLog(request, keyBeingEdited, response.status)
         return response
     }
     let newUiRec = ret.rec
@@ -33,6 +36,7 @@ async function editSingleAttribute(req) {
     if (Object.keys(newUiRec).includes('key')) {
         response.status = 'fail'
         response.error = `Key for the JIRA_AGILE row can't be edited`
+        await insertInEditLog(request, keyBeingEdited, response.status)
         return response
     }
 
@@ -41,6 +45,7 @@ async function editSingleAttribute(req) {
     if (!ret.parseSuccess) {
         response.status = 'fail'
         response.error = 'unable to parse the current record according to given mapping'
+        await insertInEditLog(request, keyBeingEdited, response.status)
         return response
     }
     let oldUiRec = ret.rec
@@ -50,6 +55,7 @@ async function editSingleAttribute(req) {
     if (!isEditable) {
         response.status = 'fail'
         response.error = errorMsg
+        await insertInEditLog(request, keyBeingEdited, response.status)
         return response
     }
 
@@ -61,6 +67,7 @@ async function editSingleAttribute(req) {
     if (!ret.parseSuccess) {
         response.status = 'fail'
         response.error = 'unable to parse the dbrecord according to given mapping'
+        await insertInEditLog(request, keyBeingEdited, response.status)
         return response
     }
     let dbRec = ret.rec
@@ -75,6 +82,7 @@ async function editSingleAttribute(req) {
         } catch (e) {
             response.status = 'fail'
             response.error = 'unable to fetch the record from JIRA to update'
+            await insertInEditLog(request, keyBeingEdited, response.status)
             return response
         }
     }
@@ -84,6 +92,7 @@ async function editSingleAttribute(req) {
         if (!isUpdated) {
             response.status = 'fail'
             response.error = 'Stale JIRA entry found. Please refresh again.'
+            await insertInEditLog(request, keyBeingEdited, response.status)
             return response
         }
     }
@@ -92,6 +101,7 @@ async function editSingleAttribute(req) {
     if (!isUpdated) {
         response.status = 'fail'
         response.error = 'Stale JIRA entry found. Please refresh again.'
+        await insertInEditLog(request, keyBeingEdited, response.status)
         return response
     }
 
@@ -105,12 +115,14 @@ async function editSingleAttribute(req) {
             } catch (e) {
                 response.status = 'fail'
                 response.error = 'unable to update the record to JIRA'
+                await insertInEditLog(request, keyBeingEdited, response.status)
                 return response
             }
         }
     }
 
-    response = await writeToDb(request)
+    response = await writeToDb(request, keyBeingEdited)
+    await insertInEditLog(request, keyBeingEdited, response.status)
     return response
 }
 
@@ -222,9 +234,8 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
     return { rec, parseSuccess }
 }
 
-async function writeToDb(request) {
+async function ifKeyBeingEdited(request) {
     let dbAbstraction = new DbAbstraction();
-    let response = {}
     let keys = await dbAbstraction.find(request.dsName, "metaData", { _id: `keys` }, {});
     console.log(keys[0]);
     let keyBeingEdited = false;
@@ -238,6 +249,13 @@ async function writeToDb(request) {
             }
         }
     }
+    await dbAbstraction.destroy()
+    return keyBeingEdited
+}
+
+async function writeToDb(request, keyBeingEdited) {
+    let dbAbstraction = new DbAbstraction();
+    let response = {}
     if (keyBeingEdited) {
         console.log("A key is being edited: Do in transaction");
         // Selector obj must contain all the keys for this case. Send this from the UI. 
@@ -272,11 +290,15 @@ async function writeToDb(request) {
             }
         }
     }
-    let editLog = getSingleEditLog(request, keyBeingEdited, response.status);
+    return response
+}
+
+async function insertInEditLog(request, keyBeingEdited, status) {
+    let dbAbstraction = new DbAbstraction();
+    let editLog = getSingleEditLog(request, keyBeingEdited, status);
     let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
     console.log('editLog (edit) response: ', editLogResp);
     await dbAbstraction.destroy()
-    return response
 }
 
 function getSingleEditLog(req, isKey, status) {
