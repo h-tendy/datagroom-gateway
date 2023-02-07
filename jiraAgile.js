@@ -11,7 +11,11 @@ var jira = new JiraApi(JiraSettings.settings);
 
 let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990"];
 
-let editableFields = ["description"]
+let editableFields = ["description", "estimate", "summary"]
+
+let customFieldMapping = {
+    "estimate": "customfield_11890"
+}
 
 async function editSingleAttribute(req) {
     let response = {}
@@ -175,10 +179,14 @@ function isRecordUpdated(oldRec, newRec) {
 function getEditedFieldsObj(oldRec, newRec) {
     let editedJiraObj = {}
     for (let newKey of Object.keys(newRec)) {
+        let jiraKey = newKey
         if (!oldRec[newKey]) continue
         if (oldRec[newKey] == newRec[newKey]) continue
-        if (!fields.includes(newKey)) continue
-        editedJiraObj[newKey] = newRec[newKey]
+        if (customFieldMapping[newKey]) {
+            jiraKey = customFieldMapping[newKey]
+        }
+        if (!fields.includes(jiraKey)) continue
+        editedJiraObj[jiraKey] = newRec[newKey]
     }
     return editedJiraObj
 }
