@@ -284,7 +284,8 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
         let response = {}
         let recs = await dbAbstraction.find(request.dsName, "data", { _id: dbAbstraction.getObjectId(request.selectorObj._id) }, {});
         if (recs.length == 1) {
-            if (isJiraAgileRec(recs[0])) {
+            let isJiraAgileRow = isJiraAgileRec(recs[0])
+            if (isJiraAgileRow) {
                 let resp = await JiraAgile.editSingleAttribute(req)
                 response.status = resp.status
                 response.error = resp.error
@@ -354,7 +355,7 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
     await dbAbstraction.destroy();
 });
 
-async function isJiraAgileRec(rec) {
+function isJiraAgileRec(rec) {
     let isJiraAgileRec = false
     let jiraUrl = "https://" + host;
     for (let [key, value] of Object.entries(rec)) {
