@@ -257,8 +257,42 @@ function getSubTasksDetailsInTable (issue) {
 
 function getProjectsMetaData() {
     try {
-        return JiraSettings.projectsMetaData
+        let filteredProjectsMetaData = {}
+        let origProjectsMetaData = JiraSettings.projectsMetaData
+        filteredProjectsMetaData.projects = []
+        for (let i = 0; i < origProjectsMetaData.projects.length; i++) {
+            let currOrigProjectMetaData = origProjectsMetaData.projects[i];
+            let currFilteredProjectMetaData = {};
+            currFilteredProjectMetaData.name = currOrigProjectMetaData.name
+            currFilteredProjectMetaData.issuetypes = [];
+            for (let j = 0; j < currOrigProjectMetaData.issuetypes.length; j++) {
+                let currOrigProjectIssueTypeMetaData = currOrigProjectMetaData.issuetypes[j];
+                let currFilteredProjectIssueTypeMetaData = {}
+                currFilteredProjectIssueTypeMetaData.name = currOrigProjectIssueTypeMetaData.name
+                currFilteredProjectIssueTypeMetaData.fields = {}
+                for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
+                    let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
+                    if (currOrigIssueTypeFieldObj.required) {
+                        currFilteredProjectIssueTypeMetaData.fields[field] = {}
+                        currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
+                        currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
+                        currFilteredProjectIssueTypeMetaData.fields[field].name = currOrigIssueTypeFieldObj.name
+                        currFilteredProjectIssueTypeMetaData.fields[field].hasDefaultValue = currOrigIssueTypeFieldObj.hasDefaultValue
+                        if (currOrigIssueTypeFieldObj.allowedValues) {
+                            currFilteredProjectIssueTypeMetaData.fields[field].allowedValues = []
+                            for (let k = 0; k < currOrigIssueTypeFieldObj.allowedValues.length; k++) {
+                                currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].value)
+                            }
+                        }
+                    }
+                }
+                currFilteredProjectMetaData.issuetypes.push(currFilteredProjectIssueTypeMetaData)
+            }
+            filteredProjectsMetaData.projects.push(currFilteredProjectMetaData)
+        }
+        return filteredProjectsMetaData
     } catch (e) {
+        console.log(e)
         return {}
     }
 }
