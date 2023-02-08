@@ -234,6 +234,36 @@ function getSubTasksDetailsInTable (issue) {
     return subtasksDetails;
 }
 
+// async function createJiraIssue(request) {
+//     let bodyData = {
+//         "fields": {
+//             "issuetype": {
+//                 "name": request.type
+//             },
+//             "summary": request.summary,
+//             "priority": {
+//                 "name": request.priority
+//             },
+//             "description": request.description,
+//         }
+//     }
+//     try {
+//         let ret = jira.addNewIssue(bodyData)
+//         jira.deleteIssue
+//     } catch (e) {
+//         console.log(e)
+//     }
+// }
+
+function getProjectsMetaData() {
+    try {
+        return JiraSettings.projectsMetaData
+    } catch (e) {
+        return {}
+    }
+}
+
 module.exports = {
-    refreshJiraQuery
+    refreshJiraQuery,
+    getProjectsMetaData
 };

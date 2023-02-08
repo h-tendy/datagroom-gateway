@@ -1206,4 +1206,32 @@ router.post('/createDsFromDs', async (req, res, next) => {
 });
 
 
+// router.post('/createJiraIssue', async (req, res, next) => {
+//     let request = req.body
+//     console.log('Create jira issue request:', req.body)
+//     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+//     if (!allowed) {
+//         res.status(415).json({});
+//         return
+//     }
+//     //TODO: call Jira.js function
+//     Jira.createJiraIssue(request)
+// })
+
+router.post('/getProjectsMetadata', async (req, res, next) => {
+    let request = req.body
+    console.log('Create jira issue request:', req.body)
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({});
+        return
+    }
+    let response = Jira.getProjectsMetaData()
+    if (resonse && Object.keys(response).length != 0) {
+        res.status(200).json(response)
+    } else {
+        res.status(415).json({})
+    }
+})
+
 module.exports = router;
