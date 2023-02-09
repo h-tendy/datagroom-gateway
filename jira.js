@@ -271,6 +271,7 @@ function getProjectsMetaData() {
                 currFilteredProjectIssueTypeMetaData.name = currOrigProjectIssueTypeMetaData.name
                 currFilteredProjectIssueTypeMetaData.fields = {}
                 for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
+                    if (field == "project" || field == "issuetype") continue
                     let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
                     if (currOrigIssueTypeFieldObj.required) {
                         currFilteredProjectIssueTypeMetaData.fields[field] = {}
@@ -278,10 +279,15 @@ function getProjectsMetaData() {
                         currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
                         currFilteredProjectIssueTypeMetaData.fields[field].name = currOrigIssueTypeFieldObj.name
                         currFilteredProjectIssueTypeMetaData.fields[field].hasDefaultValue = currOrigIssueTypeFieldObj.hasDefaultValue
+                        currFilteredProjectIssueTypeMetaData.fields[field].multipleValues = ((currOrigIssueTypeFieldObj.operations && currOrigIssueTypeFieldObj.operations.length > 1) ? true : false)
                         if (currOrigIssueTypeFieldObj.allowedValues) {
                             currFilteredProjectIssueTypeMetaData.fields[field].allowedValues = []
                             for (let k = 0; k < currOrigIssueTypeFieldObj.allowedValues.length; k++) {
-                                currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].value)
+                                if (currOrigIssueTypeFieldObj.allowedValues[k].value) {
+                                    currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].value)
+                                } else if (currOrigIssueTypeFieldObj.allowedValues[k].name) {
+                                    currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].name)
+                                }
                             }
                         }
                     }
