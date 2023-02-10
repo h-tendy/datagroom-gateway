@@ -273,13 +273,15 @@ function getProjectsMetaData() {
                 for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
                     if (field == "project" || field == "issuetype") continue
                     let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
-                    if (currOrigIssueTypeFieldObj.required) {
+                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890") {
                         currFilteredProjectIssueTypeMetaData.fields[field] = {}
                         currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
                         currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
                         currFilteredProjectIssueTypeMetaData.fields[field].name = currOrigIssueTypeFieldObj.name
+                        if (currFilteredProjectIssueTypeMetaData.fields[field].name == "Story Points") {
+                            currFilteredProjectIssueTypeMetaData.fields[field].name = "estimate"
+                        }
                         currFilteredProjectIssueTypeMetaData.fields[field].hasDefaultValue = currOrigIssueTypeFieldObj.hasDefaultValue
-                        currFilteredProjectIssueTypeMetaData.fields[field].multipleValues = ((currOrigIssueTypeFieldObj.operations && currOrigIssueTypeFieldObj.operations.length > 1) ? true : false)
                         if (currOrigIssueTypeFieldObj.allowedValues) {
                             currFilteredProjectIssueTypeMetaData.fields[field].allowedValues = []
                             for (let k = 0; k < currOrigIssueTypeFieldObj.allowedValues.length; k++) {
