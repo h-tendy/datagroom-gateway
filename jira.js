@@ -305,7 +305,12 @@ function getProjectsMetaData() {
     }
 }
 
+function getDefaultTypeFieldsAndValues() {
+    return JiraSettings.defaultTypeFieldsAndValues
+}
+
 module.exports = {
     refreshJiraQuery,
-    getProjectsMetaData
+    getProjectsMetaData,
+    getDefaultTypeFieldsAndValues
 };
