@@ -252,7 +252,7 @@ function getProjectsMetaData() {
                 for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
                     if (field == "project" || field == "issuetype") continue
                     let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
-                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || (field == "customfield_25554" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "assignee" && currFilteredProjectIssueTypeMetaData.name == "Bug")) {
+                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || (field == "customfield_25554" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "assignee" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "fixVersions" && currFilteredProjectIssueTypeMetaData.name == "Epic")) {
                         currFilteredProjectIssueTypeMetaData.fields[field] = {}
                         currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
                         currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
@@ -389,6 +389,7 @@ async function createJiraIssue(jiraFormData) {
             "update": {}
         };
     } else if (issueType == "Epic") {
+        let fixVersions = jiraFormData["Epic"]["fixVersions"].map((version) => { return { "name": version } });
         bodyData = {
             "fields": {
                 "description": jiraFormData[jiraFormData.Type].description,
@@ -405,7 +406,8 @@ async function createJiraIssue(jiraFormData) {
                     "key": jiraFormData.Project
                 },
                 "summary": jiraFormData[jiraFormData.Type].summary,
-                "customfield_12791": jiraFormData[jiraFormData.Type]["customfield_12791"]
+                "customfield_12791": jiraFormData[jiraFormData.Type]["customfield_12791"],
+                "fixVersions": fixVersions
             },
             "update": {}
         };
