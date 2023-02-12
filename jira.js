@@ -252,7 +252,7 @@ function getProjectsMetaData() {
                 for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
                     if (field == "project" || field == "issuetype") continue
                     let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
-                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || field == "customfield_25554" || field == "assignee") {
+                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || (field == "customfield_25554" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "assignee" && currFilteredProjectIssueTypeMetaData.name == "Bug")) {
                         currFilteredProjectIssueTypeMetaData.fields[field] = {}
                         currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
                         currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
@@ -357,7 +357,7 @@ async function createJiraIssue(jiraFormData) {
                     "name": jiraFormData[jiraFormData.Type].priority
                 },
                 "project": {
-                    "name": jiraFormData.Project
+                    "key": jiraFormData.Project
                 },
                 "summary": jiraFormData[jiraFormData.Type].summary,
                 "customfield_11890": jiraFormData[jiraFormData.Type]["customfield_11890"]
@@ -381,7 +381,7 @@ async function createJiraIssue(jiraFormData) {
                     "name": jiraFormData[jiraFormData.Type].priority
                 },
                 "project": {
-                    "name": jiraFormData.Project
+                    "key": jiraFormData.Project
                 },
                 "summary": jiraFormData[jiraFormData.Type].summary,
                 "customfield_11890": jiraFormData[jiraFormData.Type]["customfield_11890"]
@@ -402,7 +402,7 @@ async function createJiraIssue(jiraFormData) {
                     "name": jiraFormData[jiraFormData.Type].priority
                 },
                 "project": {
-                    "name": jiraFormData.Project
+                    "key": jiraFormData.Project
                 },
                 "summary": jiraFormData[jiraFormData.Type].summary,
                 "customfield_12791": jiraFormData[jiraFormData.Type]["customfield_12791"]
