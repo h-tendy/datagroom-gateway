@@ -252,7 +252,7 @@ function getProjectsMetaData() {
                 for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
                     if (field == "project" || field == "issuetype") continue
                     let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
-                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || (field == "customfield_25554" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "assignee" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "fixVersions" && currFilteredProjectIssueTypeMetaData.name == "Epic")) {
+                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || (field == "customfield_25554" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "assignee" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "fixVersions" && (currFilteredProjectIssueTypeMetaData.name == "Epic" || currFilteredProjectIssueTypeMetaData.name == "User Story"))) {
                         currFilteredProjectIssueTypeMetaData.fields[field] = {}
                         currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
                         currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
@@ -344,6 +344,7 @@ async function createJiraIssue(jiraFormData) {
             "update": {}
         };
     } else if (issueType == "User Story") {
+        let fixVersions = jiraFormData["Epic"]["fixVersions"].map((version) => { return { "name": version } });
         bodyData = {
             "fields": {
                 "description": jiraFormData[jiraFormData.Type].description,
@@ -360,7 +361,8 @@ async function createJiraIssue(jiraFormData) {
                     "key": jiraFormData.Project
                 },
                 "summary": jiraFormData[jiraFormData.Type].summary,
-                "customfield_11890": jiraFormData[jiraFormData.Type]["customfield_11890"]
+                "customfield_11890": parseInt(jiraFormData[jiraFormData.Type]["customfield_11890"]),
+                "fixVersions": fixVersions
             },
             "update": {}
         };
@@ -384,7 +386,7 @@ async function createJiraIssue(jiraFormData) {
                     "key": jiraFormData.Project
                 },
                 "summary": jiraFormData[jiraFormData.Type].summary,
-                "customfield_11890": jiraFormData[jiraFormData.Type]["customfield_11890"]
+                "customfield_11890": parseInt(jiraFormData[jiraFormData.Type]["customfield_11890"])
             },
             "update": {}
         };
