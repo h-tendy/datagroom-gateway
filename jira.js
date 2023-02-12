@@ -242,7 +242,7 @@ function getProjectsMetaData() {
         for (let i = 0; i < origProjectsMetaData.projects.length; i++) {
             let currOrigProjectMetaData = origProjectsMetaData.projects[i];
             let currFilteredProjectMetaData = {};
-            currFilteredProjectMetaData.name = currOrigProjectMetaData.name
+            currFilteredProjectMetaData.key = currOrigProjectMetaData.key
             currFilteredProjectMetaData.issuetypes = [];
             for (let j = 0; j < currOrigProjectMetaData.issuetypes.length; j++) {
                 let currOrigProjectIssueTypeMetaData = currOrigProjectMetaData.issuetypes[j];
@@ -252,7 +252,7 @@ function getProjectsMetaData() {
                 for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
                     if (field == "project" || field == "issuetype") continue
                     let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
-                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890") {
+                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || field == "customfield_25554" || field == "assignee") {
                         currFilteredProjectIssueTypeMetaData.fields[field] = {}
                         currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
                         currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
@@ -299,6 +299,7 @@ async function createJiraIssue(jiraFormData) {
         let customfield_25558_values = jiraFormData["Bug"]["customfield_25558"].map((entry) => { return { "value": entry } });
         let customfield_21295_values = jiraFormData["Bug"]["customfield_21295"].map((entry) => { return { "name": entry } });
         let customfield_25555_values = jiraFormData["Bug"]["customfield_25555"].map((entry) => { return { "value": entry } });
+        let customfield_25554_values = jiraFormData["Bug"]["customfield_25554"].map((entry) => { return { "value": entry } });
         bodyData = {
             "fields": {
                 "description": jiraFormData[jiraFormData.Type].description,
@@ -312,7 +313,7 @@ async function createJiraIssue(jiraFormData) {
                     "name": jiraFormData[jiraFormData.Type].priority
                 },
                 "project": {
-                    "name": jiraFormData.Project
+                    "key": jiraFormData.Project
                 },
                 "summary": jiraFormData[jiraFormData.Type].summary,
                 "versions": versions,
@@ -335,6 +336,10 @@ async function createJiraIssue(jiraFormData) {
                 "customfield_25518": {
                     "value": jiraFormData[jiraFormData.Type].customfield_25518
                 },
+                "assignee": {
+                    "name": jiraFormData[jiraFormData.Type].assignee
+                },
+                "customfield_25554": customfield_25554_values
             },
             "update": {}
         };
@@ -408,23 +413,19 @@ async function createJiraIssue(jiraFormData) {
     if (bodyData.fields.labels == "None") delete bodyData.fields.labels
     if (bodyData.fields.parent && !bodyData.fields.parent.key) delete bodyData.fields.parent.key
     try {
-        // let ret = await jira.addNewIssue(bodyData)
-        // if (ret.transition.status == 200) {
-        //     response.status = 'success'
-        //     response.key = ret.key
-        // } else {
-        //     response.status = 'fail'
-        //     response.error = 'unable to create jira issue'
-        // }
-        response.status = 'success'
-        response.key = 'THANOS-22222'
+        let ret = await jira.addNewIssue(bodyData)
+        if (ret.key) {
+            response.status = 'success'
+            response.key = ret.key
+        } else {
+            response.status = 'fail'
+            response.error = 'unable to determine jira key after the update to JIRA'
+        }
     } catch (e) {
         console.log(e)
         response.status = 'fail'
-        response.error = 'unable to create issue in jira backend'
+        response.error = `Unable to create issue in JIRA backend. Error: ${e.message}`
     }
-    response.status = 'fail'
-    response.error = 'unable to create jira issue'
     return response
 }
 
