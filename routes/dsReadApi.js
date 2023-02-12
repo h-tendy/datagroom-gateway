@@ -1250,4 +1250,58 @@ router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
     }
 })
 
+router.post('/view/convertToJira', async (req, res, next) => {
+    let request = req.body;
+    console.log("In convertToJira: ", request);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
+    if (!allowed) {
+        res.status(415).json({});
+        return
+    }
+    let dbAbstraction = new DbAbstraction();
+    try {
+        let response = {}
+        // Call jira function with the incoming data and update the jira.
+        let jiraFormData = request.jiraFormData
+        let jiraResponse = await Jira.createJiraIssue(jiraFormData)
+        if (jiraResponse.status == 'fail') {
+            response.status = jiraResponse.status
+            response.error = jiraResponse.error
+            res.status(200).send(response);
+            return
+        }
+        // Once the response comes back make the mongodb data according to the mapping and update mongodb
+        let jiraRec = await Jira.getJiraRecordFromKey(jiraResponse.key)
+        if (Object.keys(jiraRec).length == 0) {
+            response.status = 'fail'
+            response.error = 'unable to retrieve jira issue after update. Please refresh table and refresh JIRA'
+            res.status(200).send(response);
+            return
+        }
+        let selectorObj = {};
+        selectorObj["_id"] = dbAbstraction.getObjectId(request.selectorObj._id);
+        let updateResponse = null
+        if (jiraFormData.Type == "Bug") {
+            updateResponse = await Jira.updateJiraRecInDb(request.dsName, selectorObj, jiraRec, request.jiraConfig)
+        } else {
+            updateResponse = await Jira.updateJiraRecInDb(request.dsName, selectorObj, jiraRec, request.jiraAgileConfig)
+        }
+        // In response, send the updated columns and their value and the status.
+        if (updateResponse.status == 'success') {
+            response.status = updateResponse.status;
+            response.record = updateResponse.record;
+            response.key = jiraResponse.key;
+        } else {
+            response.status = updateResponse.status;
+            response.error = updateResponse.error;
+        }
+        res.status(200).send(response)
+        return
+    } catch (e) {
+        console.log("Got exception: ", e);
+        res.status(415).send(e);
+    }
+    await dbAbstraction.destroy();
+});
+
 module.exports = router;

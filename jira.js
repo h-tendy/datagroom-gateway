@@ -234,27 +234,6 @@ function getSubTasksDetailsInTable (issue) {
     return subtasksDetails;
 }
 
-// async function createJiraIssue(request) {
-//     let bodyData = {
-//         "fields": {
-//             "issuetype": {
-//                 "name": request.type
-//             },
-//             "summary": request.summary,
-//             "priority": {
-//                 "name": request.priority
-//             },
-//             "description": request.description,
-//         }
-//     }
-//     try {
-//         let ret = jira.addNewIssue(bodyData)
-//         jira.deleteIssue
-//     } catch (e) {
-//         console.log(e)
-//     }
-// }
-
 function getProjectsMetaData() {
     try {
         let filteredProjectsMetaData = {}
@@ -309,8 +288,183 @@ function getDefaultTypeFieldsAndValues() {
     return JiraSettings.defaultTypeFieldsAndValues
 }
 
+async function createJiraIssue(jiraFormData) {
+    let response = {}
+    // let jiraFormData = request.jiraFormData
+    let issueType = jiraFormData.Type
+    let bodyData = null
+    if (issueType == "Bug") {
+        // TODO: Can be made more generic. For future??
+        let versions = jiraFormData["Bug"]["versions"].map((version) => { return { "name": version } });
+        let customfield_25558_values = jiraFormData["Bug"]["customfield_25558"].map((entry) => { return { "value": entry } });
+        let customfield_21295_values = jiraFormData["Bug"]["customfield_21295"].map((entry) => { return { "name": entry } });
+        let customfield_25555_values = jiraFormData["Bug"]["customfield_25555"].map((entry) => { return { "value": entry } });
+        bodyData = {
+            "fields": {
+                "description": jiraFormData[jiraFormData.Type].description,
+                "issuetype": {
+                    "name": jiraFormData.Type
+                },
+                "labels": [
+                    jiraFormData.JIRA_AGILE_ID
+                ],
+                "priority": {
+                    "name": jiraFormData[jiraFormData.Type].priority
+                },
+                "project": {
+                    "name": jiraFormData.Project
+                },
+                "summary": jiraFormData[jiraFormData.Type].summary,
+                "versions": versions,
+                "customfield_25563": {
+                    "value": jiraFormData[jiraFormData.Type].customfield_25563
+                },
+                "customfield_25716": {
+                    "value": jiraFormData[jiraFormData.Type].customfield_25716
+                },
+                "customfield_25558": customfield_25558_values,
+                "customfield_25570": {
+                    "value": jiraFormData[jiraFormData.Type].customfield_25570
+                },
+                "customfield_11504": {
+                    "value": jiraFormData[jiraFormData.Type].customfield_11504
+                },
+                "customfield_21295": customfield_21295_values,
+                "customfield_25578": jiraFormData[jiraFormData.Type].customfield_25578,
+                "customfield_25555": customfield_25555_values,
+                "customfield_25518": {
+                    "value": jiraFormData[jiraFormData.Type].customfield_25518
+                },
+            },
+            "update": {}
+        };
+    } else if (issueType == "User Story") {
+        bodyData = {
+            "fields": {
+                "description": jiraFormData[jiraFormData.Type].description,
+                "issuetype": {
+                    "name": jiraFormData.Type
+                },
+                "labels": [
+                    jiraFormData.JIRA_AGILE_ID
+                ],
+                "priority": {
+                    "name": jiraFormData[jiraFormData.Type].priority
+                },
+                "project": {
+                    "name": jiraFormData.Project
+                },
+                "summary": jiraFormData[jiraFormData.Type].summary,
+                "customfield_11890": jiraFormData[jiraFormData.Type]["customfield_11890"]
+            },
+            "update": {}
+        };
+    } else if (issueType == "Sub-task") {
+        bodyData = {
+            "fields": {
+                "description": jiraFormData[jiraFormData.Type].description,
+                "issuetype": {
+                    "name": jiraFormData.Type
+                },
+                "labels": [
+                    jiraFormData.JIRA_AGILE_ID
+                ],
+                "parent": {
+                    "key": jiraFormData[jiraFormData.Type].parent
+                },
+                "priority": {
+                    "name": jiraFormData[jiraFormData.Type].priority
+                },
+                "project": {
+                    "name": jiraFormData.Project
+                },
+                "summary": jiraFormData[jiraFormData.Type].summary,
+                "customfield_11890": jiraFormData[jiraFormData.Type]["customfield_11890"]
+            },
+            "update": {}
+        };
+    } else if (issueType == "Epic") {
+        bodyData = {
+            "fields": {
+                "description": jiraFormData[jiraFormData.Type].description,
+                "issuetype": {
+                    "name": jiraFormData.Type
+                },
+                "labels": [
+                    jiraFormData.JIRA_AGILE_ID
+                ],
+                "priority": {
+                    "name": jiraFormData[jiraFormData.Type].priority
+                },
+                "project": {
+                    "name": jiraFormData.Project
+                },
+                "summary": jiraFormData[jiraFormData.Type].summary,
+                "customfield_12791": jiraFormData[jiraFormData.Type]["customfield_12791"]
+            },
+            "update": {}
+        };
+    }
+    if (bodyData.fields.labels == "None") delete bodyData.fields.labels
+    if (bodyData.fields.parent && !bodyData.fields.parent.key) delete bodyData.fields.parent.key
+    try {
+        // let ret = await jira.addNewIssue(bodyData)
+        // if (ret.transition.status == 200) {
+        //     response.status = 'success'
+        //     response.key = ret.key
+        // } else {
+        //     response.status = 'fail'
+        //     response.error = 'unable to create jira issue'
+        // }
+        response.status = 'success'
+        response.key = 'THANOS-22222'
+    } catch (e) {
+        console.log(e)
+        response.status = 'fail'
+        response.error = 'unable to create issue in jira backend'
+    }
+    response.status = 'fail'
+    response.error = 'unable to create jira issue'
+    return response
+}
+
+async function getJiraRecordFromKey(key) {
+    try {
+        let issue = await jira.findIssue(key)
+        let jiraRec = utils.getRecFromJiraIssue(issue)
+        return jiraRec
+    } catch (e) {
+        return {}
+    }
+}
+
+async function updateJiraRecInDb(dsName, selectorObj, jiraRec, jiraConfig) {
+    let dbAbstraction = new DbAbstraction();
+    let r;
+    let response = {};
+    if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
+        r = defaultJiraMapping(jiraRec, jiraConfig);
+    } else {
+        r = doJiraMapping(jiraRec, jiraConfig);
+    }
+    try {
+        await dbAbstraction.update(dsName, "data", selectorObj, r.fullRec);
+        response.status = 'success'
+        response.record = r.fullRec
+    } catch (e) {
+        response.status = 'fail'
+        response.error = 'unable to update the jiraRec in db'
+        console.log("Db update error refreshJiraQuery: ", e);
+    }
+    await dbAbstraction.destroy();
+    return response
+}
+
 module.exports = {
     refreshJiraQuery,
     getProjectsMetaData,
-    getDefaultTypeFieldsAndValues
+    getDefaultTypeFieldsAndValues,
+    createJiraIssue,
+    getJiraRecordFromKey,
+    updateJiraRecInDb
 };
