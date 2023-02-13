@@ -307,7 +307,7 @@ async function createJiraIssue(jiraFormData) {
                     "name": jiraFormData.Type
                 },
                 "labels": [
-                    jiraFormData.JIRA_AGILE_ID
+                    jiraFormData.JIRA_AGILE_LABEL
                 ],
                 "priority": {
                     "name": jiraFormData[jiraFormData.Type].priority
@@ -352,7 +352,7 @@ async function createJiraIssue(jiraFormData) {
                     "name": jiraFormData.Type
                 },
                 "labels": [
-                    jiraFormData.JIRA_AGILE_ID
+                    jiraFormData.JIRA_AGILE_LABEL
                 ],
                 "priority": {
                     "name": jiraFormData[jiraFormData.Type].priority
@@ -374,7 +374,7 @@ async function createJiraIssue(jiraFormData) {
                     "name": jiraFormData.Type
                 },
                 "labels": [
-                    jiraFormData.JIRA_AGILE_ID
+                    jiraFormData.JIRA_AGILE_LABEL
                 ],
                 "parent": {
                     "key": jiraFormData[jiraFormData.Type].parent
@@ -399,7 +399,7 @@ async function createJiraIssue(jiraFormData) {
                     "name": jiraFormData.Type
                 },
                 "labels": [
-                    jiraFormData.JIRA_AGILE_ID
+                    jiraFormData.JIRA_AGILE_LABEL
                 ],
                 "priority": {
                     "name": jiraFormData[jiraFormData.Type].priority
