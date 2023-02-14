@@ -1315,6 +1315,13 @@ router.post('/view/addJiraRow', async (req, res, next) => {
     let dbAbstraction = new DbAbstraction();
     try {
         let response = {}
+        let parentJiraRec = await Jira.getJiraRecordFromKey(request.parentKey)
+        if (Object.keys(parentJiraRec).length == 0) {
+            response.status = 'fail'
+            response.error = 'unable to retrieve parent Jira. Please refresh jira.'
+            res.status(200).send(response);
+            return
+        }
         // Call jira function with the incoming data and update the jira.
         let jiraFormData = request.jiraFormData
         let jiraResponse = await Jira.createJiraIssue(jiraFormData)
@@ -1353,6 +1360,14 @@ router.post('/view/addJiraRow', async (req, res, next) => {
         } else {
             response.status = 'fail';
             response.error = 'unable to update the db with new issue. Please refresh jira.'
+        }
+
+        parentJiraRec = await Jira.getJiraRecordFromKey(request.parentKey)
+        let parentSelectorObj = {};
+        parentSelectorObj["_id"] = dbAbstraction.getObjectId(request.parentSelectorObj._id);
+        let parentUpdateResponse = await Jira.updateJiraRecInDb(request.dsName, parentSelectorObj, parentJiraRec, request.jiraAgileConfig)
+        if (parentUpdateResponse.status == 'success') {
+            response.parentRecord = parentUpdateResponse.record;
         }
         res.status(200).send(response)
         return
