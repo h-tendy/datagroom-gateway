@@ -147,9 +147,9 @@ function getRecFromJiraIssue(issue) {
   else
     rec.description = "";
   if (issue.fields.customfield_11890) {
-    rec.estimate = issue.fields.customfield_11890
+    rec['Story Points'] = issue.fields.customfield_11890
   } else {
-    rec.estimate = 0
+    rec['Story Points'] = 0
   }
   if (issue.fields.customfield_11990) {
     let sprintDetails = issue.fields.customfield_11990[0]

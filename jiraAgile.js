@@ -13,12 +13,12 @@ let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfi
 
 let editableFieldsAndTypeMapping = {
     "description": 'string',
-    "estimate": 'number',
+    "Story Points": 'number',
     "summary": 'string'
 }
 
 let customFieldMapping = {
-    "estimate": "customfield_11890"
+    "Story Points": "customfield_11890"
 }
 
 async function editSingleAttribute(req) {
