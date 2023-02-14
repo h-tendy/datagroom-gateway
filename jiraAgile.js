@@ -129,7 +129,7 @@ async function editSingleAttribute(req) {
                 console.log(ret)
             } catch (e) {
                 response.status = 'fail'
-                response.error = 'unable to update the record to JIRA'
+                response.error = `unable to update the record to JIRA. Error: ${e.message}`
                 await insertInEditLog(request, keyBeingEdited, response.status)
                 return response
             }
