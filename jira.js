@@ -103,12 +103,12 @@ function doJiraMapping(rec, jiraConfig) {
         if (!rec[key]) continue;
         if (!fullRec[jiraContentMapping[key]]) {
             if (revContentMap[jiraContentMapping[key]] > 1)
-                fullRec[jiraContentMapping[key]] = `**${key}**: ${rec[key]}`;
+                fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n`;
             else 
                 fullRec[jiraContentMapping[key]] = rec[key];
         } else {
-            let ws = "<br>";
-            let recValue = `**${key}**: ${rec[key]}`;
+            let ws = "<br/>\n";
+            let recValue = `**${key}**:\n ${rec[key]}\n`;
             fullRec[jiraContentMapping[key]] += ws + recValue;
         }
     }
@@ -119,7 +119,7 @@ function defaultJiraMapping(rec, jiraConfig) {
     let jiraUrl = "https://" + host; 
     let jiraKeyMapping = {'key': 'Work-id'}
     // No need for "Details" links to appear here. 
-    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'estimate': 'Description', 'sprintNumber': 'Description' };
+    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintNumber': 'Description' };
     let selectorObj = {}, fullRec = {};
     if (jiraConfig._id == "jiraAgileConfig") {
         selectorObj[jiraKeyMapping['key']] = `[JIRA_AGILE-${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -149,7 +149,7 @@ async function markAsStale (dsName, jiraConfig) {
     let jiraFieldMapping; 
     if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
         // No need for "Details" links to appear here. 
-        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'estimate': 'Description', 'sprintNumber': 'Description' };
+        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintNumber': 'Description' };
     } else { 
         jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
     }
@@ -257,9 +257,6 @@ function getProjectsMetaData() {
                         currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
                         currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
                         currFilteredProjectIssueTypeMetaData.fields[field].name = currOrigIssueTypeFieldObj.name
-                        if (currFilteredProjectIssueTypeMetaData.fields[field].name == "Story Points") {
-                            currFilteredProjectIssueTypeMetaData.fields[field].name = "estimate"
-                        }
                         currFilteredProjectIssueTypeMetaData.fields[field].hasDefaultValue = currOrigIssueTypeFieldObj.hasDefaultValue
                         if (currOrigIssueTypeFieldObj.allowedValues) {
                             currFilteredProjectIssueTypeMetaData.fields[field].allowedValues = []
@@ -466,11 +463,22 @@ async function updateJiraRecInDb(dsName, selectorObj, jiraRec, jiraConfig) {
     return response
 }
 
+function getFullRecFromJiraRec(jiraRec, jiraConfig) {
+    let r;
+    if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
+        r = defaultJiraMapping(jiraRec, jiraConfig);
+    } else {
+        r = doJiraMapping(jiraRec, jiraConfig);
+    }
+    return r
+}
+
 module.exports = {
     refreshJiraQuery,
     getProjectsMetaData,
     getDefaultTypeFieldsAndValues,
     createJiraIssue,
     getJiraRecordFromKey,
-    updateJiraRecInDb
+    updateJiraRecInDb,
+    getFullRecFromJiraRec
 };

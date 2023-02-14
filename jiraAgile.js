@@ -13,12 +13,12 @@ let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfi
 
 let editableFieldsAndTypeMapping = {
     "description": 'string',
-    "estimate": 'number',
+    "Story Points": 'number',
     "summary": 'string'
 }
 
 let customFieldMapping = {
-    "estimate": "customfield_11890"
+    "Story Points": "customfield_11890"
 }
 
 async function editSingleAttribute(req) {
@@ -246,7 +246,7 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
             rec[recKey] = recVal
         } else {
             let dbVal = dbRecord[dbKey]
-            let dbValArr = dbVal.split("<br>")
+            let dbValArr = dbVal.split("<br/>")
             for (let eachEntry of dbValArr) {
                 let eachEntryKeyMatchArr = eachEntry.match(/\*\*(.*)\*\*:(.*)/s)
                 if (eachEntryKeyMatchArr && eachEntryKeyMatchArr.length >= 3) {
