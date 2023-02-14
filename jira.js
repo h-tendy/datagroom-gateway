@@ -466,11 +466,22 @@ async function updateJiraRecInDb(dsName, selectorObj, jiraRec, jiraConfig) {
     return response
 }
 
+function getFullRecFromJiraRec(jiraRec, jiraConfig) {
+    let r;
+    if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
+        r = defaultJiraMapping(jiraRec, jiraConfig);
+    } else {
+        r = doJiraMapping(jiraRec, jiraConfig);
+    }
+    return r
+}
+
 module.exports = {
     refreshJiraQuery,
     getProjectsMetaData,
     getDefaultTypeFieldsAndValues,
     createJiraIssue,
     getJiraRecordFromKey,
-    updateJiraRecInDb
+    updateJiraRecInDb,
+    getFullRecFromJiraRec
 };
