@@ -129,7 +129,7 @@ async function editSingleAttribute(req) {
                 console.log(ret)
             } catch (e) {
                 response.status = 'fail'
-                response.error = 'unable to update the record to JIRA'
+                response.error = `unable to update the record to JIRA. Error: ${e.message}`
                 await insertInEditLog(request, keyBeingEdited, response.status)
                 return response
             }
@@ -193,7 +193,13 @@ function getEditedFieldsObj(oldRec, newRec) {
     let errorMsg = ''
     for (let newKey of Object.keys(newRec)) {
         let jiraKey = newKey
-        if (!oldRec[newKey]) continue
+        if (!oldRec[newKey]) {
+            if (fields.includes(jiraKey)) {
+                editedJiraObj[jiraKey] = newRec[newKey]
+            } else {
+                continue
+            }
+        }        
         if (oldRec[newKey] == newRec[newKey]) continue
         if (customFieldMapping[newKey]) {
             jiraKey = customFieldMapping[newKey]
