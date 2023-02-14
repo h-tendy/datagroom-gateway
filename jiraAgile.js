@@ -193,7 +193,13 @@ function getEditedFieldsObj(oldRec, newRec) {
     let errorMsg = ''
     for (let newKey of Object.keys(newRec)) {
         let jiraKey = newKey
-        if (!oldRec[newKey]) continue
+        if (!oldRec[newKey]) {
+            if (fields.includes(jiraKey)) {
+                editedJiraObj[jiraKey] = newRec[newKey]
+            } else {
+                continue
+            }
+        }        
         if (oldRec[newKey] == newRec[newKey]) continue
         if (customFieldMapping[newKey]) {
             jiraKey = customFieldMapping[newKey]
