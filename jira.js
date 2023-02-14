@@ -103,12 +103,12 @@ function doJiraMapping(rec, jiraConfig) {
         if (!rec[key]) continue;
         if (!fullRec[jiraContentMapping[key]]) {
             if (revContentMap[jiraContentMapping[key]] > 1)
-                fullRec[jiraContentMapping[key]] = `**${key}**: ${rec[key]}`;
+                fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n`;
             else 
                 fullRec[jiraContentMapping[key]] = rec[key];
         } else {
-            let ws = "<br>";
-            let recValue = `**${key}**: ${rec[key]}`;
+            let ws = "<br/>\n";
+            let recValue = `**${key}**:\n ${rec[key]}\n`;
             fullRec[jiraContentMapping[key]] += ws + recValue;
         }
     }

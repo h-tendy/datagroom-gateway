@@ -246,7 +246,7 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
             rec[recKey] = recVal
         } else {
             let dbVal = dbRecord[dbKey]
-            let dbValArr = dbVal.split("<br>")
+            let dbValArr = dbVal.split("<br/>")
             for (let eachEntry of dbValArr) {
                 let eachEntryKeyMatchArr = eachEntry.match(/\*\*(.*)\*\*:(.*)/s)
                 if (eachEntryKeyMatchArr && eachEntryKeyMatchArr.length >= 3) {
