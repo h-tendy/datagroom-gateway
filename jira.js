@@ -261,7 +261,7 @@ function getProjectsMetaData() {
                 for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
                     if (field == "project" || field == "issuetype") continue
                     let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
-                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || (field == "customfield_25554" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "assignee" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "fixVersions" && (currFilteredProjectIssueTypeMetaData.name == "Epic" || currFilteredProjectIssueTypeMetaData.name == "User Story")) || (field == "customfield_12790" && currFilteredProjectIssueTypeMetaData.name == "User Story")) {
+                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || (field == "customfield_25554" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "assignee" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "fixVersions" && (currFilteredProjectIssueTypeMetaData.name == "Epic" || currFilteredProjectIssueTypeMetaData.name == "Story")) || (field == "customfield_12790" && currFilteredProjectIssueTypeMetaData.name == "Story") || (field == "customfield_21909" && currFilteredProjectIssueTypeMetaData.name == "Story")) {
                         currFilteredProjectIssueTypeMetaData.fields[field] = {}
                         currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
                         currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
@@ -349,7 +349,7 @@ async function createJiraIssue(jiraFormData) {
             },
             "update": {}
         };
-    } else if (issueType == "User Story") {
+    } else if (issueType == "Story") {
         let fixVersions = jiraFormData["Epic"]["fixVersions"].map((version) => { return { "name": version } });
         bodyData = {
             "fields": {
@@ -369,7 +369,11 @@ async function createJiraIssue(jiraFormData) {
                 "summary": jiraFormData[jiraFormData.Type].summary,
                 "customfield_11890": parseInt(jiraFormData[jiraFormData.Type]["customfield_11890"]),
                 "fixVersions": fixVersions,
-                "customfield_12790": jiraFormData[jiraFormData.Type].customfield_12790
+                "customfield_12790": jiraFormData[jiraFormData.Type].customfield_12790,
+                "customfield_21909": {
+                    // "value": jiraFormData[jiraFormData.Type].customfield_21909,
+                    "id": "48749"
+                }
             },
             "update": {}
         };
