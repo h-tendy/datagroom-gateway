@@ -245,6 +245,8 @@ function getSubTasksDetailsInTable (issue) {
 
 function getProjectsMetaData() {
     try {
+        let defaultTypeFieldsAndValues = JiraSettings.defaultTypeFieldsAndValues
+        let expectedIssueTypes = Object.keys(defaultTypeFieldsAndValues)
         let filteredProjectsMetaData = {}
         let origProjectsMetaData = JiraSettings.projectsMetaData
         filteredProjectsMetaData.projects = []
@@ -254,27 +256,27 @@ function getProjectsMetaData() {
             currFilteredProjectMetaData.key = currOrigProjectMetaData.key
             currFilteredProjectMetaData.issuetypes = [];
             for (let j = 0; j < currOrigProjectMetaData.issuetypes.length; j++) {
+                if (!expectedIssueTypes.includes(currOrigProjectMetaData.issuetypes[j].name)) continue
                 let currOrigProjectIssueTypeMetaData = currOrigProjectMetaData.issuetypes[j];
                 let currFilteredProjectIssueTypeMetaData = {}
                 currFilteredProjectIssueTypeMetaData.name = currOrigProjectIssueTypeMetaData.name
                 currFilteredProjectIssueTypeMetaData.fields = {}
                 for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
                     if (field == "project" || field == "issuetype") continue
+                    if (!Object.keys(defaultTypeFieldsAndValues[currFilteredProjectIssueTypeMetaData.name]).includes(field)) continue;
                     let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
-                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || (field == "customfield_25554" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "assignee" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "fixVersions" && (currFilteredProjectIssueTypeMetaData.name == "Epic" || currFilteredProjectIssueTypeMetaData.name == "Story")) || (field == "customfield_12790" && currFilteredProjectIssueTypeMetaData.name == "Story") || (field == "customfield_21909" && currFilteredProjectIssueTypeMetaData.name == "Story")) {
-                        currFilteredProjectIssueTypeMetaData.fields[field] = {}
-                        currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
-                        currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
-                        currFilteredProjectIssueTypeMetaData.fields[field].name = currOrigIssueTypeFieldObj.name
-                        currFilteredProjectIssueTypeMetaData.fields[field].hasDefaultValue = currOrigIssueTypeFieldObj.hasDefaultValue
-                        if (currOrigIssueTypeFieldObj.allowedValues) {
-                            currFilteredProjectIssueTypeMetaData.fields[field].allowedValues = []
-                            for (let k = 0; k < currOrigIssueTypeFieldObj.allowedValues.length; k++) {
-                                if (currOrigIssueTypeFieldObj.allowedValues[k].value) {
-                                    currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].value)
-                                } else if (currOrigIssueTypeFieldObj.allowedValues[k].name) {
-                                    currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].name)
-                                }
+                    currFilteredProjectIssueTypeMetaData.fields[field] = {}
+                    currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
+                    currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
+                    currFilteredProjectIssueTypeMetaData.fields[field].name = currOrigIssueTypeFieldObj.name
+                    currFilteredProjectIssueTypeMetaData.fields[field].hasDefaultValue = currOrigIssueTypeFieldObj.hasDefaultValue
+                    if (currOrigIssueTypeFieldObj.allowedValues) {
+                        currFilteredProjectIssueTypeMetaData.fields[field].allowedValues = []
+                        for (let k = 0; k < currOrigIssueTypeFieldObj.allowedValues.length; k++) {
+                            if (currOrigIssueTypeFieldObj.allowedValues[k].value) {
+                                currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].value)
+                            } else if (currOrigIssueTypeFieldObj.allowedValues[k].name) {
+                                currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].name)
                             }
                         }
                     }
