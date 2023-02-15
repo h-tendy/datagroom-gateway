@@ -296,6 +296,7 @@ async function createFilteredProjectsMetaData() {
     } catch (e) {
         console.log(e)
     }
+    setTimeout(createFilteredProjectsMetaData, JiraSettings.jiraMetaDataRefreshIntervalInMs)
 }
 
 function getIssueTypesForGivenProject(projectKey) {
