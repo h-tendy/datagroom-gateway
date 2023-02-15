@@ -105,7 +105,7 @@ function doJiraMapping(rec, jiraConfig) {
         if (!rec[key]) continue;
         if (!fullRec[jiraContentMapping[key]]) {
             if (revContentMap[jiraContentMapping[key]] > 1)
-                if (key == "subtasksDetails") {
+                if (key == "subtasksDetails" || key == "dependsLinks" || key == "implementLinks" || key == "packageLinks" || key == "relatesLinks" || key == "testLinks" || key == "coversLinks" || key == "defectLinks" || key == "automatesLinks") {
                     fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
                 } else {
                     fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
@@ -113,9 +113,8 @@ function doJiraMapping(rec, jiraConfig) {
             else 
                 fullRec[jiraContentMapping[key]] = rec[key];
         } else {
-            // let ws = "<br/>\n";
             let recValue;
-            if (key == "subtasksDetails") {
+            if (key == "subtasksDetails" || key == "dependsLinks" || key == "implementLinks" || key == "packageLinks" || key == "relatesLinks" || key == "testLinks" || key == "coversLinks" || key == "defectLinks" || key == "automatesLinks") {
                 recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
             } else {
                 recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
