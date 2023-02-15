@@ -103,13 +103,22 @@ function doJiraMapping(rec, jiraConfig) {
         if (!rec[key]) continue;
         if (!fullRec[jiraContentMapping[key]]) {
             if (revContentMap[jiraContentMapping[key]] > 1)
-                fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n`;
+                if (key == "subtasksDetails") {
+                    fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
+                } else {
+                    fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
+                }
             else 
                 fullRec[jiraContentMapping[key]] = rec[key];
         } else {
-            let ws = "<br/>\n";
-            let recValue = `**${key}**:\n ${rec[key]}\n`;
-            fullRec[jiraContentMapping[key]] += ws + recValue;
+            // let ws = "<br/>\n";
+            let recValue;
+            if (key == "subtasksDetails") {
+                recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
+            } else {
+                recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
+            }
+            fullRec[jiraContentMapping[key]] += recValue;
         }
     }
     return { selectorObj, fullRec }
