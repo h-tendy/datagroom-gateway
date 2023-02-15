@@ -7,6 +7,8 @@ const utils = require('./utils')
 let host = JiraSettings.host;
 var jira = new JiraApi(JiraSettings.settings);
 
+let filteredProjectsMetaData = {}
+
 // Custom fields per installation
 let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990"];
 
@@ -243,27 +245,30 @@ function getSubTasksDetailsInTable (issue) {
     return subtasksDetails;
 }
 
-function getProjectsMetaData() {
+function createFilteredProjectsMetaData() {
     try {
         let defaultTypeFieldsAndValues = JiraSettings.defaultTypeFieldsAndValues
-        let expectedIssueTypes = Object.keys(defaultTypeFieldsAndValues)
-        let filteredProjectsMetaData = {}
+        let expectedProjects = []
+        for (let projectObj of defaultTypeFieldsAndValues.projects) {
+            expectedProjects.push(projectObj.key)
+        }
         let origProjectsMetaData = JiraSettings.projectsMetaData
         filteredProjectsMetaData.projects = []
         for (let i = 0; i < origProjectsMetaData.projects.length; i++) {
+            if (!expectedProjects.includes(origProjectsMetaData.projects[i].key)) continue
             let currOrigProjectMetaData = origProjectsMetaData.projects[i];
             let currFilteredProjectMetaData = {};
             currFilteredProjectMetaData.key = currOrigProjectMetaData.key
             currFilteredProjectMetaData.issuetypes = [];
             for (let j = 0; j < currOrigProjectMetaData.issuetypes.length; j++) {
-                if (!expectedIssueTypes.includes(currOrigProjectMetaData.issuetypes[j].name)) continue
+                if (!getIssueTypesForGivenProject(currFilteredProjectMetaData.key).includes(currOrigProjectMetaData.issuetypes[j].name)) continue
                 let currOrigProjectIssueTypeMetaData = currOrigProjectMetaData.issuetypes[j];
                 let currFilteredProjectIssueTypeMetaData = {}
                 currFilteredProjectIssueTypeMetaData.name = currOrigProjectIssueTypeMetaData.name
                 currFilteredProjectIssueTypeMetaData.fields = {}
                 for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
                     if (field == "project" || field == "issuetype") continue
-                    if (!Object.keys(defaultTypeFieldsAndValues[currFilteredProjectIssueTypeMetaData.name]).includes(field)) continue;
+                    if (!getFieldsForGivenProjectAndIssueType(currFilteredProjectMetaData.key, currFilteredProjectIssueTypeMetaData.name).includes(field)) continue;
                     let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
                     currFilteredProjectIssueTypeMetaData.fields[field] = {}
                     currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
@@ -290,6 +295,33 @@ function getProjectsMetaData() {
         console.log(e)
         return {}
     }
+}
+
+function getIssueTypesForGivenProject(projectKey) {
+    let defaultProjects = JiraSettings.defaultTypeFieldsAndValues.projects
+    for (let projectObj of defaultProjects) {
+        if (projectObj.key != projectKey) continue
+        return Object.keys(projectObj.issuetypes)
+    }
+    return []
+}
+
+function getFieldsForGivenProjectAndIssueType(projectKey, issuetype) {
+    try {
+        let defaultProjects = JiraSettings.defaultTypeFieldsAndValues.projects
+        for (let projectObj of defaultProjects) {
+            if (projectObj.key != projectKey) continue
+            return Object.keys(projectObj.issuetypes[issuetype])
+        }
+    } catch (e) {
+        return []
+    }
+    return []
+}
+
+function getProjectsMetaData() {
+    createFilteredProjectsMetaData()
+    return filteredProjectsMetaData
 }
 
 function getDefaultTypeFieldsAndValues() {
