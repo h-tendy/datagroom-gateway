@@ -8,10 +8,12 @@ let settings = {
     strictSSL: false
 }
 
+//NOTE: currently supported for single project. Will be extended further for multiple projects
+
 let defaultTypeFieldsAndValues = {
     "projects": [
         {
-            "key": "THANOS",
+            "key": "<ProjectKey>",
             "issuetypes": {
                 "Bug": {
                     "summary": "",
