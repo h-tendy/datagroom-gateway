@@ -14,6 +14,7 @@ const Utils = require('./utils');
 const PrepAttachments = require('./prepAttachments');
 let fs = require('fs');
 const dotenv = require('dotenv')
+const Jira = require('./jira')
 
 dotenv.config({ path: './.env' })
 
@@ -254,6 +255,10 @@ function dgUnlockForClient (clientId) {
 
     })
 })();
+
+(async function () {
+    await Jira.createFilteredProjectsMetaData()
+})()
 
 
 function loginAuthenticateForReact(req, res, next) {

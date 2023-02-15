@@ -7,6 +7,8 @@ const utils = require('./utils')
 let host = JiraSettings.host;
 var jira = new JiraApi(JiraSettings.settings);
 
+let filteredProjectsMetaData = {}
+
 // Custom fields per installation
 let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990"];
 
@@ -103,13 +105,22 @@ function doJiraMapping(rec, jiraConfig) {
         if (!rec[key]) continue;
         if (!fullRec[jiraContentMapping[key]]) {
             if (revContentMap[jiraContentMapping[key]] > 1)
-                fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n`;
+                if (key == "subtasksDetails") {
+                    fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
+                } else {
+                    fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
+                }
             else 
                 fullRec[jiraContentMapping[key]] = rec[key];
         } else {
-            let ws = "<br/>\n";
-            let recValue = `**${key}**:\n ${rec[key]}\n`;
-            fullRec[jiraContentMapping[key]] += ws + recValue;
+            // let ws = "<br/>\n";
+            let recValue;
+            if (key == "subtasksDetails") {
+                recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
+            } else {
+                recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
+            }
+            fullRec[jiraContentMapping[key]] += recValue;
         }
     }
     return { selectorObj, fullRec }
@@ -234,38 +245,46 @@ function getSubTasksDetailsInTable (issue) {
     return subtasksDetails;
 }
 
-function getProjectsMetaData() {
+async function createFilteredProjectsMetaData() {
     try {
-        let filteredProjectsMetaData = {}
-        let origProjectsMetaData = JiraSettings.projectsMetaData
+        let defaultTypeFieldsAndValues = JiraSettings.defaultTypeFieldsAndValues
+        let expectedProjects = []
+        for (let projectObj of defaultTypeFieldsAndValues.projects) {
+            expectedProjects.push(projectObj.key)
+        }
+        let origProjectsMetaData = await jira.getIssueCreateMetadata({
+            projectKeys: expectedProjects,
+            expand: ["projects.issuetypes.fields"]
+        })
         filteredProjectsMetaData.projects = []
         for (let i = 0; i < origProjectsMetaData.projects.length; i++) {
+            if (!expectedProjects.includes(origProjectsMetaData.projects[i].key)) continue
             let currOrigProjectMetaData = origProjectsMetaData.projects[i];
             let currFilteredProjectMetaData = {};
             currFilteredProjectMetaData.key = currOrigProjectMetaData.key
             currFilteredProjectMetaData.issuetypes = [];
             for (let j = 0; j < currOrigProjectMetaData.issuetypes.length; j++) {
+                if (!getIssueTypesForGivenProject(currFilteredProjectMetaData.key).includes(currOrigProjectMetaData.issuetypes[j].name)) continue
                 let currOrigProjectIssueTypeMetaData = currOrigProjectMetaData.issuetypes[j];
                 let currFilteredProjectIssueTypeMetaData = {}
                 currFilteredProjectIssueTypeMetaData.name = currOrigProjectIssueTypeMetaData.name
                 currFilteredProjectIssueTypeMetaData.fields = {}
                 for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
                     if (field == "project" || field == "issuetype") continue
+                    if (!getFieldsForGivenProjectAndIssueType(currFilteredProjectMetaData.key, currFilteredProjectIssueTypeMetaData.name).includes(field)) continue;
                     let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
-                    if (currOrigIssueTypeFieldObj.required || field == "description" || field == "priority" || field == "customfield_11890" || (field == "customfield_25554" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "assignee" && currFilteredProjectIssueTypeMetaData.name == "Bug") || (field == "fixVersions" && (currFilteredProjectIssueTypeMetaData.name == "Epic" || currFilteredProjectIssueTypeMetaData.name == "User Story")) || (field == "customfield_12790" && currFilteredProjectIssueTypeMetaData.name == "User Story")) {
-                        currFilteredProjectIssueTypeMetaData.fields[field] = {}
-                        currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
-                        currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
-                        currFilteredProjectIssueTypeMetaData.fields[field].name = currOrigIssueTypeFieldObj.name
-                        currFilteredProjectIssueTypeMetaData.fields[field].hasDefaultValue = currOrigIssueTypeFieldObj.hasDefaultValue
-                        if (currOrigIssueTypeFieldObj.allowedValues) {
-                            currFilteredProjectIssueTypeMetaData.fields[field].allowedValues = []
-                            for (let k = 0; k < currOrigIssueTypeFieldObj.allowedValues.length; k++) {
-                                if (currOrigIssueTypeFieldObj.allowedValues[k].value) {
-                                    currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].value)
-                                } else if (currOrigIssueTypeFieldObj.allowedValues[k].name) {
-                                    currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].name)
-                                }
+                    currFilteredProjectIssueTypeMetaData.fields[field] = {}
+                    currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
+                    currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
+                    currFilteredProjectIssueTypeMetaData.fields[field].name = currOrigIssueTypeFieldObj.name
+                    currFilteredProjectIssueTypeMetaData.fields[field].hasDefaultValue = currOrigIssueTypeFieldObj.hasDefaultValue
+                    if (currOrigIssueTypeFieldObj.allowedValues) {
+                        currFilteredProjectIssueTypeMetaData.fields[field].allowedValues = []
+                        for (let k = 0; k < currOrigIssueTypeFieldObj.allowedValues.length; k++) {
+                            if (currOrigIssueTypeFieldObj.allowedValues[k].value) {
+                                currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].value)
+                            } else if (currOrigIssueTypeFieldObj.allowedValues[k].name) {
+                                currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].name)
                             }
                         }
                     }
@@ -274,11 +293,36 @@ function getProjectsMetaData() {
             }
             filteredProjectsMetaData.projects.push(currFilteredProjectMetaData)
         }
-        return filteredProjectsMetaData
     } catch (e) {
         console.log(e)
-        return {}
     }
+    setTimeout(createFilteredProjectsMetaData, JiraSettings.jiraMetaDataRefreshIntervalInMs)
+}
+
+function getIssueTypesForGivenProject(projectKey) {
+    let defaultProjects = JiraSettings.defaultTypeFieldsAndValues.projects
+    for (let projectObj of defaultProjects) {
+        if (projectObj.key != projectKey) continue
+        return Object.keys(projectObj.issuetypes)
+    }
+    return []
+}
+
+function getFieldsForGivenProjectAndIssueType(projectKey, issuetype) {
+    try {
+        let defaultProjects = JiraSettings.defaultTypeFieldsAndValues.projects
+        for (let projectObj of defaultProjects) {
+            if (projectObj.key != projectKey) continue
+            return Object.keys(projectObj.issuetypes[issuetype])
+        }
+    } catch (e) {
+        return []
+    }
+    return []
+}
+
+function getProjectsMetaData() {
+    return filteredProjectsMetaData
 }
 
 function getDefaultTypeFieldsAndValues() {
@@ -340,7 +384,7 @@ async function createJiraIssue(jiraFormData) {
             },
             "update": {}
         };
-    } else if (issueType == "User Story") {
+    } else if (issueType == "Story") {
         let fixVersions = jiraFormData["Epic"]["fixVersions"].map((version) => { return { "name": version } });
         bodyData = {
             "fields": {
@@ -360,7 +404,11 @@ async function createJiraIssue(jiraFormData) {
                 "summary": jiraFormData[jiraFormData.Type].summary,
                 "customfield_11890": parseInt(jiraFormData[jiraFormData.Type]["customfield_11890"]),
                 "fixVersions": fixVersions,
-                "customfield_12790": jiraFormData[jiraFormData.Type].customfield_12790
+                "customfield_12790": jiraFormData[jiraFormData.Type].customfield_12790,
+                "customfield_21909": {
+                    // "value": jiraFormData[jiraFormData.Type].customfield_21909,
+                    "id": "48749"
+                }
             },
             "update": {}
         };
@@ -480,5 +528,6 @@ module.exports = {
     createJiraIssue,
     getJiraRecordFromKey,
     updateJiraRecInDb,
-    getFullRecFromJiraRec
+    getFullRecFromJiraRec,
+    createFilteredProjectsMetaData
 };
