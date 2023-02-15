@@ -245,14 +245,17 @@ function getSubTasksDetailsInTable (issue) {
     return subtasksDetails;
 }
 
-function createFilteredProjectsMetaData() {
+async function createFilteredProjectsMetaData() {
     try {
         let defaultTypeFieldsAndValues = JiraSettings.defaultTypeFieldsAndValues
         let expectedProjects = []
         for (let projectObj of defaultTypeFieldsAndValues.projects) {
             expectedProjects.push(projectObj.key)
         }
-        let origProjectsMetaData = JiraSettings.projectsMetaData
+        let origProjectsMetaData = await jira.getIssueCreateMetadata({
+            projectKeys: expectedProjects,
+            expand: ["projects.issuetypes.fields"]
+        })
         filteredProjectsMetaData.projects = []
         for (let i = 0; i < origProjectsMetaData.projects.length; i++) {
             if (!expectedProjects.includes(origProjectsMetaData.projects[i].key)) continue
@@ -290,10 +293,8 @@ function createFilteredProjectsMetaData() {
             }
             filteredProjectsMetaData.projects.push(currFilteredProjectMetaData)
         }
-        return filteredProjectsMetaData
     } catch (e) {
         console.log(e)
-        return {}
     }
 }
 
@@ -320,7 +321,6 @@ function getFieldsForGivenProjectAndIssueType(projectKey, issuetype) {
 }
 
 function getProjectsMetaData() {
-    createFilteredProjectsMetaData()
     return filteredProjectsMetaData
 }
 
@@ -527,5 +527,6 @@ module.exports = {
     createJiraIssue,
     getJiraRecordFromKey,
     updateJiraRecInDb,
-    getFullRecFromJiraRec
+    getFullRecFromJiraRec,
+    createFilteredProjectsMetaData
 };
