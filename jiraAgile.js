@@ -14,7 +14,8 @@ let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfi
 let editableFieldsAndTypeMapping = {
     "description": 'string',
     "Story Points": 'number',
-    "summary": 'string'
+    "summary": 'string',
+    "assignee": 'string'
 }
 
 let customFieldMapping = {
@@ -195,7 +196,11 @@ function getEditedFieldsObj(oldRec, newRec) {
         let jiraKey = newKey
         if (!oldRec[newKey]) {
             if (fields.includes(jiraKey)) {
-                editedJiraObj[jiraKey] = newRec[newKey]
+                if (jiraKey == "assignee") {
+                    editedJiraObj[jiraKey] = { "name": newRec[newKey].trim() }
+                } else {
+                    editedJiraObj[jiraKey] = newRec[newKey]
+                }
             } else {
                 continue
             }
@@ -214,7 +219,11 @@ function getEditedFieldsObj(oldRec, newRec) {
                 errorMsg = `${newKey} should be ${editableFieldsAndTypeMapping[newKey]} type`
             }
         } else {
-            editedJiraObj[jiraKey] = newRec[newKey]
+            if (jiraKey == "assignee") {
+                editedJiraObj[jiraKey] = { "name": newRec[newKey].trim() }
+            } else {
+                editedJiraObj[jiraKey] = newRec[newKey]
+            }
         }
     }
     return { editedJiraObj, errorMsg }
