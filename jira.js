@@ -23,12 +23,19 @@ async function refreshJiraQuery (dsName, jiraConfig) {
     let startAt = 0; let total = 0;
     let resultRecords = [];
     let names, results; 
-
+    let jql = jiraConfig.jql
     await markAsStale(dsName, jiraConfig);
+
+    if (jiraConfig._id == "jiraAgileConfig") {
+        jql = await getJiraAgileJql(jiraConfig)
+    }
+
+    //TODO: Better error msg to frontend. For now, it's ok.
+    if (!jql) return
     do {
         console.log("Fetching from: ", startAt);
         // Comment out 'fields' below for getting all fields for field exploration. 
-        results = await jira.searchJira(jiraConfig.jql, { startAt, fields, expand: ["names"] } );
+        results = await jira.searchJira(jql, { startAt, fields, expand: ["names"] });
         startAt += results.issues.length;
         names = results.names;
         for (let i = 0; i < results.issues.length; i++) {
@@ -518,6 +525,30 @@ function getFullRecFromJiraRec(jiraRec, jiraConfig) {
         r = doJiraMapping(jiraRec, jiraConfig);
     }
     return r
+}
+
+async function getJiraAgileJql(jiraConfig) {
+    let jql;
+    try {
+        if (jiraConfig._id == "jiraAgileConfig") {
+            let jiraConfiguration = await jira.getConfiguration(jiraConfig.boardId)
+            let filterUrl = jiraConfiguration.filter.self;
+            const auth = 'Basic ' + Buffer.from(JiraSettings.settings.username + ':' + JiraSettings.settings.password).toString('base64');
+            const options = {
+                headers: {
+                    'Authorization': auth
+                }
+            };
+            const response = await fetch(filterUrl, options);
+            if (response.ok) {
+                let responseJson = await response.json();
+                jql = responseJson.jql
+            }
+        }
+    } catch (e) {
+        console.log("Error encountered while retreiving the jql for JIRA_AGILE config")
+    }
+    return jql
 }
 
 module.exports = {
