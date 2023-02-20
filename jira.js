@@ -342,11 +342,11 @@ async function createJiraIssue(jiraFormData) {
     let bodyData = null
     if (issueType == "Bug") {
         // TODO: Can be made more generic. For future??
-        let versions = jiraFormData["Bug"]["versions"].map((version) => { return { "name": version } });
-        let customfield_25558_values = jiraFormData["Bug"]["customfield_25558"].map((entry) => { return { "value": entry } });
-        let customfield_21295_values = jiraFormData["Bug"]["customfield_21295"].map((entry) => { return { "name": entry } });
-        let customfield_25555_values = jiraFormData["Bug"]["customfield_25555"].map((entry) => { return { "value": entry } });
-        let customfield_25554_values = jiraFormData["Bug"]["customfield_25554"].map((entry) => { return { "value": entry } });
+        let versions = jiraFormData[issueType]["versions"].map((version) => { return { "name": version } });
+        let customfield_25558_values = jiraFormData[issueType]["customfield_25558"].map((entry) => { return { "value": entry } });
+        let customfield_21295_values = jiraFormData[issueType]["customfield_21295"].map((entry) => { return { "name": entry } });
+        let customfield_25555_values = jiraFormData[issueType]["customfield_25555"].map((entry) => { return { "value": entry } });
+        let customfield_25554_values = jiraFormData[issueType]["customfield_25554"].map((entry) => { return { "value": entry } });
         bodyData = {
             "fields": {
                 "description": jiraFormData[jiraFormData.Type].description,
@@ -391,7 +391,8 @@ async function createJiraIssue(jiraFormData) {
             "update": {}
         };
     } else if (issueType == "Story") {
-        let fixVersions = jiraFormData["Epic"]["fixVersions"].map((version) => { return { "name": version } });
+        let fixVersions = jiraFormData[issueType]["fixVersions"].map((version) => { return { "name": version } });
+        let customfield_26394_values = jiraFormData[issueType]["customfield_26394"].map((entry) => { return { "value": entry } });
         bodyData = {
             "fields": {
                 "description": jiraFormData[jiraFormData.Type].description,
@@ -412,9 +413,21 @@ async function createJiraIssue(jiraFormData) {
                 "fixVersions": fixVersions,
                 "customfield_12790": jiraFormData[jiraFormData.Type].customfield_12790,
                 "customfield_21909": {
-                    // "value": jiraFormData[jiraFormData.Type].customfield_21909,
-                    "id": "48749"
-                }
+                    "value": jiraFormData[jiraFormData.Type].customfield_21909,
+                },
+                "customfield_28096": {
+                    "value": jiraFormData[jiraFormData.Type].customfield_28096,
+                },
+                "assignee": {
+                    "name": jiraFormData[jiraFormData.Type].assignee
+                },
+                "customfield_28101": {
+                    "name": jiraFormData[jiraFormData.Type].customfield_28101
+                },
+                "customfield_26394": customfield_26394_values,
+                "customfield_28102": {
+                    "name": jiraFormData[jiraFormData.Type].customfield_28102
+                },
             },
             "update": {}
         };
@@ -443,7 +456,8 @@ async function createJiraIssue(jiraFormData) {
             "update": {}
         };
     } else if (issueType == "Epic") {
-        let fixVersions = jiraFormData["Epic"]["fixVersions"].map((version) => { return { "name": version } });
+        let fixVersions = jiraFormData[issueType]["fixVersions"].map((version) => { return { "name": version } });
+        let customfield_26394_values = jiraFormData[issueType]["customfield_26394"].map((entry) => { return { "value": entry } });
         bodyData = {
             "fields": {
                 "description": jiraFormData[jiraFormData.Type].description,
@@ -461,7 +475,17 @@ async function createJiraIssue(jiraFormData) {
                 },
                 "summary": jiraFormData[jiraFormData.Type].summary,
                 "customfield_12791": jiraFormData[jiraFormData.Type]["customfield_12791"],
-                "fixVersions": fixVersions
+                "fixVersions": fixVersions,
+                "customfield_21909": {
+                    "value": jiraFormData[jiraFormData.Type].customfield_21909,
+                },
+                "customfield_28096": {
+                    "value": jiraFormData[jiraFormData.Type].customfield_28096,
+                },
+                "customfield_26394": customfield_26394_values,
+                "assignee": {
+                    "name": jiraFormData[jiraFormData.Type].assignee
+                },
             },
             "update": {}
         };
