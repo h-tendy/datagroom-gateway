@@ -695,7 +695,7 @@ router.post('/view/refreshJira', async (req, res, next) => {
             await Jira.refreshJiraQuery(request.dsName, jiraConfig);
             response.status = 'success'
         }
-        if (jiraAgileConfig && jiraAgileConfig.jira && jiraAgileConfig.jql) {
+        if (jiraAgileConfig && jiraAgileConfig.jira) {
             await Jira.refreshJiraQuery(request.dsName, jiraAgileConfig);
             response.status = 'success'
         }
