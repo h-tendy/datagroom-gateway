@@ -15,11 +15,13 @@ let editableFieldsAndTypeMapping = {
     "description": 'string',
     "Story Points": 'number',
     "summary": 'string',
-    "assignee": 'string'
+    "assignee": 'string',
+    "sprintName": 'string',
 }
 
 let customFieldMapping = {
-    "Story Points": "customfield_11890"
+    "Story Points": "customfield_11890",
+    "sprintName": "customfield_11990",
 }
 
 async function editSingleAttribute(req) {
@@ -116,7 +118,7 @@ async function editSingleAttribute(req) {
 
     /**Compare the latest jira with that in db. If db is not updated send the message to the UI and cancel the edit operation */
     if (latestJiraRec) {
-        let ret = getEditedFieldsObj(oldUiRec, newUiRec)
+        let ret = await getEditedFieldsObj(oldUiRec, newUiRec, jiraAgileConfig.boardId)
         if (ret.errorMsg != '') {
             response.status = 'fail'
             response.error = ret.errorMsg
@@ -189,7 +191,7 @@ function isRecordUpdated(oldRec, newRec) {
     return isUpdated
 }
 
-function getEditedFieldsObj(oldRec, newRec) {
+async function getEditedFieldsObj(oldRec, newRec, boardId) {
     let editedJiraObj = {}
     let errorMsg = ''
     for (let newKey of Object.keys(newRec)) {
@@ -198,6 +200,13 @@ function getEditedFieldsObj(oldRec, newRec) {
             if (fields.includes(jiraKey)) {
                 if (jiraKey == "assignee") {
                     editedJiraObj[jiraKey] = { "name": newRec[newKey].trim() }
+                } else if (jiraKey == "sprintName") {
+                    let sprintId = await getSprintIdFromSprintName(newRec[newKey], boardId)
+                    if (!sprintId) {
+                        errorMsg = `Can't find the sprintId for the sprintName. Maybe you have to create one.`
+                    } else {
+                        editedJiraObj[customFieldMapping[jiraKey]] = sprintId
+                    }
                 } else {
                     editedJiraObj[jiraKey] = newRec[newKey]
                 }
@@ -221,12 +230,39 @@ function getEditedFieldsObj(oldRec, newRec) {
         } else {
             if (jiraKey == "assignee") {
                 editedJiraObj[jiraKey] = { "name": newRec[newKey].trim() }
+            } else if (newKey == "sprintName") {
+                let sprintId = await getSprintIdFromSprintName(newRec[newKey], boardId)
+                if (!sprintId) {
+                    errorMsg = `Can't find the sprintId for the sprintName. Maybe you have to create one.`
+                } else {
+                    editedJiraObj[jiraKey] = sprintId
+                }
             } else {
                 editedJiraObj[jiraKey] = newRec[newKey]
             }
         }
     }
     return { editedJiraObj, errorMsg }
+}
+
+/**
+ * @param {string} sprintName
+ * @param {string} boardId
+ */
+async function getSprintIdFromSprintName(sprintName, boardId) {
+    let sprintId = null;
+    try {
+        let allSprints = await jira.getAllSprints(boardId);
+        for (let element of allSprints.values) {
+            if (element.name == sprintName.trim()) {
+                sprintId = element.id
+                break;
+            }
+        }
+    } catch (e) {
+        console.log(`Got error while retreiving sprintId for sprintName ${sprintName} for boardId ${boardId}`);
+    }
+    return sprintId
 }
 
 function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
