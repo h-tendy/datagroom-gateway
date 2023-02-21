@@ -195,17 +195,21 @@ async function getEditedFieldsObj(oldRec, newRec, boardId) {
     let editedJiraObj = {}
     let errorMsg = ''
     for (let newKey of Object.keys(newRec)) {
+        if (oldRec[newKey] == newRec[newKey]) continue
         let jiraKey = newKey
+        if (customFieldMapping[newKey]) {
+            jiraKey = customFieldMapping[newKey]
+        }
         if (!oldRec[newKey]) {
             if (fields.includes(jiraKey)) {
                 if (jiraKey == "assignee") {
                     editedJiraObj[jiraKey] = { "name": newRec[newKey].trim() }
-                } else if (jiraKey == "sprintName") {
+                } else if (newKey == "sprintName") {
                     let sprintId = await getSprintIdFromSprintName(newRec[newKey], boardId)
                     if (!sprintId) {
                         errorMsg = `Can't find the sprintId for the sprintName. Maybe you have to create one.`
                     } else {
-                        editedJiraObj[customFieldMapping[jiraKey]] = sprintId
+                        editedJiraObj[jiraKey] = sprintId
                     }
                 } else {
                     editedJiraObj[jiraKey] = newRec[newKey]
@@ -214,10 +218,6 @@ async function getEditedFieldsObj(oldRec, newRec, boardId) {
                 continue
             }
         }        
-        if (oldRec[newKey] == newRec[newKey]) continue
-        if (customFieldMapping[newKey]) {
-            jiraKey = customFieldMapping[newKey]
-        }
         if (!fields.includes(jiraKey)) continue
         if (typeof newRec[newKey] != editableFieldsAndTypeMapping[newKey]) {
             if (editableFieldsAndTypeMapping[newKey] == 'number' && typeof newRec[newKey] == 'string') {
