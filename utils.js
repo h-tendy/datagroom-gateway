@@ -153,14 +153,14 @@ function getRecFromJiraIssue(issue) {
   }
   if (issue.fields.customfield_11990) {
     let sprintDetails = issue.fields.customfield_11990[0]
-    let sprintNumMatchArr = sprintDetails.match(/name=.*Sprint\s*(\d)+?/)
-    if (sprintNumMatchArr && sprintNumMatchArr.length >= 2) {
-      rec.sprintNumber = parseInt(sprintNumMatchArr[1])
+    let sprintNameMatchArr = sprintDetails.match(/name=([^,]*)/)
+    if (sprintNameMatchArr && sprintNameMatchArr.length >= 2) {
+      rec.sprintName = sprintNameMatchArr[1]
     } else {
-      rec.sprintNumber = 0
+      rec.sprintName = ""
     }
   } else {
-    rec.sprintNumber = 0
+    rec.sprintName = ""
   }
   if (issue.fields.subtasks && issue.fields.subtasks.length) {
     rec.subtasks = "[";
