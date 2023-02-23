@@ -487,7 +487,20 @@ async function createJiraIssue(jiraFormData) {
                     "name": jiraFormData[jiraFormData.Type].assignee
                 },
             },
-            "update": {}
+            "update": {
+                "issuelinks": [
+                    {
+                        "add": {
+                            "type": {
+                                "name": 'Relates'
+                            },
+                            "outwardIssue": {
+                                "key": jiraFormData[jiraFormData.Type].issuelinks
+                            }
+                        }
+                    }
+                ]
+            }
         };
     }
     if (bodyData.fields.labels == "None") delete bodyData.fields.labels
