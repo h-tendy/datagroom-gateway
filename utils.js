@@ -55,6 +55,7 @@ function getRecFromJiraIssue(issue) {
   rec.key = issue.key;
   rec.summary = issue.fields.summary;
   rec.type = issue.fields.issuetype.name;
+  rec.jiraSummary = `${rec.summary}\n(${rec.key})`
   rec.assignee = issue.fields.assignee ? issue.fields.assignee.name : "NotSet";
   rec.status = issue.fields.status.name;
   rec.priority = issue.fields.priority.name;
