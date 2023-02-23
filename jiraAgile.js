@@ -9,7 +9,7 @@ const utils = require('./utils')
 let host = JiraSettings.host;
 var jira = new JiraApi(JiraSettings.settings);
 
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990"];
+let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990", "jiraSummary"];
 
 let editableFieldsAndTypeMapping = {
     "description": 'string',
@@ -164,6 +164,7 @@ function isFieldEditable(oldUiParsedRec, newUiParsedRec) {
     let errorMsg = ''
     let editableFields = Object.keys(editableFieldsAndTypeMapping)
     for (let oldKeys of Object.keys(oldUiParsedRec)) {
+        if (oldKeys == "jiraSummary") continue
         if (!newUiParsedRec[oldKeys]) continue
         if (newUiParsedRec[oldKeys] == oldUiParsedRec[oldKeys]) continue
         if (!editableFields.includes(oldKeys)) {
@@ -195,6 +196,7 @@ async function getEditedFieldsObj(oldRec, newRec, boardId) {
     let editedJiraObj = {}
     let errorMsg = ''
     for (let newKey of Object.keys(newRec)) {
+        if (newKey == "jiraSummary") continue
         if (oldRec[newKey] == newRec[newKey]) continue
         let jiraKey = newKey
         if (customFieldMapping[newKey]) {
@@ -294,6 +296,17 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
                     recVal = jiraIssueIdMatchArr[1]
                 }
             }
+            if (recKey == 'jiraSummary') {
+                let arr = recVal.split('\n');
+                if (arr.length >= 2) {
+                    const output = recVal.split('\n')[0];
+                    rec['summary'] = output
+                } else {
+                    const regex = /\s*\([^)]*\)/;
+                    const output = recVal.replace(regex, '');
+                    rec['summary'] = output
+                }
+            }
             rec[recKey] = recVal
         } else {
             let dbVal = dbRecord[dbKey]
@@ -307,6 +320,17 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
                     let jiraIssueIdMatchArr = recVal.match(regex)
                     if (recKey == 'key' && jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
                         recVal = jiraIssueIdMatchArr[1]
+                    }
+                    if (recKey == 'jiraSummary') {
+                        let arr = recVal.split('\n');
+                        if (arr.length >= 2) {
+                            const output = recVal.split('\n')[0];
+                            rec['summary'] = output
+                        } else {
+                            const regex = /\s*\([^)]*\)/;
+                            const output = recVal.replace(regex, '');
+                            rec['summary'] = output
+                        }
                     }
                     rec[recKey] = recVal
                 }
