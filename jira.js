@@ -10,7 +10,7 @@ var jira = new JiraApi(JiraSettings.settings);
 let filteredProjectsMetaData = {}
 
 // Custom fields per installation
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990", "jiraSummary"];
+let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990", "jiraSummary", "fixVersions"];
 
 // Must have 'Work-id' and 'Description' fields in the data-set. 
 // The keys for this dataset must include 'Work-id' for now. 
@@ -19,10 +19,10 @@ let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfi
 // If you change 'Description', you'll lose it when it next updates. 
 // Make it possible for users to specify the jql. 
 
-async function refreshJiraQuery (dsName, jiraConfig) {
+async function refreshJiraQuery(dsName, jiraConfig) {
     let startAt = 0; let total = 0;
     let resultRecords = [];
-    let names, results; 
+    let names, results;
     let jql = jiraConfig.jql
     await markAsStale(dsName, jiraConfig);
 
@@ -55,7 +55,7 @@ async function refreshJiraQuery (dsName, jiraConfig) {
             }
         }
     } while (startAt < results.total)
-    
+
     // Db stunts
     let dbAbstraction = new DbAbstraction();
     /*
@@ -84,17 +84,17 @@ async function refreshJiraQuery (dsName, jiraConfig) {
 
 function doJiraMapping(rec, jiraConfig) {
     let jiraFieldMapping = jiraConfig.jiraFieldMapping
-    let jiraUrl = "https://" + host; 
+    let jiraUrl = "https://" + host;
     jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
-    let jiraKeyMapping = {'key': jiraFieldMapping['key']};
+    let jiraKeyMapping = { 'key': jiraFieldMapping['key'] };
     delete jiraFieldMapping.key;
     let jiraContentMapping = jiraFieldMapping;
     let revContentMap = {};
     for (let key in jiraFieldMapping) {
         let dsField = jiraFieldMapping[key];
-        if (!revContentMap[dsField]) 
+        if (!revContentMap[dsField])
             revContentMap[dsField] = 1;
-        else 
+        else
             revContentMap[dsField] = revContentMap[dsField] + 1;
     }
 
@@ -117,7 +117,7 @@ function doJiraMapping(rec, jiraConfig) {
                 } else {
                     fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
                 }
-            else 
+            else
                 fullRec[jiraContentMapping[key]] = rec[key];
         } else {
             let recValue;
@@ -133,10 +133,10 @@ function doJiraMapping(rec, jiraConfig) {
 }
 
 function defaultJiraMapping(rec, jiraConfig) {
-    let jiraUrl = "https://" + host; 
-    let jiraKeyMapping = {'key': 'Work-id'}
+    let jiraUrl = "https://" + host;
+    let jiraKeyMapping = { 'key': 'Work-id' }
     // No need for "Details" links to appear here. 
-    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintName': 'Description', 'jiraSummary': 'Description' };
+    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintName': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description' };
     let selectorObj = {}, fullRec = {};
     if (jiraConfig._id == "jiraAgileConfig") {
         selectorObj[jiraKeyMapping['key']] = `[JIRA_AGILE-${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -161,16 +161,16 @@ function defaultJiraMapping(rec, jiraConfig) {
     return { selectorObj, fullRec }
 }
 
-async function markAsStale (dsName, jiraConfig) {
-    let jiraUrl = "https://" + host; 
-    let jiraFieldMapping; 
+async function markAsStale(dsName, jiraConfig) {
+    let jiraUrl = "https://" + host;
+    let jiraFieldMapping;
     if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
         // No need for "Details" links to appear here. 
-        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintName': 'Description', 'jiraSummary': 'Description' };
-    } else { 
+        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintName': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description' };
+    } else {
         jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
     }
-    let jiraKeyMapping = {'key': jiraFieldMapping['key']};
+    let jiraKeyMapping = { 'key': jiraFieldMapping['key'] };
     delete jiraFieldMapping.key;
     let jiraContentMapping = jiraFieldMapping;
 
@@ -182,7 +182,7 @@ async function markAsStale (dsName, jiraConfig) {
             filters[jiraKeyMapping['key']] = { $regex: `^((?!JIRA_AGILE).)*${jiraUrl + '/browse/'}.*`, $options: 'im' };
         }
         //filters[jiraKeyMapping['key']] = {$regex: `IQN-`, $options: 'i'};
-    } catch (e) {}
+    } catch (e) { }
     // XXX: Do lots of validation.
     //console.log("mongo filters: ", filters);
     let dbAbstraction = new DbAbstraction();
@@ -225,12 +225,12 @@ async function markAsStale (dsName, jiraConfig) {
                 }
             }
         } while (page <= response.total_pages)
-    } catch (e) {}
+    } catch (e) { }
     await dbAbstraction.destroy();
 }
 
 
-function getSubTasksDetailsInTable (issue) {
+function getSubTasksDetailsInTable(issue) {
     let subtasksDetails = "";
     if (issue.fields.subtasks && issue.fields.subtasks.length) {
         subtasksDetails = "<table>";

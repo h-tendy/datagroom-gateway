@@ -116,6 +116,12 @@ function getRecFromJiraIssue(issue) {
       rec.versions += issue.fields.versions[i].name + ' ';
     }
   }
+  if (issue.fields.fixVersions && issue.fields.fixVersions.length) {
+    rec.fixVersions = "";
+    for (let i = 0; i < issue.fields.fixVersions.length; i++) {
+      rec.fixVersions += issue.fields.fixVersions[i].name + ' ';
+    }
+  }
   if (issue.fields.parent) {
     rec.parentKey = `[${issue.fields.parent.key}](${jiraUrl + '/browse/' + issue.fields.parent.key})`
     try {
