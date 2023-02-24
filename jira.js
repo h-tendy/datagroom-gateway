@@ -2,6 +2,7 @@ var JiraApi = require('jira-client');
 const DbAbstraction = require('./dbAbstraction');
 const JiraSettings = require('./jiraSettings');
 const utils = require('./utils')
+const fetch = require('node-fetch')
 // Initialize
 
 let host = JiraSettings.host;
@@ -583,7 +584,7 @@ async function getJiraAgileJql(jiraConfig) {
             }
         }
     } catch (e) {
-        console.log("Error encountered while retreiving the jql for JIRA_AGILE config")
+        console.log("Error encountered while retreiving the jql for JIRA_AGILE config", e)
     }
     return jql
 }
