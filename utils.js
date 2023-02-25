@@ -367,8 +367,19 @@ function getIssueLinksInList(issueLinks, type, dir) {
   return [dirName, details];
 }
 
+function sanitizeData(formData) {
+  for (let key of Object.keys(formData)) {
+    if (typeof (formData[key]) == "string") {
+      formData[key] = formData[key].trim()
+    } else if (typeof (formData[key] == "object")) {
+      sanitizeData(formData[key])
+    }
+  }
+}
+
 module.exports = {
     execCmdExecutor,
   copyRecursiveSync,
-  getRecFromJiraIssue
+  getRecFromJiraIssue,
+  sanitizeData
 };
