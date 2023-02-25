@@ -1263,6 +1263,7 @@ router.post('/view/convertToJira', async (req, res, next) => {
         let response = {}
         // Call jira function with the incoming data and update the jira.
         let jiraFormData = request.jiraFormData
+        Utils.sanitizeData(jiraFormData)
         let jiraResponse = await Jira.createJiraIssue(jiraFormData)
         if (jiraResponse.status == 'fail') {
             response.status = jiraResponse.status
@@ -1326,6 +1327,7 @@ router.post('/view/addJiraRow', async (req, res, next) => {
         }
         // Call jira function with the incoming data and update the jira.
         let jiraFormData = request.jiraFormData
+        Utils.sanitizeData(jiraFormData)
         let jiraResponse = await Jira.createJiraIssue(jiraFormData)
         if (jiraResponse.status == 'fail') {
             response.status = jiraResponse.status
