@@ -33,7 +33,6 @@ async function editSingleAttribute(req) {
     let revContentMap = getRevContentMap(jiraAgileConfig)
 
     let keyBeingEdited = await ifKeyBeingEdited(request)
-
     /**Get the incoming edited record parsed */
     let ret = parseRecord(request.editObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
     if (!ret.parseSuccess) {
@@ -281,7 +280,7 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
                 let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
                 let jiraIssueIdMatchArr = recVal.match(regex)
                 if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
-                    recVal = jiraIssueIdMatchArr[1]
+                    recVal = jiraIssueIdMatchArr[1].trim()
                 }
             }
             rec[recKey] = recVal
@@ -293,7 +292,7 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
                 let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
                 let jiraIssueIdMatchArr = recVal.match(regex)
                 if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
-                    recVal = jiraIssueIdMatchArr[1]
+                    recVal = jiraIssueIdMatchArr[1].trim()
                 }
             }
             if (recKey == 'jiraSummary') {
@@ -314,7 +313,7 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
             for (let eachEntry of dbValArr) {
                 let eachEntryKeyMatchArr = eachEntry.match(/\*\*(.*)\*\*:(.*)/s)
                 if (eachEntryKeyMatchArr && eachEntryKeyMatchArr.length >= 3) {
-                    let recKey = eachEntryKeyMatchArr[1]
+                    let recKey = eachEntryKeyMatchArr[1].trim()
                     let recVal = eachEntryKeyMatchArr[2].trim()
                     let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
                     let jiraIssueIdMatchArr = recVal.match(regex)
