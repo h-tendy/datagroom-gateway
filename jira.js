@@ -110,13 +110,18 @@ function doJiraMapping(rec, jiraConfig) {
     }
 
     for (let key in jiraContentMapping) {
-        if (!rec[key]) continue;
+        // We want to sprintName in UI even if it is empty
+        if (!rec[key] && key != "sprintName") continue;
         if (!fullRec[jiraContentMapping[key]]) {
             if (revContentMap[jiraContentMapping[key]] > 1)
                 if (key == "subtasksDetails" || key == "dependsLinks" || key == "implementLinks" || key == "packageLinks" || key == "relatesLinks" || key == "testLinks" || key == "coversLinks" || key == "defectLinks" || key == "automatesLinks") {
                     fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
                 } else {
-                    fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
+                    if (rec[key] == "") {
+                        fullRec[jiraContentMapping[key]] = `**${key}**:\n` + "<br/>\n";
+                    } else {
+                        fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
+                    }
                 }
             else
                 fullRec[jiraContentMapping[key]] = rec[key];
@@ -125,7 +130,11 @@ function doJiraMapping(rec, jiraConfig) {
             if (key == "subtasksDetails" || key == "dependsLinks" || key == "implementLinks" || key == "packageLinks" || key == "relatesLinks" || key == "testLinks" || key == "coversLinks" || key == "defectLinks" || key == "automatesLinks") {
                 recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
             } else {
-                recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
+                if (rec[key] == "") {
+                    recValue = `**${key}**:\n` + "<br/>\n";
+                } else {
+                    recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
+                }
             }
             fullRec[jiraContentMapping[key]] += recValue;
         }
