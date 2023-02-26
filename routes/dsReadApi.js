@@ -289,6 +289,7 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
                 let resp = await JiraAgile.editSingleAttribute(req)
                 response.status = resp.status
                 response.error = resp.error
+                if (resp.record) response.record = resp.record
                 res.status(200).send(response);
                 await dbAbstraction.destroy();
                 return

@@ -33,7 +33,7 @@ async function editSingleAttribute(req) {
     let revContentMap = getRevContentMap(jiraAgileConfig)
 
     let keyBeingEdited = await ifKeyBeingEdited(request)
-
+    utils.sanitizeData(request.editObj)
     /**Get the incoming edited record parsed */
     let ret = parseRecord(request.editObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
     if (!ret.parseSuccess) {
@@ -43,6 +43,7 @@ async function editSingleAttribute(req) {
         return response
     }
     let newUiRec = ret.rec
+    request.editObj = getRecord(newUiRec, jiraAgileConfig)
 
     if (Object.keys(newUiRec).includes('key')) {
         response.status = 'fail'
@@ -136,10 +137,20 @@ async function editSingleAttribute(req) {
                 await insertInEditLog(request, keyBeingEdited, response.status)
                 return response
             }
+        } else {
+            /**This condition will be hit when only whitespace chars have been inserted into some field.
+             * In those cases we can do silent fail, the UI will know the old val and it will revert to it.
+             */
+            response.status = 'silentFail'
+            return response
         }
     }
 
-    response = await writeToDb(request, keyBeingEdited)
+    let responseFromDb = await writeToDb(request, keyBeingEdited)
+    if (responseFromDb.status == 'success') {
+        response = JSON.parse(JSON.stringify(responseFromDb))
+        response.record = request.editObj
+    }
     await insertInEditLog(request, keyBeingEdited, response.status)
     return response
 }
@@ -281,7 +292,7 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
                 let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
                 let jiraIssueIdMatchArr = recVal.match(regex)
                 if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
-                    recVal = jiraIssueIdMatchArr[1]
+                    recVal = jiraIssueIdMatchArr[1].trim()
                 }
             }
             rec[recKey] = recVal
@@ -293,7 +304,7 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
                 let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
                 let jiraIssueIdMatchArr = recVal.match(regex)
                 if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
-                    recVal = jiraIssueIdMatchArr[1]
+                    recVal = jiraIssueIdMatchArr[1].trim()
                 }
             }
             if (recKey == 'jiraSummary') {
@@ -314,7 +325,7 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
             for (let eachEntry of dbValArr) {
                 let eachEntryKeyMatchArr = eachEntry.match(/\*\*(.*)\*\*:(.*)/s)
                 if (eachEntryKeyMatchArr && eachEntryKeyMatchArr.length >= 3) {
-                    let recKey = eachEntryKeyMatchArr[1]
+                    let recKey = eachEntryKeyMatchArr[1].trim()
                     let recVal = eachEntryKeyMatchArr[2].trim()
                     let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
                     let jiraIssueIdMatchArr = recVal.match(regex)
@@ -426,6 +437,57 @@ function getSingleEditLog(req, isKey, status) {
 
 function getKeyByValue(object, value) {
     return Object.keys(object).find(key => object[key] === value);
+}
+
+function getRecord(rec, jiraConfig) {
+    let jiraFieldMapping = jiraConfig.jiraFieldMapping
+    let jiraUrl = "https://" + host;
+    jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
+    let jiraKeyMapping = { 'key': jiraFieldMapping['key'] };
+    delete jiraFieldMapping.key;
+    let jiraContentMapping = jiraFieldMapping;
+    let revContentMap = {};
+    for (let key in jiraFieldMapping) {
+        let dsField = jiraFieldMapping[key];
+        if (!revContentMap[dsField])
+            revContentMap[dsField] = 1;
+        else
+            revContentMap[dsField] = revContentMap[dsField] + 1;
+    }
+
+    let fullRec = {}
+
+    for (let key in jiraContentMapping) {
+        // We want to sprintName in UI even if it is empty
+        if (!rec[key] && key != "sprintName") continue;
+        if (!fullRec[jiraContentMapping[key]]) {
+            if (revContentMap[jiraContentMapping[key]] > 1)
+                if (key == "subtasksDetails" || key == "dependsLinks" || key == "implementLinks" || key == "packageLinks" || key == "relatesLinks" || key == "testLinks" || key == "coversLinks" || key == "defectLinks" || key == "automatesLinks") {
+                    fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
+                } else {
+                    if (rec[key] == "") {
+                        fullRec[jiraContentMapping[key]] = `**${key}**:\n` + "<br/>\n";
+                    } else {
+                        fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
+                    }
+                }
+            else
+                fullRec[jiraContentMapping[key]] = rec[key];
+        } else {
+            let recValue;
+            if (key == "subtasksDetails" || key == "dependsLinks" || key == "implementLinks" || key == "packageLinks" || key == "relatesLinks" || key == "testLinks" || key == "coversLinks" || key == "defectLinks" || key == "automatesLinks") {
+                recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
+            } else {
+                if (rec[key] == "") {
+                    recValue = `**${key}**:\n` + "<br/>\n";
+                } else {
+                    recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n";
+                }
+            }
+            fullRec[jiraContentMapping[key]] += recValue;
+        }
+    }
+    return fullRec
 }
 
 module.exports = {
