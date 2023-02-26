@@ -367,12 +367,12 @@ function getIssueLinksInList(issueLinks, type, dir) {
   return [dirName, details];
 }
 
-function sanitizeData(formData) {
-  for (let key of Object.keys(formData)) {
-    if (typeof (formData[key]) == "string") {
-      formData[key] = formData[key].trim()
-    } else if (typeof (formData[key] == "object")) {
-      sanitizeData(formData[key])
+function sanitizeData(objData) {
+  for (let key of Object.keys(objData)) {
+    if (typeof (objData[key]) == "string") {
+      objData[key] = objData[key].trim()
+    } else if (typeof (objData[key] == "object")) {
+      sanitizeData(objData[key])
     }
   }
 }
