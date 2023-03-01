@@ -11,7 +11,7 @@ var jira = new JiraApi(JiraSettings.settings);
 let filteredProjectsMetaData = {}
 
 // Custom fields per installation
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990", "jiraSummary", "fixVersions"];
+let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_25693", "customfield_25518", "customfield_12790", "customfield_11890", "customfield_11990", "jiraSummary", "fixVersions", "customfield_28097"];
 
 // Must have 'Work-id' and 'Description' fields in the data-set. 
 // The keys for this dataset must include 'Work-id' for now. 
@@ -146,7 +146,7 @@ function defaultJiraMapping(rec, jiraConfig) {
     let jiraUrl = "https://" + host;
     let jiraKeyMapping = { 'key': 'Work-id' }
     // No need for "Details" links to appear here. 
-    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintName': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description' };
+    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintName': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description', 'agileCommit': 'Description' };
     let selectorObj = {}, fullRec = {};
     if (jiraConfig._id == "jiraAgileConfig") {
         selectorObj[jiraKeyMapping['key']] = `[JIRA_AGILE-${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -176,7 +176,7 @@ async function markAsStale(dsName, jiraConfig) {
     let jiraFieldMapping;
     if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
         // No need for "Details" links to appear here. 
-        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintName': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description' };
+        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintName': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description', 'agileCommit': 'Description' };
     } else {
         jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
     }
@@ -403,6 +403,7 @@ async function createJiraIssue(jiraFormData) {
         };
     } else if (issueType == "Story") {
         let fixVersions = jiraFormData[issueType]["fixVersions"].map((version) => { return { "name": version } });
+        let customfield_28097_values = jiraFormData[issueType]["customfield_28097"].map((entry) => { return { "name": entry } });
         let customfield_26394_values = jiraFormData[issueType]["customfield_26394"].map((entry) => { return { "value": entry } });
         bodyData = {
             "fields": {
@@ -439,11 +440,13 @@ async function createJiraIssue(jiraFormData) {
                 "customfield_28102": {
                     "name": jiraFormData[jiraFormData.Type].customfield_28102
                 },
+                "customfield_28097": customfield_28097_values,
             },
             "update": {}
         };
     } else if (issueType == "Story Task") {
         let fixVersions = jiraFormData[issueType]["fixVersions"].map((version) => { return { "name": version } });
+        let customfield_28097_values = jiraFormData[issueType]["customfield_28097"].map((entry) => { return { "name": entry } });
         bodyData = {
             "fields": {
                 "description": jiraFormData[jiraFormData.Type].description,
@@ -470,13 +473,14 @@ async function createJiraIssue(jiraFormData) {
                     "name": jiraFormData[jiraFormData.Type].assignee
                 },
                 "fixVersions": fixVersions,
-                // "customfield_11890": parseInt(jiraFormData[jiraFormData.Type]["customfield_11890"])
+                "customfield_28097": customfield_28097_values,
             },
             "update": {}
         };
     } else if (issueType == "Epic") {
         let fixVersions = jiraFormData[issueType]["fixVersions"].map((version) => { return { "name": version } });
         let customfield_26394_values = jiraFormData[issueType]["customfield_26394"].map((entry) => { return { "value": entry } });
+        let customfield_28097_values = jiraFormData[issueType]["customfield_28097"].map((entry) => { return { "name": entry } });
         bodyData = {
             "fields": {
                 "description": jiraFormData[jiraFormData.Type].description,
@@ -505,6 +509,7 @@ async function createJiraIssue(jiraFormData) {
                 "assignee": {
                     "name": jiraFormData[jiraFormData.Type].assignee
                 },
+                "customfield_28097": customfield_28097_values,
             },
             "update": {
                 "issuelinks": [
