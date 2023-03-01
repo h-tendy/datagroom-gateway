@@ -119,7 +119,13 @@ function getRecFromJiraIssue(issue) {
   if (issue.fields.fixVersions && issue.fields.fixVersions.length) {
     rec.fixVersions = "";
     for (let i = 0; i < issue.fields.fixVersions.length; i++) {
-      rec.fixVersions += issue.fields.fixVersions[i].name + ' ';
+      rec.fixVersions += issue.fields.fixVersions[i].name + ',';
+    }
+  }
+  if (issue.fields.customfield_28097 && issue.fields.customfield_28097.length) {
+    rec.agileCommit = "";
+    for (let i = 0; i < issue.fields.customfield_28097.length; i++) {
+      rec.agileCommit += issue.fields.customfield_28097[i].name + ',';
     }
   }
   if (issue.fields.parent) {
