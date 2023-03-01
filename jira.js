@@ -310,8 +310,9 @@ async function createFilteredProjectsMetaData() {
             filteredProjectsMetaData.projects.push(currFilteredProjectMetaData)
         }
     } catch (e) {
-        console.log(e)
+        console.log("Error in createFilteredProjectsMetaData", e)
     }
+    console.log("Filtered meta data updated", filteredProjectsMetaData)
     setTimeout(createFilteredProjectsMetaData, JiraSettings.jiraMetaDataRefreshIntervalInMs)
 }
 
@@ -441,7 +442,8 @@ async function createJiraIssue(jiraFormData) {
             },
             "update": {}
         };
-    } else if (issueType == "Sub-task") {
+    } else if (issueType == "Story Task") {
+        let fixVersions = jiraFormData[issueType]["fixVersions"].map((version) => { return { "name": version } });
         bodyData = {
             "fields": {
                 "description": jiraFormData[jiraFormData.Type].description,
@@ -461,7 +463,14 @@ async function createJiraIssue(jiraFormData) {
                     "key": jiraFormData.Project
                 },
                 "summary": jiraFormData[jiraFormData.Type].summary,
-                "customfield_11890": parseInt(jiraFormData[jiraFormData.Type]["customfield_11890"])
+                "customfield_28096": {
+                    "value": jiraFormData[jiraFormData.Type].customfield_28096,
+                },
+                "assignee": {
+                    "name": jiraFormData[jiraFormData.Type].assignee
+                },
+                "fixVersions": fixVersions,
+                // "customfield_11890": parseInt(jiraFormData[jiraFormData.Type]["customfield_11890"])
             },
             "update": {}
         };

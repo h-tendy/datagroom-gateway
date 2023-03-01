@@ -459,7 +459,7 @@ function getRecord(rec, jiraConfig) {
 
     for (let key in jiraContentMapping) {
         // We want to sprintName in UI even if it is empty
-        if (!rec[key] && key != "sprintName") continue;
+        if (!rec[key]) continue;
         if (!fullRec[jiraContentMapping[key]]) {
             if (revContentMap[jiraContentMapping[key]] > 1)
                 if (key == "subtasksDetails" || key == "dependsLinks" || key == "implementLinks" || key == "packageLinks" || key == "relatesLinks" || key == "testLinks" || key == "coversLinks" || key == "defectLinks" || key == "automatesLinks") {
