@@ -31,118 +31,126 @@ async function editSingleAttribute(req) {
     let dbAbstraction = new DbAbstraction();
 
     let revContentMap = getRevContentMap(jiraAgileConfig)
-
+    let editedCol = request.column;
+    if (!editedCol) {
+        response.status = 'fail'
+        response.error = 'unable to get edited column attribute'
+        await insertInEditLog(request, request.key, response.status)
+        return response
+    }
     let keyBeingEdited = await ifKeyBeingEdited(request)
-    utils.sanitizeData(request.editObj)
-    /**Get the incoming edited record parsed */
-    let ret = parseRecord(request.editObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
-    if (!ret.parseSuccess) {
-        response.status = 'fail'
-        response.error = 'unable to parse the incoming edited record according to given mapping'
-        await insertInEditLog(request, keyBeingEdited, response.status)
-        return response
-    }
-    let newUiRec = ret.rec
-    request.editObj = getRecord(newUiRec, jiraAgileConfig)
-
-    if (Object.keys(newUiRec).includes('key')) {
-        response.status = 'fail'
-        response.error = `Key for the JIRA_AGILE row can't be edited`
-        await insertInEditLog(request, keyBeingEdited, response.status)
-        return response
-    }
-
-    /**Get the old existing UI record parsed */
-    ret = parseRecord(request.selectorObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
-    if (!ret.parseSuccess) {
-        response.status = 'fail'
-        response.error = 'unable to parse the current record according to given mapping'
-        await insertInEditLog(request, keyBeingEdited, response.status)
-        return response
-    }
-    let oldUiRec = ret.rec
-
-    /**Compare which of the fields are edited by comparing oldUI and new UI rec and determine whether we support edit of those fields */
-    let { isEditable, errorMsg } = isFieldEditable(oldUiRec, newUiRec)
-    if (!isEditable) {
-        response.status = 'fail'
-        response.error = errorMsg
-        await insertInEditLog(request, keyBeingEdited, response.status)
-        return response
-    }
-
-    /**Get record from db and parse it accordingly */
-    let recs = await dbAbstraction.find(request.dsName, "data", { _id: dbAbstraction.getObjectId(request.selectorObj._id) }, {});
-    let record = recs[0]
-    dbAbstraction.destroy()
-    ret = parseRecord(record, revContentMap, jiraAgileConfig.jiraFieldMapping)
-    if (!ret.parseSuccess) {
-        response.status = 'fail'
-        response.error = 'unable to parse the dbrecord according to given mapping'
-        await insertInEditLog(request, keyBeingEdited, response.status)
-        return response
-    }
-    let dbRec = ret.rec
-
-    /**Get the latest record from JIRA if jira is enabled */
-    let jiraIssueName = dbRec.key
-    let latestJiraRec = null
-    if (jiraAgileConfig && jiraAgileConfig.jira) {
-        try {
-            let issue = await jira.findIssue(jiraIssueName)
-            latestJiraRec = utils.getRecFromJiraIssue(issue)
-        } catch (e) {
+    if (isJiraMappedColumnBeingEdited(editedCol, jiraAgileConfig)) {
+        utils.sanitizeData(request.editObj)
+        /**Get the incoming edited record parsed */
+        let ret = parseRecord(request.editObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
+        if (!ret.parseSuccess) {
             response.status = 'fail'
-            response.error = 'unable to fetch the record from JIRA to update'
+            response.error = 'unable to parse the incoming edited record according to given mapping'
             await insertInEditLog(request, keyBeingEdited, response.status)
             return response
         }
-    }
+        let newUiRec = ret.rec
+        request.editObj = getRecord(newUiRec, jiraAgileConfig)
 
-    if (latestJiraRec) {
-        let isUpdated = isRecordUpdated(dbRec, latestJiraRec)
+        if (Object.keys(newUiRec).includes('key')) {
+            response.status = 'fail'
+            response.error = `Key for the JIRA_AGILE row can't be edited`
+            await insertInEditLog(request, keyBeingEdited, response.status)
+            return response
+        }
+
+        /**Get the old existing UI record parsed */
+        ret = parseRecord(request.selectorObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
+        if (!ret.parseSuccess) {
+            response.status = 'fail'
+            response.error = 'unable to parse the current record according to given mapping'
+            await insertInEditLog(request, keyBeingEdited, response.status)
+            return response
+        }
+        let oldUiRec = ret.rec
+
+        /**Compare which of the fields are edited by comparing oldUI and new UI rec and determine whether we support edit of those fields */
+        let { isEditable, errorMsg } = isFieldEditable(oldUiRec, newUiRec)
+        if (!isEditable) {
+            response.status = 'fail'
+            response.error = errorMsg
+            await insertInEditLog(request, keyBeingEdited, response.status)
+            return response
+        }
+
+        /**Get record from db and parse it accordingly */
+        let recs = await dbAbstraction.find(request.dsName, "data", { _id: dbAbstraction.getObjectId(request.selectorObj._id) }, {});
+        let record = recs[0]
+        dbAbstraction.destroy()
+        ret = parseRecord(record, revContentMap, jiraAgileConfig.jiraFieldMapping)
+        if (!ret.parseSuccess) {
+            response.status = 'fail'
+            response.error = 'unable to parse the dbrecord according to given mapping'
+            await insertInEditLog(request, keyBeingEdited, response.status)
+            return response
+        }
+        let dbRec = ret.rec
+
+        /**Get the latest record from JIRA if jira is enabled */
+        let jiraIssueName = dbRec.key
+        let latestJiraRec = null
+        if (jiraAgileConfig && jiraAgileConfig.jira) {
+            try {
+                let issue = await jira.findIssue(jiraIssueName)
+                latestJiraRec = utils.getRecFromJiraIssue(issue)
+            } catch (e) {
+                response.status = 'fail'
+                response.error = 'unable to fetch the record from JIRA to update'
+                await insertInEditLog(request, keyBeingEdited, response.status)
+                return response
+            }
+        }
+
+        if (latestJiraRec) {
+            let isUpdated = isRecordUpdated(dbRec, latestJiraRec)
+            if (!isUpdated) {
+                response.status = 'fail'
+                response.error = 'Stale JIRA entry found. Please refresh again.'
+                await insertInEditLog(request, keyBeingEdited, response.status)
+                return response
+            }
+        }
+
+        let isUpdated = isRecordUpdated(oldUiRec, dbRec)
         if (!isUpdated) {
             response.status = 'fail'
             response.error = 'Stale JIRA entry found. Please refresh again.'
             await insertInEditLog(request, keyBeingEdited, response.status)
             return response
         }
-    }
 
-    let isUpdated = isRecordUpdated(oldUiRec, dbRec)
-    if (!isUpdated) {
-        response.status = 'fail'
-        response.error = 'Stale JIRA entry found. Please refresh again.'
-        await insertInEditLog(request, keyBeingEdited, response.status)
-        return response
-    }
-
-    /**Compare the latest jira with that in db. If db is not updated send the message to the UI and cancel the edit operation */
-    if (latestJiraRec) {
-        let ret = await getEditedFieldsObj(oldUiRec, newUiRec, jiraAgileConfig.boardId)
-        if (ret.errorMsg != '') {
-            response.status = 'fail'
-            response.error = ret.errorMsg
-            await insertInEditLog(request, keyBeingEdited, response.status)
-            return response
-        }
-        let editedObj = ret.editedJiraObj
-        if (Object.keys(editedObj).length != 0) {
-            try {
-                let ret = await jira.updateIssue(jiraIssueName, { "fields": editedObj })
-                console.log(ret)
-            } catch (e) {
+        /**Compare the latest jira with that in db. If db is not updated send the message to the UI and cancel the edit operation */
+        if (latestJiraRec) {
+            let ret = await getEditedFieldsObj(oldUiRec, newUiRec, jiraAgileConfig.boardId)
+            if (ret.errorMsg != '') {
                 response.status = 'fail'
-                response.error = `unable to update the record to JIRA. Error: ${e.message}`
+                response.error = ret.errorMsg
                 await insertInEditLog(request, keyBeingEdited, response.status)
                 return response
             }
-        } else {
-            /**This condition will be hit when only whitespace chars have been inserted into some field.
-             * In those cases we can do silent fail, the UI will know the old val and it will revert to it.
-             */
-            response.status = 'silentFail'
-            return response
+            let editedObj = ret.editedJiraObj
+            if (Object.keys(editedObj).length != 0) {
+                try {
+                    let ret = await jira.updateIssue(jiraIssueName, { "fields": editedObj })
+                    console.log(ret)
+                } catch (e) {
+                    response.status = 'fail'
+                    response.error = `unable to update the record to JIRA. Error: ${e.message}`
+                    await insertInEditLog(request, keyBeingEdited, response.status)
+                    return response
+                }
+            } else {
+                /**This condition will be hit when only whitespace chars have been inserted into some field.
+                 * In those cases we can do silent fail, the UI will know the old val and it will revert to it.
+                 */
+                response.status = 'silentFail'
+                return response
+            }
         }
     }
 
@@ -153,6 +161,21 @@ async function editSingleAttribute(req) {
     }
     await insertInEditLog(request, keyBeingEdited, response.status)
     return response
+}
+
+function isJiraMappedColumnBeingEdited(columnBeingEdited, jiraConfig) {
+    let isJiraColumnBeingEdited = false;
+    let jiraFieldMapping = jiraConfig.jiraFieldMapping
+    jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
+    // iterate over values of jiraFieldMapping
+    for (let key in jiraFieldMapping) {
+        let dsField = jiraFieldMapping[key];
+        if (dsField == columnBeingEdited) {
+            isJiraColumnBeingEdited = true;
+            break;
+        }
+    }
+    return isJiraColumnBeingEdited;
 }
 
 function getRevContentMap(jiraConfig) {
