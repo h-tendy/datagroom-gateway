@@ -1194,7 +1194,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
         let aclConfig = await dbAbstraction.find(request.toDsName, "metaData", { _id: `aclConfig` }, {} );
         aclConfig = aclConfig[0];
         if (aclConfig && !aclConfig.acl.includes(request.dsUser)) {
-            aclConfig.acl.push(dsUser);
+            aclConfig.acl.push(request.dsUser);
             dbResponse = await dbAbstraction.update(request.toDsName, "metaData", { _id: "aclConfig" }, { ...aclConfig });
         }
 
