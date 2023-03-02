@@ -212,11 +212,19 @@ async function markAsStale(dsName, jiraConfig) {
                 let alreadyStale = false;
 
                 // Stale marking only in 'summary' column. 
-                if (/ENTRY NO LONGER PRESENT IN/.test(rec[jiraContentMapping['summary']])) {
-                    alreadyStale = true;
-                    continue;
+                if (jiraContentMapping['summary']) {
+                    if (/ENTRY NO LONGER PRESENT IN/.test(rec[jiraContentMapping['summary']])) {
+                        alreadyStale = true;
+                        continue;
+                    }
+                    jiraColumns[jiraContentMapping['summary']] = '[ENTRY NO LONGER PRESENT IN JIRA QUERY]{.y}\n\n' + rec[jiraContentMapping['summary']];
+                } else if (jiraContentMapping['jiraSummary']) {
+                    if (/ENTRY NO LONGER PRESENT IN/.test(rec[jiraContentMapping['jiraSummary']])) {
+                        alreadyStale = true;
+                        continue;
+                    }
+                    jiraColumns[jiraContentMapping['jiraSummary']] = '[ENTRY NO LONGER PRESENT IN JIRA QUERY]{.y}\n\n' + rec[jiraContentMapping['jiraSummary']];
                 }
-                jiraColumns[jiraContentMapping['summary']] = '[ENTRY NO LONGER PRESENT IN JIRA QUERY]{.y}\n\n' + rec[jiraContentMapping['summary']];
 
                 /* // Comment out stale marking in all fields.
                 for (let jiraKey in jiraContentMapping) {
