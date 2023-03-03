@@ -374,12 +374,18 @@ function getIssueLinksInList(issueLinks, type, dir) {
 }
 
 function sanitizeData(objData) {
-  for (let key of Object.keys(objData)) {
-    if (typeof (objData[key]) == "string") {
-      objData[key] = objData[key].trim()
-    } else if (typeof (objData[key] == "object")) {
-      sanitizeData(objData[key])
+  try {
+    if (objData) {
+      for (let key of Object.keys(objData)) {
+        if (typeof (objData[key]) == "string") {
+          objData[key] = objData[key].trim()
+        } else if (typeof (objData[key] == "object")) {
+          sanitizeData(objData[key])
+        }
+      }
     }
+  } catch (e) {
+    console.log("Failed to sanitize data", e);
   }
 }
 
