@@ -1227,7 +1227,7 @@ router.post('/getProjectsMetadata', async (req, res, next) => {
         res.status(415).json({});
         return
     }
-    let response = await Jira.getProjectsMetaData(request.dsName, request.jiraAgileConfig)
+    let response = await Jira.getProjectsMetaData(request.dsName, request.jiraConfig, request.jiraAgileConfig)
     if (response && Object.keys(response).length != 0) {
         res.status(200).json(response)
     } else {

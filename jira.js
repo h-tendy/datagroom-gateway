@@ -347,9 +347,136 @@ function getFieldsForGivenProjectAndIssueType(projectKey, issuetype) {
     return []
 }
 
-async function addDynamicFieldsToProjectsMetaData(dsName, jiraConfig) {
+function getRevContentMap(jiraConfig) {
+    let jiraFieldMapping = jiraConfig.jiraFieldMapping
+    jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
+    delete jiraFieldMapping.key;
+    let revContentMap = {};
+    for (let key in jiraFieldMapping) {
+        let dsField = jiraFieldMapping[key];
+        if (!revContentMap[dsField])
+            revContentMap[dsField] = 1;
+        else
+            revContentMap[dsField] = revContentMap[dsField] + 1;
+    }
+    return revContentMap
+}
+
+function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
+    let dbKeys = Object.keys(dbRecord)
+    let rec = {}
+    let parseSuccess = true;
+    let jiraUrl = "https://" + host;
+    for (let dbKey of dbKeys) {
+        let recKey = getKeyByValue(jiraFieldMapping, dbKey)
+        if (!recKey) continue
+        if (!revContentMap[dbKey]) {
+            let recVal = dbRecord[dbKey]
+            if (typeof recVal == 'string') {
+                let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
+                let jiraIssueIdMatchArr = recVal.match(regex)
+                if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
+                    recVal = jiraIssueIdMatchArr[1].trim()
+                }
+            }
+            rec[recKey] = recVal
+            continue
+        }
+        if (revContentMap[dbKey] == 1) {
+            let recVal = dbRecord[dbKey]
+            if (typeof recVal == 'string') {
+                let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
+                let jiraIssueIdMatchArr = recVal.match(regex)
+                if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
+                    recVal = jiraIssueIdMatchArr[1].trim()
+                }
+            }
+            if (recKey == 'jiraSummary') {
+                let arr = recVal.split('\n');
+                if (arr.length >= 2) {
+                    const output = recVal.split('\n')[0];
+                    rec['summary'] = output
+                } else {
+                    const regex = /\s*\([^)]*\)/;
+                    const output = recVal.replace(regex, '');
+                    rec['summary'] = output
+                }
+            }
+            rec[recKey] = recVal
+        } else {
+            let dbVal = dbRecord[dbKey]
+            let dbValArr = dbVal.split("<br/>")
+            for (let eachEntry of dbValArr) {
+                let eachEntryKeyMatchArr = eachEntry.match(/\*\*(.*)\*\*:(.*)/s)
+                if (eachEntryKeyMatchArr && eachEntryKeyMatchArr.length >= 3) {
+                    let recKey = eachEntryKeyMatchArr[1].trim()
+                    let recVal = eachEntryKeyMatchArr[2].trim()
+                    let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
+                    let jiraIssueIdMatchArr = recVal.match(regex)
+                    if (recKey == 'key' && jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
+                        recVal = jiraIssueIdMatchArr[1]
+                    }
+                    if (recKey == 'jiraSummary') {
+                        let arr = recVal.split('\n');
+                        if (arr.length >= 2) {
+                            const output = recVal.split('\n')[0];
+                            rec['summary'] = output
+                        } else {
+                            const regex = /\s*\([^)]*\)/;
+                            const output = recVal.replace(regex, '');
+                            rec['summary'] = output
+                        }
+                    }
+                    rec[recKey] = recVal
+                }
+            }
+        }
+    }
+    return { rec, parseSuccess }
+}
+
+async function getAllAssigneesForJira(dsName, jiraConfig) {
+    let assignees = new Set();
+    let dbAbstraction = new DbAbstraction();
+    let jiraUrl = "https://" + host;
+    let revContentMap = getRevContentMap(jiraConfig)
+    try {
+        if (!jiraConfig.jiraFieldMapping.key) {
+            return Array.from(assignees);
+        }
+        let filters = {}
+        let mappedColumn = jiraConfig.jiraFieldMapping.key;
+        filters[mappedColumn] = { $regex: `^((?!JIRA_AGILE).)*${jiraUrl + '/browse/'}.*`, $options: 'im' };
+        let page = 1, perPage = 5;
+        let response = {};
+        do {
+            response = await dbAbstraction.pagedFind(dsName, "data", filters, {}, page, perPage)
+            page += 1;
+            for (let i = 0; i < response.data.length; i++) {
+                console.log(response.data[i]);
+                let ret = parseRecord(response.data[i], revContentMap, jiraConfig.jiraFieldMapping)
+                if (!ret.parseSuccess) {
+                    console.log('unable to parse the record while getting assignees for all jiraAgileRows')
+                    return assignees
+                }
+                let jiraRec = ret.rec
+                let assignee = jiraRec.assignee;
+                if (assignee && assignee != "NotSet") {
+                    assignees.add(assignee)
+                }
+            }
+        } while (page <= response.total_pages)
+    } catch (e) {
+        console.log("Error in getAllAssigneesForJiraAgile", e)
+    }
+    dbAbstraction.destroy();
+    return Array.from(assignees);
+}
+
+async function addDynamicFieldsToProjectsMetaData(dsName, jiraConfig, jiraAgileConfig) {
     let memo = {
-        "assignees": null,
+        "jiraAssignees": null,
+        "jiraAgileAssignees": null,
         "epics": null,
         "stories": null,
     }
@@ -360,21 +487,29 @@ async function addDynamicFieldsToProjectsMetaData(dsName, jiraConfig) {
                 let currIssuetype = currProject.issuetypes[j];
                 for (let field of Object.keys(currIssuetype.fields)) {
                     if (field == "assignee") {
-                        currIssuetype.fields[field].type = "creatableArray"
-                        if (!memo.assignees) {
-                            memo.assignees = await JIRA_AGILE.getAllAssigneesForJiraAgile(dsName, jiraConfig)
+                        if (currIssuetype.name == "Bug") {
+                            currIssuetype.fields[field].type = "creatableArray"
+                            if (!memo.jiraAssignees) {
+                                memo.jiraAssignees = await getAllAssigneesForJira(dsName, jiraConfig)
+                            }
+                            currIssuetype.fields[field].allowedValues = memo.jiraAssignees
+                        } else {
+                            currIssuetype.fields[field].type = "creatableArray"
+                            if (!memo.jiraAgileAssignees) {
+                                memo.jiraAgileAssignees = await JIRA_AGILE.getAllAssigneesForJiraAgile(dsName, jiraAgileConfig)
+                            }
+                            currIssuetype.fields[field].allowedValues = memo.jiraAgileAssignees
                         }
-                        currIssuetype.fields[field].allowedValues = memo.assignees
                     } else if (currIssuetype.fields[field].name == "Epic Link") {
                         currIssuetype.fields[field].type = "creatableArray";
                         if (!memo.epics) {
-                            memo.epics = await JIRA_AGILE.getIssuesForGivenTypes("Epic", dsName, jiraConfig)
+                            memo.epics = await JIRA_AGILE.getIssuesForGivenTypes("Epic", dsName, jiraAgileConfig)
                         }
                         currIssuetype.fields[field].allowedValues = memo.epics
                     } else if (currIssuetype.name == "Story Task" && field == "parent") {
                         currIssuetype.fields[field].type = "creatableArray";
                         if (!memo.stories) {
-                            memo.stories = await JIRA_AGILE.getIssuesForGivenTypes("Story", dsName, jiraConfig)
+                            memo.stories = await JIRA_AGILE.getIssuesForGivenTypes("Story", dsName, jiraAgileConfig)
                         }
                         currIssuetype.fields[field].allowedValues = memo.stories;
                     }
@@ -386,8 +521,8 @@ async function addDynamicFieldsToProjectsMetaData(dsName, jiraConfig) {
     }
 }
 
-async function getProjectsMetaData(dsName, jiraConfig) {
-    await addDynamicFieldsToProjectsMetaData(dsName, jiraConfig)
+async function getProjectsMetaData(dsName, jiraConfig, jiraAgileConfig) {
+    await addDynamicFieldsToProjectsMetaData(dsName, jiraConfig, jiraAgileConfig)
     return filteredProjectsMetaData
 }
 
