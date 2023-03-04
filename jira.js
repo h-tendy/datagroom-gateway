@@ -3,6 +3,7 @@ const DbAbstraction = require('./dbAbstraction');
 const JiraSettings = require('./jiraSettings');
 const utils = require('./utils')
 const fetch = require('node-fetch')
+const JIRA_AGILE = require('./jiraAgile')
 // Initialize
 
 let host = JiraSettings.host;
@@ -346,7 +347,47 @@ function getFieldsForGivenProjectAndIssueType(projectKey, issuetype) {
     return []
 }
 
-function getProjectsMetaData() {
+async function addDynamicFieldsToProjectsMetaData(dsName, jiraConfig) {
+    let memo = {
+        "assignees": null,
+        "epics": null,
+        "stories": null,
+    }
+    try {
+        for (let i = 0; i < filteredProjectsMetaData.projects.length; i++) {
+            let currProject = filteredProjectsMetaData.projects[i];
+            for (let j = 0; j < currProject.issuetypes.length; j++) {
+                let currIssuetype = currProject.issuetypes[j];
+                for (let field of Object.keys(currIssuetype.fields)) {
+                    if (field == "assignee") {
+                        currIssuetype.fields[field].type = "creatableArray"
+                        if (!memo.assignees) {
+                            memo.assignees = await JIRA_AGILE.getAllAssigneesForJiraAgile(dsName, jiraConfig)
+                        }
+                        currIssuetype.fields[field].allowedValues = memo.assignees
+                    } else if (currIssuetype.fields[field].name == "Epic Link") {
+                        currIssuetype.fields[field].type = "creatableArray";
+                        if (!memo.epics) {
+                            memo.epics = await JIRA_AGILE.getIssuesForGivenTypes("Epic", dsName, jiraConfig)
+                        }
+                        currIssuetype.fields[field].allowedValues = memo.epics
+                    } else if (currIssuetype.name == "Story Task" && field == "parent") {
+                        currIssuetype.fields[field].type = "creatableArray";
+                        if (!memo.stories) {
+                            memo.stories = await JIRA_AGILE.getIssuesForGivenTypes("Story", dsName, jiraConfig)
+                        }
+                        currIssuetype.fields[field].allowedValues = memo.stories;
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.log("Error in addDynamicFieldsToProjectsMetaData", e)
+    }
+}
+
+async function getProjectsMetaData(dsName, jiraConfig) {
+    await addDynamicFieldsToProjectsMetaData(dsName, jiraConfig)
     return filteredProjectsMetaData
 }
 

@@ -513,6 +513,79 @@ function getRecord(rec, jiraConfig) {
     return fullRec
 }
 
+async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
+    let assignees = new Set();
+    let dbAbstraction = new DbAbstraction();
+    let jiraUrl = "https://" + host;
+    let revContentMap = getRevContentMap(jiraAgileConfig)
+    try {
+        if (!jiraAgileConfig.jiraFieldMapping.key) {
+            return Array.from(assignees);
+        }
+        let filters = {}
+        let mappedColumn = jiraAgileConfig.jiraFieldMapping.key;
+        filters[mappedColumn] = { $regex: `JIRA_AGILE.*${jiraUrl + '/browse/'}`, $options: 'i' };
+        let page = 1, perPage = 5;
+        let response = {};
+        do {
+            response = await dbAbstraction.pagedFind(dsName, "data", filters, {}, page, perPage)
+            page += 1;
+            for (let i = 0; i < response.data.length; i++) {
+                console.log(response.data[i]);
+                let ret = parseRecord(response.data[i], revContentMap, jiraAgileConfig.jiraFieldMapping)
+                if (!ret.parseSuccess) {
+                    console.log('unable to parse the record while getting assignees for all jiraAgileRows')
+                    return assignees
+                }
+                let jiraRec = ret.rec
+                let assignee = jiraRec.assignee;
+                if (assignee && assignee != "NotSet") {
+                    assignees.add(assignee)
+                }
+            }
+        } while (page <= response.total_pages)
+    } catch (e) {
+        console.log("Error in getAllAssigneesForJiraAgile", e)
+    }
+    dbAbstraction.destroy();
+    return Array.from(assignees);
+}
+
+async function getIssuesForGivenTypes(type, dsName, jiraAgileConfig) {
+    let issues = new Set();
+    let dbAbstraction = new DbAbstraction();
+    let revContentMap = getRevContentMap(jiraAgileConfig)
+    try {
+        if (!jiraAgileConfig.jiraFieldMapping.type) {
+            return Array.from(issues);
+        }
+        let mappedColumn = jiraAgileConfig.jiraFieldMapping.type;
+        let response = {};
+        let page = 1, perPage = 5;
+        do {
+            response = await dbAbstraction.pagedFind(dsName, "data", { [mappedColumn]: type }, {}, page, perPage)
+            page += 1;
+            for (let i = 0; i < response.data.length; i++) {
+                let ret = parseRecord(response.data[i], revContentMap, jiraAgileConfig.jiraFieldMapping)
+                if (!ret.parseSuccess) {
+                    console.log('unable to parse the record while getting assignees for all jiraAgileRows')
+                    return issues
+                }
+                let jiraRec = ret.rec
+                if (jiraRec.key) {
+                    issues.add(jiraRec.key)
+                }
+            }
+        } while (page <= response.total_pages)
+    } catch (e) {
+        console.log("Error in getIssuesForGivenTypes", e)
+    }
+    dbAbstraction.destroy();
+    return Array.from(issues);
+}
+
 module.exports = {
-    editSingleAttribute
+    editSingleAttribute,
+    getAllAssigneesForJiraAgile,
+    getIssuesForGivenTypes
 }
