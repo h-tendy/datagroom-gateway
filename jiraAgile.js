@@ -30,7 +30,7 @@ async function editSingleAttribute(req) {
     let jiraAgileConfig = request.jiraAgileConfig
     let dbAbstraction = new DbAbstraction();
 
-    let revContentMap = getRevContentMap(jiraAgileConfig)
+    let revContentMap = utils.getRevContentMap(jiraAgileConfig)
     let editedCol = request.column;
     if (!editedCol) {
         response.status = 'fail'
@@ -42,7 +42,7 @@ async function editSingleAttribute(req) {
     if (isJiraMappedColumnBeingEdited(editedCol, jiraAgileConfig)) {
         utils.sanitizeData(request.editObj)
         /**Get the incoming edited record parsed */
-        let ret = parseRecord(request.editObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
+        let ret = utils.parseRecord(request.editObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
         if (!ret.parseSuccess) {
             response.status = 'fail'
             response.error = 'unable to parse the incoming edited record according to given mapping'
@@ -60,7 +60,7 @@ async function editSingleAttribute(req) {
         }
 
         /**Get the old existing UI record parsed */
-        ret = parseRecord(request.selectorObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
+        ret = utils.parseRecord(request.selectorObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
         if (!ret.parseSuccess) {
             response.status = 'fail'
             response.error = 'unable to parse the current record according to given mapping'
@@ -82,7 +82,7 @@ async function editSingleAttribute(req) {
         let recs = await dbAbstraction.find(request.dsName, "data", { _id: dbAbstraction.getObjectId(request.selectorObj._id) }, {});
         let record = recs[0]
         dbAbstraction.destroy()
-        ret = parseRecord(record, revContentMap, jiraAgileConfig.jiraFieldMapping)
+        ret = utils.parseRecord(record, revContentMap, jiraAgileConfig.jiraFieldMapping)
         if (!ret.parseSuccess) {
             response.status = 'fail'
             response.error = 'unable to parse the dbrecord according to given mapping'
@@ -176,21 +176,6 @@ function isJiraMappedColumnBeingEdited(columnBeingEdited, jiraConfig) {
         }
     }
     return isJiraColumnBeingEdited;
-}
-
-function getRevContentMap(jiraConfig) {
-    let jiraFieldMapping = jiraConfig.jiraFieldMapping
-    jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
-    delete jiraFieldMapping.key;
-    let revContentMap = {};
-    for (let key in jiraFieldMapping) {
-        let dsField = jiraFieldMapping[key];
-        if (!revContentMap[dsField])
-            revContentMap[dsField] = 1;
-        else
-            revContentMap[dsField] = revContentMap[dsField] + 1;
-    }
-    return revContentMap
 }
 
 function isFieldEditable(oldUiParsedRec, newUiParsedRec) {
@@ -301,79 +286,6 @@ async function getSprintIdFromSprintName(sprintName, boardId) {
     return sprintId
 }
 
-function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
-    let dbKeys = Object.keys(dbRecord)
-    let rec = {}
-    let parseSuccess = true;
-    let jiraUrl = "https://" + host;
-    for (let dbKey of dbKeys) {
-        let recKey = getKeyByValue(jiraFieldMapping, dbKey)
-        if (!recKey) continue
-        if (!revContentMap[dbKey]) {
-            let recVal = dbRecord[dbKey]
-            if (typeof recVal == 'string') {
-                let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
-                let jiraIssueIdMatchArr = recVal.match(regex)
-                if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
-                    recVal = jiraIssueIdMatchArr[1].trim()
-                }
-            }
-            rec[recKey] = recVal
-            continue
-        }
-        if (revContentMap[dbKey] == 1) {
-            let recVal = dbRecord[dbKey]
-            if (typeof recVal == 'string') {
-                let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
-                let jiraIssueIdMatchArr = recVal.match(regex)
-                if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
-                    recVal = jiraIssueIdMatchArr[1].trim()
-                }
-            }
-            if (recKey == 'jiraSummary') {
-                let arr = recVal.split('\n');
-                if (arr.length >= 2) {
-                    const output = recVal.split('\n')[0];
-                    rec['summary'] = output
-                } else {
-                    const regex = /\s*\([^)]*\)/;
-                    const output = recVal.replace(regex, '');
-                    rec['summary'] = output
-                }
-            }
-            rec[recKey] = recVal
-        } else {
-            let dbVal = dbRecord[dbKey]
-            let dbValArr = dbVal.split("<br/>")
-            for (let eachEntry of dbValArr) {
-                let eachEntryKeyMatchArr = eachEntry.match(/\*\*(.*)\*\*:(.*)/s)
-                if (eachEntryKeyMatchArr && eachEntryKeyMatchArr.length >= 3) {
-                    let recKey = eachEntryKeyMatchArr[1].trim()
-                    let recVal = eachEntryKeyMatchArr[2].trim()
-                    let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
-                    let jiraIssueIdMatchArr = recVal.match(regex)
-                    if (recKey == 'key' && jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
-                        recVal = jiraIssueIdMatchArr[1]
-                    }
-                    if (recKey == 'jiraSummary') {
-                        let arr = recVal.split('\n');
-                        if (arr.length >= 2) {
-                            const output = recVal.split('\n')[0];
-                            rec['summary'] = output
-                        } else {
-                            const regex = /\s*\([^)]*\)/;
-                            const output = recVal.replace(regex, '');
-                            rec['summary'] = output
-                        }
-                    }
-                    rec[recKey] = recVal
-                }
-            }
-        }
-    }
-    return { rec, parseSuccess }
-}
-
 async function ifKeyBeingEdited(request) {
     let dbAbstraction = new DbAbstraction();
     let keys = await dbAbstraction.find(request.dsName, "metaData", { _id: `keys` }, {});
@@ -458,10 +370,6 @@ function getSingleEditLog(req, isKey, status) {
     return editDoc;
 }
 
-function getKeyByValue(object, value) {
-    return Object.keys(object).find(key => object[key] === value);
-}
-
 function getRecord(rec, jiraConfig) {
     let jiraFieldMapping = jiraConfig.jiraFieldMapping
     let jiraUrl = "https://" + host;
@@ -517,7 +425,7 @@ async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
     let assignees = new Set();
     let dbAbstraction = new DbAbstraction();
     let jiraUrl = "https://" + host;
-    let revContentMap = getRevContentMap(jiraAgileConfig)
+    let revContentMap = utils.getRevContentMap(jiraAgileConfig)
     try {
         if (!jiraAgileConfig.jiraFieldMapping.key) {
             return Array.from(assignees);
@@ -532,7 +440,7 @@ async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
             page += 1;
             for (let i = 0; i < response.data.length; i++) {
                 console.log(response.data[i]);
-                let ret = parseRecord(response.data[i], revContentMap, jiraAgileConfig.jiraFieldMapping)
+                let ret = utils.parseRecord(response.data[i], revContentMap, jiraAgileConfig.jiraFieldMapping)
                 if (!ret.parseSuccess) {
                     console.log('unable to parse the record while getting assignees for all jiraAgileRows')
                     return assignees
@@ -554,7 +462,7 @@ async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
 async function getIssuesForGivenTypes(type, dsName, jiraAgileConfig) {
     let issues = new Set();
     let dbAbstraction = new DbAbstraction();
-    let revContentMap = getRevContentMap(jiraAgileConfig)
+    let revContentMap = utils.getRevContentMap(jiraAgileConfig)
     try {
         if (!jiraAgileConfig.jiraFieldMapping.type) {
             return Array.from(issues);
@@ -566,7 +474,7 @@ async function getIssuesForGivenTypes(type, dsName, jiraAgileConfig) {
             response = await dbAbstraction.pagedFind(dsName, "data", { [mappedColumn]: type }, {}, page, perPage)
             page += 1;
             for (let i = 0; i < response.data.length; i++) {
-                let ret = parseRecord(response.data[i], revContentMap, jiraAgileConfig.jiraFieldMapping)
+                let ret = utils.parseRecord(response.data[i], revContentMap, jiraAgileConfig.jiraFieldMapping)
                 if (!ret.parseSuccess) {
                     console.log('unable to parse the record while getting assignees for all jiraAgileRows')
                     return issues
