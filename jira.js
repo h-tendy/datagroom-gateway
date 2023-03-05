@@ -413,13 +413,13 @@ async function addDynamicFieldsToProjectsMetaData(dsName, jiraConfig, jiraAgileC
                             currIssuetype.fields[field].allowedValues = memo.jiraAgileAssignees
                         }
                     } else if (currIssuetype.fields[field].name == "Epic Link") {
-                        currIssuetype.fields[field].type = "creatableArray";
+                        currIssuetype.fields[field].type = "searchableOption";
                         if (!memo.epics) {
                             memo.epics = await JIRA_AGILE.getIssuesForGivenTypes("Epic", dsName, jiraAgileConfig)
                         }
                         currIssuetype.fields[field].allowedValues = memo.epics
                     } else if (currIssuetype.name == "Story Task" && field == "parent") {
-                        currIssuetype.fields[field].type = "creatableArray";
+                        currIssuetype.fields[field].type = "searchableOption";
                         if (!memo.stories) {
                             memo.stories = await JIRA_AGILE.getIssuesForGivenTypes("Story", dsName, jiraAgileConfig)
                         }

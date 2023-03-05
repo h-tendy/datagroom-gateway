@@ -480,8 +480,13 @@ async function getIssuesForGivenTypes(type, dsName, jiraAgileConfig) {
                     return issues
                 }
                 let jiraRec = ret.rec
-                if (jiraRec.key) {
-                    issues.add(jiraRec.key)
+                let key = jiraRec.key
+                let summary = jiraRec.summary
+                if (key) {
+                    let obj = {};
+                    obj.key = key;
+                    obj.summary = summary;
+                    issues.add(obj)
                 }
             }
         } while (page <= response.total_pages)
