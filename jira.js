@@ -3,6 +3,7 @@ const DbAbstraction = require('./dbAbstraction');
 const JiraSettings = require('./jiraSettings');
 const utils = require('./utils')
 const fetch = require('node-fetch')
+const JIRA_AGILE = require('./jiraAgile')
 // Initialize
 
 let host = JiraSettings.host;
@@ -346,7 +347,94 @@ function getFieldsForGivenProjectAndIssueType(projectKey, issuetype) {
     return []
 }
 
-function getProjectsMetaData() {
+async function getAllAssigneesForJira(dsName, jiraConfig) {
+    let assignees = new Set();
+    let dbAbstraction = new DbAbstraction();
+    let jiraUrl = "https://" + host;
+    let revContentMap = utils.getRevContentMap(jiraConfig)
+    try {
+        if (!jiraConfig.jiraFieldMapping.key) {
+            return Array.from(assignees);
+        }
+        let filters = {}
+        let mappedColumn = jiraConfig.jiraFieldMapping.key;
+        filters[mappedColumn] = { $regex: `^((?!JIRA_AGILE).)*${jiraUrl + '/browse/'}.*`, $options: 'im' };
+        let page = 1, perPage = 5;
+        let response = {};
+        do {
+            response = await dbAbstraction.pagedFind(dsName, "data", filters, {}, page, perPage)
+            page += 1;
+            for (let i = 0; i < response.data.length; i++) {
+                console.log(response.data[i]);
+                let ret = utils.parseRecord(response.data[i], revContentMap, jiraConfig.jiraFieldMapping)
+                if (!ret.parseSuccess) {
+                    console.log('unable to parse the record while getting assignees for all jiraAgileRows')
+                    return assignees
+                }
+                let jiraRec = ret.rec
+                let assignee = jiraRec.assignee;
+                if (assignee && assignee != "NotSet") {
+                    assignees.add(assignee)
+                }
+            }
+        } while (page <= response.total_pages)
+    } catch (e) {
+        console.log("Error in getAllAssigneesForJiraAgile", e)
+    }
+    dbAbstraction.destroy();
+    return Array.from(assignees);
+}
+
+async function addDynamicFieldsToProjectsMetaData(dsName, jiraConfig, jiraAgileConfig) {
+    let memo = {
+        "jiraAssignees": null,
+        "jiraAgileAssignees": null,
+        "epics": null,
+        "stories": null,
+    }
+    try {
+        for (let i = 0; i < filteredProjectsMetaData.projects.length; i++) {
+            let currProject = filteredProjectsMetaData.projects[i];
+            for (let j = 0; j < currProject.issuetypes.length; j++) {
+                let currIssuetype = currProject.issuetypes[j];
+                for (let field of Object.keys(currIssuetype.fields)) {
+                    if (field == "assignee") {
+                        if (currIssuetype.name == "Bug") {
+                            currIssuetype.fields[field].type = "creatableArray"
+                            if (!memo.jiraAssignees) {
+                                memo.jiraAssignees = await getAllAssigneesForJira(dsName, jiraConfig)
+                            }
+                            currIssuetype.fields[field].allowedValues = memo.jiraAssignees
+                        } else {
+                            currIssuetype.fields[field].type = "creatableArray"
+                            if (!memo.jiraAgileAssignees) {
+                                memo.jiraAgileAssignees = await JIRA_AGILE.getAllAssigneesForJiraAgile(dsName, jiraAgileConfig)
+                            }
+                            currIssuetype.fields[field].allowedValues = memo.jiraAgileAssignees
+                        }
+                    } else if (currIssuetype.fields[field].name == "Epic Link") {
+                        currIssuetype.fields[field].type = "searchableOption";
+                        if (!memo.epics) {
+                            memo.epics = await JIRA_AGILE.getIssuesForGivenTypes("Epic", dsName, jiraAgileConfig)
+                        }
+                        currIssuetype.fields[field].allowedValues = memo.epics
+                    } else if (currIssuetype.name == "Story Task" && field == "parent") {
+                        currIssuetype.fields[field].type = "searchableOption";
+                        if (!memo.stories) {
+                            memo.stories = await JIRA_AGILE.getIssuesForGivenTypes("Story", dsName, jiraAgileConfig)
+                        }
+                        currIssuetype.fields[field].allowedValues = memo.stories;
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.log("Error in addDynamicFieldsToProjectsMetaData", e)
+    }
+}
+
+async function getProjectsMetaData(dsName, jiraConfig, jiraAgileConfig) {
+    await addDynamicFieldsToProjectsMetaData(dsName, jiraConfig, jiraAgileConfig)
     return filteredProjectsMetaData
 }
 

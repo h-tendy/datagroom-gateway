@@ -389,9 +389,107 @@ function sanitizeData(objData) {
   }
 }
 
+function getRevContentMap(jiraConfig) {
+  let jiraFieldMapping = jiraConfig.jiraFieldMapping
+  jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
+  delete jiraFieldMapping.key;
+  let revContentMap = {};
+  for (let key in jiraFieldMapping) {
+    let dsField = jiraFieldMapping[key];
+    if (!revContentMap[dsField])
+      revContentMap[dsField] = 1;
+    else
+      revContentMap[dsField] = revContentMap[dsField] + 1;
+  }
+  return revContentMap
+}
+
+function getKeyByValue(object, value) {
+  return Object.keys(object).find(key => object[key] === value);
+}
+
+/**Given a mongodb record, and the reverse contentMapping and jiraFieldMapping. 
+ * It gives back the jira rec object.
+ */
+function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
+  let dbKeys = Object.keys(dbRecord)
+  let rec = {}
+  let parseSuccess = true;
+  let jiraUrl = "https://" + host;
+  for (let dbKey of dbKeys) {
+    let recKey = getKeyByValue(jiraFieldMapping, dbKey)
+    if (!recKey) continue
+    if (!revContentMap[dbKey]) {
+      let recVal = dbRecord[dbKey]
+      if (typeof recVal == 'string') {
+        let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
+        let jiraIssueIdMatchArr = recVal.match(regex)
+        if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
+          recVal = jiraIssueIdMatchArr[1].trim()
+        }
+      }
+      rec[recKey] = recVal
+      continue
+    }
+    if (revContentMap[dbKey] == 1) {
+      let recVal = dbRecord[dbKey]
+      if (typeof recVal == 'string') {
+        let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
+        let jiraIssueIdMatchArr = recVal.match(regex)
+        if (jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
+          recVal = jiraIssueIdMatchArr[1].trim()
+        }
+      }
+      if (recKey == 'jiraSummary') {
+        let arr = recVal.split('\n');
+        if (arr.length >= 2) {
+          const output = recVal.split('\n')[0];
+          rec['summary'] = output
+        } else {
+          const regex = /\s*\([^)]*\)/;
+          const output = recVal.replace(regex, '');
+          rec['summary'] = output
+        }
+      }
+      rec[recKey] = recVal
+    } else {
+      let dbVal = dbRecord[dbKey]
+      let dbValArr = dbVal.split("<br/>")
+      for (let eachEntry of dbValArr) {
+        let eachEntryKeyMatchArr = eachEntry.match(/\*\*(.*)\*\*:(.*)/s)
+        if (eachEntryKeyMatchArr && eachEntryKeyMatchArr.length >= 3) {
+          let recKey = eachEntryKeyMatchArr[1].trim()
+          let recVal = eachEntryKeyMatchArr[2].trim()
+          let regex = new RegExp(`${jiraUrl}/browse/(.*)\\)`)
+          let jiraIssueIdMatchArr = recVal.match(regex)
+          if (recKey == 'key' && jiraIssueIdMatchArr && jiraIssueIdMatchArr.length >= 2) {
+            recVal = jiraIssueIdMatchArr[1]
+          }
+          if (recKey == 'jiraSummary') {
+            let arr = recVal.split('\n');
+            if (arr.length >= 2) {
+              const output = recVal.split('\n')[0];
+              rec['summary'] = output
+            } else {
+              const regex = /\s*\([^)]*\)/;
+              const output = recVal.replace(regex, '');
+              rec['summary'] = output
+            }
+          }
+          rec[recKey] = recVal
+        }
+      }
+    }
+  }
+  return { rec, parseSuccess }
+}
+
+
 module.exports = {
     execCmdExecutor,
   copyRecursiveSync,
   getRecFromJiraIssue,
-  sanitizeData
+  sanitizeData,
+  getRevContentMap,
+  parseRecord
 };
