@@ -103,6 +103,18 @@ function getRecFromJiraIssue(issue) {
     rec.phaseBugFound = issue.fields.customfield_25518.value;
   else
     rec.phaseBugFound = "NotSet";
+  if (issue.fields.duedate)
+    rec.duedate = issue.fields.duedate.split('T')[0];
+  else
+    rec.duedate = "NotSet";
+  if (issue.fields.customfield_25555 && issue.fields.customfield_25555.length) {
+    rec.targetRlsGx = "";
+    for (let i = 0; i < issue.fields.customfield_25555.length; i++) {
+      rec.targetRlsGx += issue.fields.customfield_25555[i].value + ' ';
+    }
+  }
+  else
+      rec.targetRlsGx = "NotSet";
   if (issue.fields.labels && issue.fields.labels.length) {
     rec.labels = "";
     for (let i = 0; i < issue.fields.labels.length; i++) {
