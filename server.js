@@ -98,6 +98,8 @@ app.use(session({
 
 Utils.execCmdExecutor('mkdir uploads');
 
+app.route('/sessionCheck').get(sessionCheck);
+
 const fileUpload = require('./routes/upload');
 app.use('/upload', fileUpload);
 const dsReadApi = require('./routes/dsReadApi');
@@ -305,6 +307,20 @@ function loginAuthenticateForReact(req, res, next) {
         })(req, res, next);
     }
 }
+
+function sessionCheck(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authorization header missing or invalid' });
+    }
+    const token = authHeader.split(' ')[1];
+    try {
+        const decoded = jwt.verify(token, Utils.jwtSecret);
+        res.status(200).json({})
+    } catch (err) {
+        return res.status(401).json({ message: 'Invalid token' });
+    }
+};
 
 let dbAbstraction = new DbAbstraction();
 dbAbstraction.hello();
