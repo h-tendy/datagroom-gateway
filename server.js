@@ -100,6 +100,27 @@ Utils.execCmdExecutor('mkdir uploads');
 
 app.route('/sessionCheck').get(sessionCheck);
 
+// Define a middleware function to authenticate requests
+const authenticate = (req, res, next) => {
+    console.log("Url called: ", req.baseUrl)
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authorization header missing or invalid' });
+    }
+    const token = authHeader.split(' ')[1];
+    try {
+        const decoded = jwt.verify(token, Utils.jwtSecret);
+        req.user = decoded.user;
+        next();
+    } catch (err) {
+        console.log("Error in authenticate middleware: " + err.message)
+        return res.status(401).json({ message: 'Invalid token' });
+    }
+};
+
+// Attach the authentication middleware to all routes except /login
+app.use(/^(?!\/login).*$/, authenticate);
+
 const fileUpload = require('./routes/upload');
 app.use('/upload', fileUpload);
 const dsReadApi = require('./routes/dsReadApi');
@@ -318,6 +339,7 @@ function sessionCheck(req, res, next) {
         const decoded = jwt.verify(token, Utils.jwtSecret);
         res.status(200).json({})
     } catch (err) {
+        console.log("session check error: " + err.message)
         return res.status(401).json({ message: 'Invalid token' });
     }
 };
