@@ -23,7 +23,6 @@ const config = {
     express: {
         port: process.env.PORT || 8887,
     },
-    jwtSecret: "_JWT_SECRET_"
 };
 
 // Active directory functionality
@@ -77,7 +76,9 @@ app.use(bodyParser.json());
 app.use(compression());
 app.use(express.static(reactuiDir));
 
-app.use(cors());
+app.use(cors({
+    credentials: true,
+}));
 app.use(cookieParser());
 
 if (!disableAD) {
@@ -93,28 +94,39 @@ app.use(session({
     secret: 'Super Secret',
     resave: false,
     saveUninitialized: true,
-    cookie: { httpOnly: true, maxAge: 2419200000 } /// maxAge in milliseconds
+    cookie: { httpOnly: true, maxAge: 2419200000, secure: false } /// maxAge in milliseconds
 }));
 
 Utils.execCmdExecutor('mkdir uploads');
 
 app.route('/sessionCheck').get(sessionCheck);
 
-// Define a middleware function to authenticate requests
+// Define a middleware function to authenticate request
 const authenticate = (req, res, next) => {
     console.log("Url called: ", req.baseUrl)
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authorization header missing or invalid' });
-    }
-    const token = authHeader.split(' ')[1];
-    try {
-        const decoded = jwt.verify(token, Utils.jwtSecret);
-        req.user = decoded.user;
-        next();
-    } catch (err) {
-        console.log("Error in authenticate middleware: " + err.message)
-        return res.status(401).json({ message: 'Invalid token' });
+
+    const token = req.cookies.jwt;
+    const username = req.cookies.username;
+    const password = req.cookies.password;
+    if (!token) {
+        // If jwt token is not available in the cookie, check for username and password fields in the cookie.
+        if (username == "guest" && password == "guest") {
+            let jwtToken = jwt.sign({ user: username }, Utils.jwtSecret)
+            req.cookies.jwt = jwtToken;
+            next();
+        } else {
+            res.redirect('/login');
+            return;
+        }
+    } else {
+        try {
+            const decoded = jwt.verify(token, Utils.jwtSecret);
+            req.user = decoded.user;
+            next();
+        } catch (err) {
+            console.log("Error in authenticate middleware: " + err.message)
+            return res.status(401).json({ message: 'Invalid token' });
+        }
     }
 };
 
@@ -293,11 +305,21 @@ function loginAuthenticateForReact(req, res, next) {
     reqObj.user = req.session.user;
 
     if (reqObj.user=='guest' && req.body.password == 'guest') {
+        let jwtToken = jwt.sign({ user: reqObj.user }, Utils.jwtSecret)
         let retUser = {
             user: "guest",
-            token: jwt.sign({ user: reqObj.user },config.jwtSecret)
+            token: jwtToken
         };
-        res.send({ ok: true, user: JSON.stringify(retUser)});       
+        res.cookie('jwt', jwtToken, { httpOnly: true });
+        res.send({ ok: true, user: JSON.stringify(retUser) });
+    } else if (reqObj.user == 'hkumar' && req.body.password == 'hkumar') {
+        let jwtToken = jwt.sign({ user: reqObj.user }, Utils.jwtSecret)
+        let retUser = {
+            user: "hkumar",
+            token: jwtToken
+        };
+        res.cookie('jwt', jwtToken, { httpOnly: true });
+        res.send({ ok: true, user: JSON.stringify(retUser) });
     } else {
         if(disableAD){
             let errMessage = `Only guest Login allowed!`;
@@ -317,24 +339,25 @@ function loginAuthenticateForReact(req, res, next) {
             if (user.thumbnailPhoto) {
                 req.session.userphoto = 'data:image/jpeg;base64,' + Buffer.from(user.thumbnailPhoto).toString('base64');
             }
+            let jwtToken = jwt.sign({ user }, Utils.jwtSecret)
             let retUser = {
                 user: req.session.user,
                 userphoto: req.session.userphoto,
-                token: jwt.sign({ user},config.jwtSecret)
+                token: jwtToken
             };
             reqObj.req = "Login Successfull";
             console.log(req.session.user, ' logged in successfully');
+            res.cookie('jwt', jwtToken, { httpOnly: true });
             res.send({ ok: true, user: JSON.stringify(retUser) });
         })(req, res, next);
     }
 }
 
 function sessionCheck(req, res, next) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authorization header missing or invalid' });
+    const token = req.cookies.jwt;
+    if (!token) {
+        return res.status(401).json({ message: 'Token missing or invalid' });
     }
-    const token = authHeader.split(' ')[1];
     try {
         const decoded = jwt.verify(token, Utils.jwtSecret);
         res.status(200).json({})

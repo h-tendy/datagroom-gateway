@@ -17,8 +17,7 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
     console.log("In columns: ", req.params);
     console.log("In columns: ", req.query);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(200).json({ });
@@ -27,6 +26,10 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     // XXX: Do lots of validation.
     let dbAbstraction = new DbAbstraction();
     let response = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `view_${req.params.dsView}` }, {} );
+    if (!response || !response[0]) {
+        res.status(200).json({});
+        return
+    }
     console.log(response[0].columns);
     let keys = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `keys` }, {} );
     console.log(keys[0]);
@@ -118,8 +121,7 @@ async function pager (req, res, collectionName) {
     console.log("In pager: ", req.params);
     console.log("In pager: ", query);
     console.log("In pager, collectionName:", collectionName)
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(200).json({ });
@@ -197,8 +199,7 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
     let query = req.query;
     console.log("In deleteFromQuery: ", req.params);
     console.log("In deleteFromQuery: ", query);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(200).json({ });
@@ -278,8 +279,7 @@ function getDeleteLog (req, _doc, status) {
 router.post('/view/editSingleAttribute', async (req, res, next) => {
     let request = req.body;
     console.log("In editSingleAttribute: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -380,8 +380,7 @@ function isJiraAgileRec(rec) {
 router.post('/view/insertOneDoc', async (req, res, next) => {
     let request = req.body;
     console.log("In insertOneDoc: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -426,8 +425,7 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     //console.log("In insertOrUpdateOneDoc: ", request);
     //res.status(200).send({status: 'success'});
     //return;
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -477,8 +475,7 @@ router.get('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
     console.log("In downloadXlsx: ", req.params);
     console.log("In downloadXlsx: ", req.query);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -532,8 +529,7 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
 router.post('/deleteDs', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteDs: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -558,8 +554,7 @@ router.post('/deleteDs', async (req, res, next) => {
 router.post('/view/deleteOneDoc', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteOneDoc: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -599,8 +594,7 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
     console.log("In deleteManyDocs: ", request);
     //res.status(200).send({status: 'success'});
     //return;
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -637,8 +631,7 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
 router.post('/view/setViewDefinitions', async (req, res, next) => {
     let request = req.body;
     console.log("In setViewDefinitions: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -697,8 +690,7 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
 router.post('/view/refreshJira', async (req, res, next) => {
     let request = req.body;
     console.log("In refreshJira: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -737,8 +729,7 @@ router.post('/view/refreshJira', async (req, res, next) => {
 router.post('/view/addFilter', async (req, res, next) => {
     let request = req.body;
     console.log("In addFilter: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -785,8 +776,7 @@ router.post('/view/addFilter', async (req, res, next) => {
 router.post('/view/editFilter', async (req, res, next) => {
     let request = req.body;
     console.log("In editFilter: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -831,8 +821,7 @@ router.post('/view/editFilter', async (req, res, next) => {
 router.post('/view/deleteFilter', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteFilter: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -881,8 +870,7 @@ router.post('/view/deleteFilter', async (req, res, next) => {
 router.post('/doBulkEdit', async (req, res, next) => {
     let request = req.body;
     console.log("In doBulkEdit: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -1179,8 +1167,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
 router.post('/createDsFromDs', async (req, res, next) => {
     let request = req.body;
     console.log("In createDsFromDs:", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.fromDsName, "", request.dsUser, token);
     if (!allowed) {
         res.status(415).json({ });
@@ -1254,8 +1241,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
 router.post('/getProjectsMetadata', async (req, res, next) => {
     let request = req.body
     console.log('Create getProjectsMetadata:', req.body)
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({});
@@ -1272,8 +1258,7 @@ router.post('/getProjectsMetadata', async (req, res, next) => {
 router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
     let request = req.body
     console.log('Create getDefaultTypeFieldsAndValues:', req.body)
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({});
@@ -1290,8 +1275,7 @@ router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
 router.post('/view/convertToJira', async (req, res, next) => {
     let request = req.body;
     console.log("In convertToJira: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({});
@@ -1347,8 +1331,7 @@ router.post('/view/convertToJira', async (req, res, next) => {
 router.post('/view/addJiraRow', async (req, res, next) => {
     let request = req.body;
     console.log("In addJiraRow: ", request);
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(415).json({});
