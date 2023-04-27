@@ -67,18 +67,18 @@ try {
 httpServer.timeout = 60 * 60 * 1000;
 
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(function (req, res, next) {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, D-Hive-User");
-    next();
-}); 
+
 app.use(bodyParser.json());
 app.use(compression());
 app.use(express.static(reactuiDir));
 
 app.use(cors({
+    origin: true,
+    allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "D-Hive-User", "authorization", "user", "User", "Authorization"],
+    optionsSuccessStatus: 204,
     credentials: true,
 }));
+
 app.use(cookieParser());
 
 if (!disableAD) {
@@ -94,11 +94,12 @@ app.use(session({
     secret: 'Super Secret',
     resave: false,
     saveUninitialized: true,
-    cookie: { httpOnly: true, maxAge: 2419200000, secure: false } /// maxAge in milliseconds
+    cookie: { httpOnly: true, maxAge: 2419200000, secure: true } /// maxAge in milliseconds
 }));
 
 Utils.execCmdExecutor('mkdir uploads');
 
+app.route('/login').post(loginAuthenticateForReact);
 app.route('/sessionCheck').get(sessionCheck);
 
 // Define a middleware function to authenticate request
@@ -109,15 +110,8 @@ const authenticate = (req, res, next) => {
     const username = req.cookies.username;
     const password = req.cookies.password;
     if (!token) {
-        // If jwt token is not available in the cookie, check for username and password fields in the cookie.
-        if (username == "guest" && password == "guest") {
-            let jwtToken = jwt.sign({ user: username }, Utils.jwtSecret)
-            req.cookies.jwt = jwtToken;
-            next();
-        } else {
-            res.redirect('/login');
-            return;
-        }
+        // If jwt token is not available kick in the basic authentication
+        basicAuth(req, res, next);
     } else {
         try {
             const decoded = jwt.verify(token, Utils.jwtSecret);
@@ -127,6 +121,34 @@ const authenticate = (req, res, next) => {
             console.log("Error in authenticate middleware: " + err.message)
             return res.status(401).json({ message: 'Invalid token' });
         }
+    }
+};
+
+// Basic auth will kick in if someone make an api request without cookie token and just the username and pwd
+const basicAuth = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+        res.redirect('/login');
+        return;
+    }
+
+    const [scheme, encodedCredentials] = authHeader.split(' ');
+
+    if (scheme.toLowerCase() !== 'basic') {
+        res.status(401).send('Invalid authentication scheme');
+        return;
+    }
+
+    const credentials = Buffer.from(encodedCredentials, 'base64').toString();
+    const [username, password] = credentials.split(':');
+
+    if (username === 'guest' && password === 'guest') {
+        let jwtToken = jwt.sign({ user: username }, Utils.jwtSecret)
+        req.cookies.jwt = jwtToken;
+        next();
+    } else {
+        res.status(401).send('Invalid username or password');
     }
 };
 
@@ -147,8 +169,6 @@ app.use('/attachments', express.static(attachmentsDir));
 const uploadAttachments = require('./routes/uploadAttachments');
 app.use('/uploadAttachments', uploadAttachments);
 
-app.route('/login').post(loginAuthenticateForReact);
-    
 app.all('*', (req, res, next) => {
     res.sendFile('./index.html', {
         root: reactuiDir
@@ -310,7 +330,7 @@ function loginAuthenticateForReact(req, res, next) {
             user: "guest",
             token: jwtToken
         };
-        res.cookie('jwt', jwtToken, { httpOnly: true });
+        res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: true, });
         res.send({ ok: true, user: JSON.stringify(retUser) });
     } else if (reqObj.user == 'hkumar' && req.body.password == 'hkumar') {
         let jwtToken = jwt.sign({ user: reqObj.user }, Utils.jwtSecret)
