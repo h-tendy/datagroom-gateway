@@ -107,8 +107,6 @@ const authenticate = (req, res, next) => {
     console.log("Url called: ", req.baseUrl)
 
     const token = req.cookies.jwt;
-    const username = req.cookies.username;
-    const password = req.cookies.password;
     if (!token) {
         // If jwt token is not available kick in the basic authentication
         basicAuth(req, res, next);
