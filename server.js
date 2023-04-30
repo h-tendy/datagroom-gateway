@@ -128,6 +128,7 @@ const basicAuth = (req, res, next) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
+        res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: true, });
         res.redirect('/login');
         return;
     }
@@ -322,6 +323,7 @@ function loginAuthenticateForReact(req, res, next) {
     let reqObj = {};
     reqObj.time = Date();
     reqObj.user = req.session.user;
+    let redirectUrl = req.cookies.originalUrl
 
     if (reqObj.user=='guest' && req.body.password == 'guest') {
         let jwtToken = jwt.sign({ user: reqObj.user }, Utils.jwtSecret)
@@ -330,7 +332,8 @@ function loginAuthenticateForReact(req, res, next) {
             token: jwtToken
         };
         res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: true, });
-        res.send({ ok: true, user: JSON.stringify(retUser) });
+        res.clearCookie('originalUrl');
+        res.send({ ok: true, user: JSON.stringify(retUser), redirectUrl: redirectUrl });
     } else if (reqObj.user == 'hkumar' && req.body.password == 'hkumar') {
         let jwtToken = jwt.sign({ user: reqObj.user }, Utils.jwtSecret)
         let retUser = {
@@ -338,7 +341,8 @@ function loginAuthenticateForReact(req, res, next) {
             token: jwtToken
         };
         res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: true, });
-        res.send({ ok: true, user: JSON.stringify(retUser) });
+        res.clearCookie('originalUrl');
+        res.send({ ok: true, user: JSON.stringify(retUser), redirectUrl: redirectUrl });
     } else {
         if(disableAD){
             let errMessage = `Only guest Login allowed!`;
@@ -367,7 +371,8 @@ function loginAuthenticateForReact(req, res, next) {
             reqObj.req = "Login Successfull";
             console.log(req.session.user, ' logged in successfully');
             res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: true, });
-            res.send({ ok: true, user: JSON.stringify(retUser) });
+            res.clearCookie('originalUrl');
+            res.send({ ok: true, user: JSON.stringify(retUser), redirectUrl: redirectUrl });
         })(req, res, next);
     }
 }
