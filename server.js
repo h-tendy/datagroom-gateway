@@ -101,6 +101,7 @@ Utils.execCmdExecutor('mkdir uploads');
 
 app.route('/login').post(loginAuthenticateForReact);
 app.route('/sessionCheck').get(sessionCheck);
+app.route('/logout').get(logout);
 
 // Define a middleware function to authenticate request
 const authenticate = (req, res, next) => {
@@ -336,7 +337,7 @@ function loginAuthenticateForReact(req, res, next) {
             user: "hkumar",
             token: jwtToken
         };
-        res.cookie('jwt', jwtToken, { httpOnly: true });
+        res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: true, });
         res.send({ ok: true, user: JSON.stringify(retUser) });
     } else {
         if(disableAD){
@@ -365,10 +366,15 @@ function loginAuthenticateForReact(req, res, next) {
             };
             reqObj.req = "Login Successfull";
             console.log(req.session.user, ' logged in successfully');
-            res.cookie('jwt', jwtToken, { httpOnly: true });
+            res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: true, });
             res.send({ ok: true, user: JSON.stringify(retUser) });
         })(req, res, next);
     }
+}
+
+function logout(req, res, next) {
+    res.clearCookie('jwt');
+    res.send({ ok: true, msg: "Logged out Successfully" });
 }
 
 function sessionCheck(req, res, next) {
