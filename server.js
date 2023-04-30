@@ -74,7 +74,7 @@ app.use(express.static(reactuiDir));
 
 app.use(cors({
     origin: true,
-    allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "D-Hive-User", "authorization", "user", "User", "Authorization"],
+    allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "D-Hive-User", "authorization", "user", "User", "Authorization", "Accept-Language", "Content-Language", "access-control-allow-origin"],
     optionsSuccessStatus: 204,
     credentials: true,
 }));
