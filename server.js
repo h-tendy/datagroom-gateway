@@ -118,7 +118,9 @@ const authenticate = (req, res, next) => {
             next();
         } catch (err) {
             console.log("Error in authenticate middleware: " + err.message)
-            return res.status(401).json({ message: 'Invalid token' });
+            res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: true, });
+            res.redirect('/login');
+            return;
         }
     }
 };
@@ -262,6 +264,7 @@ function dgUnlockForClient (clientId) {
     */
     io.on('connection', (client) => {
         console.log(`${Date()}: Client connected...`, client.id);
+        // if (!isAuthorized(client)) return;
         client.on('Hello', function (helloObj) {
             console.log(`${Date()}: Hello from :`, helloObj);
             client.emit('Hello', { server: "Hi there!" });
