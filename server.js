@@ -264,7 +264,7 @@ function dgUnlockForClient (clientId) {
     */
     io.on('connection', (client) => {
         console.log(`${Date()}: Client connected...`, client.id);
-        // if (!isAuthorized(client)) return;
+        if (!isAuthorized(client)) return;
         client.on('Hello', function (helloObj) {
             console.log(`${Date()}: Hello from :`, helloObj);
             client.emit('Hello', { server: "Hi there!" });
@@ -318,6 +318,37 @@ function dgUnlockForClient (clientId) {
     await Jira.createFilteredProjectsMetaData()
 })()
 
+function isAuthorized(client) {
+    let clientCookie = client?.handshake?.headers?.cookie;
+    console.log(`${Date()}: Client connected cookie...`, clientCookie);
+    if (!clientCookie) {
+        console.log("No client cookie found");
+        client.emit('exception', 'Authentication failed. Reload the page or login again.');
+        client.disconnect(true);
+        return false;
+    }
+    let clientCookieArray = clientCookie.split(';');
+    let requiredClientCookieArray = clientCookieArray.filter((cookie) => cookie.trim().startsWith("jwt="));
+    if (requiredClientCookieArray.length != 1) {
+        console.log("No jwt cookie found.")
+        client.emit('exception', 'Authentication failed. Reload the page or login again.');
+        client.disconnect(true);
+        return false;
+    }
+    // Extract the jwt token from the cookie
+    let token = requiredClientCookieArray[0].split("=")[1];
+    // Verify that the token is valid
+    try {
+        const decoded = jwt.verify(token, Utils.jwtSecret);
+        console.log("Token is valid");
+    } catch (err) {
+        console.log("Error in verifying authentication in socket connection: " + err.message)
+        client.emit('exception', 'Authentication failed. Reload the page or login again.');
+        client.disconnect(true);
+        return false;
+    }
+    return true;
+}
 
 function loginAuthenticateForReact(req, res, next) {
     req.session.user = req.body.username;
