@@ -20,7 +20,7 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
-        res.status(200).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     // XXX: Do lots of validation.
@@ -124,7 +124,7 @@ async function pager (req, res, collectionName) {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
-        res.status(200).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let [filters, sorters] = getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
@@ -202,7 +202,7 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
-        res.status(200).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let [filters, sorters] = getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
@@ -282,7 +282,7 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -383,7 +383,7 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -428,7 +428,7 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -478,7 +478,7 @@ router.get('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
 
@@ -532,7 +532,7 @@ router.post('/deleteDs', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -557,7 +557,7 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
 
@@ -597,7 +597,7 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let deletedObj = {};
@@ -634,7 +634,7 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -693,7 +693,7 @@ router.post('/view/refreshJira', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let deletedObj = {};
@@ -732,7 +732,7 @@ router.post('/view/addFilter', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -779,7 +779,7 @@ router.post('/view/editFilter', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -824,7 +824,7 @@ router.post('/view/deleteFilter', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -873,7 +873,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -1170,7 +1170,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.fromDsName, "", request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({ });
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -1244,7 +1244,7 @@ router.post('/getProjectsMetadata', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({});
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let response = await Jira.getProjectsMetaData(request.dsName, request.jiraConfig, request.jiraAgileConfig)
@@ -1261,7 +1261,7 @@ router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({});
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let response = Jira.getDefaultTypeFieldsAndValues()
@@ -1278,7 +1278,7 @@ router.post('/view/convertToJira', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({});
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -1334,7 +1334,7 @@ router.post('/view/addJiraRow', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(415).json({});
+        res.status(403).json({ "Error": "access_denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
