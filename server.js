@@ -110,6 +110,7 @@ const authenticate = (req, res, next) => {
     const token = req.cookies.jwt;
     if (!token) {
         // If jwt token is not available kick in the basic authentication
+        console.log("No jwt token in cookie. Will forward for basic authentication");
         basicAuth(req, res, next);
     } else {
         try {
@@ -130,6 +131,7 @@ const basicAuth = (req, res, next) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
+        console.log("AuthHeader not found in request. Redirecting to the login page.");
         res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: true, });
         res.redirect('/login');
         return;
@@ -138,6 +140,7 @@ const basicAuth = (req, res, next) => {
     const [scheme, encodedCredentials] = authHeader.split(' ');
 
     if (scheme.toLowerCase() !== 'basic') {
+        console.log('Invalid authentication scheme: ' + scheme);
         res.status(401).send('Invalid authentication scheme');
         return;
     }
