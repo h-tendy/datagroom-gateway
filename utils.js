@@ -1,7 +1,11 @@
 const exec = require('child_process').exec;
 const fs = require("fs")
 const path = require("path")
+const crypto = require("crypto");
 
+var jwtSecret = crypto.randomBytes(32).toString("hex");
+
+// var jwtSecret = "_JWT_SECRET_";
 const JiraSettings = require('./jiraSettings');
 let host = JiraSettings.host;
 
@@ -503,5 +507,6 @@ module.exports = {
   getRecFromJiraIssue,
   sanitizeData,
   getRevContentMap,
-  parseRecord
+  parseRecord,
+  jwtSecret
 };
