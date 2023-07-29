@@ -322,7 +322,7 @@ function dgUnlockForClient (clientId) {
 })()
 
 function isAuthorized(client) {
-    let clientCookie = client?.handshake?.headers?.cookie;
+    let clientCookie = client && client.handshake && client.handshake.headers && client.handshake.headers.cookie;
     console.log(`${Date()}: Client connected cookie...`, clientCookie);
     if (!clientCookie) {
         console.log("No client cookie found");
@@ -399,7 +399,7 @@ function loginAuthenticateForReact(req, res, next) {
             if (user.thumbnailPhoto) {
                 req.session.userphoto = 'data:image/jpeg;base64,' + Buffer.from(user.thumbnailPhoto).toString('base64');
             }
-            let jwtToken = jwt.sign({ user }, Utils.jwtSecret)
+            let jwtToken = jwt.sign({ user: req.session.user }, Utils.jwtSecret)
             let retUser = {
                 user: req.session.user,
                 userphoto: req.session.userphoto,
