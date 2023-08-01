@@ -72,8 +72,8 @@ async function refreshJiraQuery(dsName, jiraConfig) {
         } else {
             r = doJiraMapping(rec, jiraConfig);
         }
-        console.log("selectorObj: ", r.selectorObj);
-        console.log("FullRec: ", r.fullRec);
+        // console.log("selectorObj: ", r.selectorObj);
+        // console.log("FullRec: ", r.fullRec);
         try {
             await dbAbstraction.update(dsName, "data", r.selectorObj, r.fullRec);
         } catch (e) {
