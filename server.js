@@ -262,7 +262,6 @@ function dgUnlockForClient (clientId) {
     return {status: false, unlocked: null}
 }
 
-var connectedClient;
 var isDbConnected = false;
 
 (() => {
@@ -274,8 +273,7 @@ var isDbConnected = false;
     */
     io.on('connection', (client) => {
         console.log(`${Date()}: Client connected...`, client.id);
-        connectedClient = client;
-        connectedClient.emit('dbConnectivityState', {dbState: isDbConnected})
+        client.emit('dbConnectivityState', {dbState: isDbConnected});
         if (!isAuthorized(client)) return;
         client.on('Hello', function (helloObj) {
             console.log(`${Date()}: Hello from :`, helloObj);
@@ -321,7 +319,6 @@ var isDbConnected = false;
             } // else, it is a stale 'unlock' !
             client.removeAllListeners();
             client.disconnect(true);
-            connectedClient=null;
         });
 
     })
@@ -449,16 +446,11 @@ async function dbPing() {
     try{
         let db = new DbAbstraction();
         isDbConnected = await db.isdbAvailable();
-        if (connectedClient) {
-            // console.log("Going to emit event");
-            connectedClient.emit('dbConnectivityState', {dbState: isDbConnected});
-        }
-        // console.log(`${Date()}: Db is available ${isDbConnected}`);
+        io.emit('dbConnectivityState', {dbState: isDbConnected});
         db.destroy();
     }  catch (e) {
         console.log("Exception caught in db not available: ", e);
     }
-    // console.log("dbPingInterval:", dbPingInterval);
     setTimeout(dbPing, dbPingInterval * 1000);
 }
 dbPing();
