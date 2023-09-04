@@ -447,7 +447,7 @@ async function dbPing() {
         let db = new DbAbstraction();
         isDbConnected = await db.isdbAvailable();
         io.emit('dbConnectivityState', {dbState: isDbConnected});
-        db.destroy();
+        await db.destroy();
     }  catch (e) {
         console.log("Exception caught in db not available: ", e);
     }
