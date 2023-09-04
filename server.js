@@ -26,13 +26,17 @@ const config = {
 };
 
 // Active directory functionality
-let disableAD = false; 
+let disableAD = false;
+let dbPingInterval = 60; //in secs
 
-if (process.argv.length >= 2) {
+if (process.argv.length >= 3) {
     for (let i = 2; i < process.argv.length; i++) {
         let argkv = process.argv[i].split('=');
         if(argkv[0] == 'disableAD' && argkv[1] == "true") {
             disableAD = true;
+        }
+        else if(argkv[0] == 'dbPingInterval') {
+            dbPingInterval = argkv[1];
         }
     }
 }
@@ -258,7 +262,7 @@ function dgUnlockForClient (clientId) {
     return {status: false, unlocked: null}
 }
 
-
+var isDbConnected = false;
 
 (() => {
     /*
@@ -269,6 +273,7 @@ function dgUnlockForClient (clientId) {
     */
     io.on('connection', (client) => {
         console.log(`${Date()}: Client connected...`, client.id);
+        client.emit('dbConnectivityState', {dbState: isDbConnected});
         if (!isAuthorized(client)) return;
         client.on('Hello', function (helloObj) {
             console.log(`${Date()}: Hello from :`, helloObj);
@@ -437,7 +442,18 @@ function sessionCheck(req, res, next) {
 
 let dbAbstraction = new DbAbstraction();
 dbAbstraction.hello();
-
+async function dbPing() {
+    try{
+        let db = new DbAbstraction();
+        isDbConnected = await db.isdbAvailable();
+        io.emit('dbConnectivityState', {dbState: isDbConnected});
+        await db.destroy();
+    }  catch (e) {
+        console.log("Exception caught in db not available: ", e);
+    }
+    setTimeout(dbPing, dbPingInterval * 1000);
+}
+dbPing();
 //setTimeout(dbAbstraction.destroy, 5000);
 
 PrepAttachments.refreshAttachmentsIntoDb();
