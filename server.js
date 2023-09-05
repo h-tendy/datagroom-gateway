@@ -445,8 +445,12 @@ dbAbstraction.hello();
 async function dbPing() {
     try{
         let db = new DbAbstraction();
-        isDbConnected = await db.isdbAvailable();
-        io.emit('dbConnectivityState', {dbState: isDbConnected});
+        let currentDbState = await db.isdbAvailable();
+        if (isDbConnected !== currentDbState) {
+            console.log(`Db connected state has changed from ${isDbConnected} to ${currentDbState}`);
+            isDbConnected = currentDbState;
+            io.emit('dbConnectivityState', { dbState: isDbConnected });
+        }
         await db.destroy();
     }  catch (e) {
         console.log("Exception caught in db not available: ", e);
