@@ -444,12 +444,26 @@ function sessionCheck(req, res, next) {
 
 let dbAbstraction = new DbAbstraction();
 dbAbstraction.hello();
+// async function dbPing() {
+//     try{
+//         let db = new DbAbstraction();
+//         isDbConnected = await db.isdbAvailable();
+//         io.emit('dbConnectivityState', {dbState: isDbConnected});
+//         await db.destroy();
+//     }  catch (e) {
+//         console.log("Exception caught in db not available: ", e);
+//     }
+//     setTimeout(dbPing, dbPingInterval * 1000);
+// }
+// dbPing();
 async function dbPing() {
     try{
         let db = new DbAbstraction();
         let currentDbState = await db.isdbAvailable();
+        console.log(" Check :: isDbConnected", isDbConnected);
+        console.log(" Check :: currentDbState", currentDbState);
         if (isDbConnected !== currentDbState) {
-            console.log(`Db connected state has changed from ${isDbConnected} to ${currentDbState}`);
+            console.log(`Check ::: Db connected state has changed from ${isDbConnected} to ${currentDbState}`);
             isDbConnected = currentDbState;
             io.emit('dbConnectivityState', { dbState: isDbConnected });
         }
