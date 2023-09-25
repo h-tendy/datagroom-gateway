@@ -27,21 +27,15 @@ const config = {
 
 // Active directory functionality
 let disableAD = false;
-let dbPingInterval = 60; //in secs
 
-if (process.argv.length >= 3) {
+if (process.argv.length >= 2) {
     for (let i = 2; i < process.argv.length; i++) {
         let argkv = process.argv[i].split('=');
         if(argkv[0] == 'disableAD' && argkv[1] == "true") {
             disableAD = true;
         }
-        else if(argkv[0] == 'dbPingInterval') {
-            dbPingInterval = argkv[1];
-        }
     }
 }
-
-
 
 const app = express();
 var httpServer, io;
@@ -457,16 +451,10 @@ async function checkDbConnectivity() {
     }
 }
 
-function regularDbCheck() {
-    checkDbConnectivity();
-    setTimeout(regularDbCheck, dbPingInterval);
-}
-
 function immediateDbCheck() {
     setInterval(() => { checkDbConnectivity(); }, 1000);
 }
 
-regularDbCheck();
 immediateDbCheck();
 //setTimeout(dbAbstraction.destroy, 5000);
 
