@@ -9,6 +9,7 @@ const session = require('express-session');
 const cors = require('cors');
 const jwt = require('jsonwebtoken')
 const DbAbstraction = require('./dbAbstraction');
+const DbConnectivityChecker = require('./dbConnectivityChecker');
 const ExcelUtils = require('./excelUtils');
 const Utils = require('./utils');
 const PrepAttachments = require('./prepAttachments');
@@ -27,12 +28,16 @@ const config = {
 
 // Active directory functionality
 let disableAD = false;
+let dbCheckInterval = 2; // in secs
 
-if (process.argv.length >= 2) {
+if (process.argv.length >= 3) {
     for (let i = 2; i < process.argv.length; i++) {
         let argkv = process.argv[i].split('=');
         if(argkv[0] == 'disableAD' && argkv[1] == "true") {
             disableAD = true;
+        }
+        else if(argkv[0] == 'dbCheckInterval') {
+            dbCheckInterval = argkv[1];
         }
     }
 }
@@ -436,26 +441,8 @@ function sessionCheck(req, res, next) {
 let dbAbstraction = new DbAbstraction();
 dbAbstraction.hello();
 
-async function checkDbConnectivity() {
-    try {
-        let db = new DbAbstraction();
-        let currentDbState = await db.isdbAvailable();
-        if (isDbConnected !== currentDbState) {
-            // console.log(`Check ::: Db connected state has changed from ${isDbConnected} to ${currentDbState}`);
-            isDbConnected = currentDbState;
-            io.emit('dbConnectivityState', { dbState: isDbConnected });
-        }
-        await db.destroy();
-    } catch (e) {
-        console.log("Exception caught in db check: ", e);
-    }
-}
-
-function immediateDbCheck() {
-    setInterval(() => { checkDbConnectivity(); }, 1000);
-}
-
-immediateDbCheck();
+const dbConnectivityChecker = new DbConnectivityChecker(io);
+dbConnectivityChecker.checkDbConnectivity(dbCheckInterval);
 //setTimeout(dbAbstraction.destroy, 5000);
 
 PrepAttachments.refreshAttachmentsIntoDb();
