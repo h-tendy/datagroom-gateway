@@ -55,7 +55,7 @@ Datagroom aims to provide tools to maintain and groom arbitrary datasets with a 
 
 Bulk editing features are now available. Yet to be documented
 
-## Installation
+## Installation on VM/Machine
 
 1. Install `MongoDb` community edition, if you want local installation. In case of cloud `MongoDb` installation. Follow the following steps:-
     * Make a new `project` and a new empty `cluster` inside that project on mongodb atlas.
@@ -70,6 +70,22 @@ Bulk editing features are now available. Yet to be documented
 1. Start server: `cd datagroom-gateway; node ./server.js disableAD=true`. Login as `guest` with `guest` as password. If you want active-directory integration, update the configuration in `ldapSettings.js`. (`node ./server.js` if you have updated `ldapSettings.js`) If you want to use the JIRA plug-in, update the configuration in `jiraSettings.js`. 
 
 1. Open a browser and navigate to `localhost:8887` 
+
+## Docker installation
+
+**Pre-requisites** - 
+* Make sure that the Docker is installed on your machine.
+* Make sure that both the gateway and UI code is cloned on the same level.
+
+**Steps to follow** :-
+
+1. Run the command `docker build -t dg-image -f datagroom-gateway/Dockerfile .` from the parent directory of datagroom-gateway.
+
+1. After the image is created. Just run the command `docker run -dit -p 8887:8887/tcp -p 8887:8887/udp -p 443:443/tcp -p 443:447/udp --name dg-container dg-image`
+
+1. You can now go to the browser on the link `http://<host-ip>:8887` and see the webapp running.
+
+1. To see the processes running - you can attach to the `dg-container` image.
 
 
 ## Uses
