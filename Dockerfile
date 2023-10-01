@@ -38,9 +38,5 @@ RUN npm install
 
 RUN chmod +x /app/datagroom-gateway/entryPoint.sh
 
-# Specify the command to run your Node.js application
-#CMD ["bash"]
-#CMD ["node", "server.js", "disableAD=true"]
-
 # Set the entrypoint to shell script
 ENTRYPOINT ["/app/datagroom-gateway/entryPoint.sh"]
