@@ -75,17 +75,33 @@ Bulk editing features are now available. Yet to be documented
 
 **Pre-requisites** - 
 * Make sure that the Docker is installed on your machine.
-* Make sure that both the gateway and UI code is cloned on the same level.
+* Make sure that both the gateway and UI code is cloned on the same directory level.
+
+### Docker installation for deployment
 
 **Steps to follow** :-
+1. For persistence of mongodb data onto the host - Run `docker volume create dg-data`. **Note- You can skip this step if you want full cleanup of the data if the docker container stops**
 
 1. Run the command `docker build -t dg-image -f datagroom-gateway/Dockerfile .` from the parent directory of datagroom-gateway.
 
-1. After the image is created. Just run the command `docker run -dit -p 8887:8887/tcp -p 8887:8887/udp -p 443:443/tcp -p 443:447/udp --name dg-container dg-image`
+1. After the image is created. Just run the command `docker run -dit -p 8887:8887/tcp -p 8887:8887/udp -p 443:443/tcp -p 443:447/udp -v dg-data:/var/lib/mongodb --name dg-container dg-image`. **Note - If you have skipped the first step of docker volume creation, you can omit the `-v dg-data:/var/lib/mongodb` in the above command.**
 
 1. You can now go to the browser on the link `http://<host-ip>:8887` and see the webapp running.
 
 1. To see the processes running - you can attach to the `dg-container` image.
+
+### Docker installation for development
+
+**Steps to follow** :-
+1. For persistence of mongodb data onto the host - Run `docker volume create dg-data`.
+
+1. Run the command `docker build -t dg-image -f datagroom-gateway/Dockerfile .` from the parent directory of datagroom-gateway.
+
+1. After the image is created. Just run the command `docker run -dit -p 8887:8887/tcp -p 8887:8887/udp -p 443:443/tcp -p 443:447/udp -v /home/${USER}:/home/${USER} -v dg-data:/var/lib/mongodb --name dg-container dg-image devMode=ON absolutePathToServerFile=<absolute path to the /datagroom-gateway/server.js file>`. <br/> Example command: - `docker run -dit -p 8887:8887/tcp -p 8887:8887/udp -p 443:443/tcp -p 443:447/udp -v /home/${USER}:/home/${USER} -v dg-data:/var/lib/mongodb --name dg-container dg-image devMode=ON absolutePathToServerFile=/home/abc_user/DG-development/datagroom-gateway/server.js`. <br/> **Note - Here, you can mount any source and target directory while development. By default it is mounting the /home/$USER. You can change this behaviour as you prefer by altering the argument to `-v`. Make sure that the absolute path to the server file is mounted correctly. If the path is invalid or not mounted correctly, it can lead to unexpected behaviour.** (absolutePathToServerFile is necessary to indicate that out of the mounted directory, in which path you are going to develop so that the docker container picks the correct path and run the intended server.js file)
+
+1. You can now go to the browser on the link `http://<host-ip>:8887` and see the webapp running.
+
+1. You can attach to the container and make the changes in backend code on the host.
 
 
 ## Uses

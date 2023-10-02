@@ -45,6 +45,7 @@ if (process.argv.length >= 3) {
 
 const app = express();
 var httpServer, io;
+var isSecure = false;
 try {
     const dirPath = path.join(__dirname, '/ssl');
     let options = {
@@ -61,6 +62,7 @@ try {
     io = require('socket.io')(httpServer, { pingTimeout: 60000 });
     httpServer.listen(443);
     console.log('https server listening on port : 443');
+    isSecure = true;
 } catch (e) {
     console.log("Trouble with cert reading: ", e);
     httpServer = require('http').createServer(app);
@@ -123,7 +125,7 @@ const authenticate = (req, res, next) => {
             next();
         } catch (err) {
             console.log("Error in authenticate middleware: " + err.message)
-            res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: true, });
+            res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: isSecure, });
             res.redirect('/login');
             return;
         }
@@ -138,7 +140,7 @@ const basicAuth = (req, res, next) => {
         let request = req.body;
         let dsName = request.dsName;
         console.log(`AuthHeader not found in request while pushing to ${dsName}. Redirecting to the login page.`);
-        res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: true, });
+        res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: isSecure, });
         res.redirect('/login');
         return;
     }
@@ -375,7 +377,7 @@ function loginAuthenticateForReact(req, res, next) {
             user: "guest",
             token: jwtToken
         };
-        res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: true, });
+        res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: isSecure, });
         res.clearCookie('originalUrl');
         res.send({ ok: true, user: JSON.stringify(retUser), redirectUrl: redirectUrl });
     } else if (reqObj.user == 'hkumar' && req.body.password == 'hkumar') {
@@ -384,7 +386,7 @@ function loginAuthenticateForReact(req, res, next) {
             user: "hkumar",
             token: jwtToken
         };
-        res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: true, });
+        res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: isSecure, });
         res.clearCookie('originalUrl');
         res.send({ ok: true, user: JSON.stringify(retUser), redirectUrl: redirectUrl });
     } else {
@@ -414,7 +416,7 @@ function loginAuthenticateForReact(req, res, next) {
             };
             reqObj.req = "Login Successfull";
             console.log(req.session.user, ' logged in successfully');
-            res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: true, });
+            res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: isSecure, });
             res.clearCookie('originalUrl');
             res.send({ ok: true, user: JSON.stringify(retUser), redirectUrl: redirectUrl });
         })(req, res, next);

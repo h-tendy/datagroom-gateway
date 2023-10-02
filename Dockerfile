@@ -15,6 +15,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_12.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g npm@7.5.2
 
+# Set the default data directory as a volume
+VOLUME /var/lib/mongodb
+
 # Create a directory for your Node.js application
 WORKDIR /app
 
