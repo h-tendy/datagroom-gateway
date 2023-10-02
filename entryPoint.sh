@@ -34,7 +34,7 @@ sleep 5 &&
 
 # Start your Node.js application
 if [ "$devMode" = "ON" ]; then
-    node "$absolutePathToServerFile" disableAD=true &
+    node "$absolutePathToServerFile" &
 else
     node "server.js" disableAD=true &
 fi
