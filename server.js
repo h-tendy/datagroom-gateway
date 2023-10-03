@@ -111,12 +111,9 @@ app.route('/logout').get(logout);
 
 // Define a middleware function to authenticate request
 const authenticate = (req, res, next) => {
-    console.log("Url called: ", req.baseUrl)
-
     const token = req.cookies.jwt;
     if (!token) {
         // If jwt token is not available kick in the basic authentication
-        console.log("No jwt token in cookie. Will forward for basic authentication");
         basicAuth(req, res, next);
     } else {
         try {
@@ -139,8 +136,8 @@ const basicAuth = (req, res, next) => {
     if (!authHeader) {
         let request = req.body;
         let dsName = request.dsName;
-        console.log(`AuthHeader not found in request while pushing to ${dsName}. Redirecting to the login page.`);
-        res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: isSecure, });
+        // console.log(`AuthHeader not found in request while pushing to ${dsName}. Redirecting to the login page.`);
+        res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: true, });
         res.redirect('/login');
         return;
     }
@@ -444,36 +441,33 @@ function sessionCheck(req, res, next) {
 
 let dbAbstraction = new DbAbstraction();
 dbAbstraction.hello();
-// async function dbPing() {
-//     try{
-//         let db = new DbAbstraction();
-//         isDbConnected = await db.isdbAvailable();
-//         io.emit('dbConnectivityState', {dbState: isDbConnected});
-//         await db.destroy();
-//     }  catch (e) {
-//         console.log("Exception caught in db not available: ", e);
-//     }
-//     setTimeout(dbPing, dbPingInterval * 1000);
-// }
-// dbPing();
-async function dbPing() {
-    try{
+
+async function checkDbConnectivity() {
+    try {
         let db = new DbAbstraction();
         let currentDbState = await db.isdbAvailable();
-        console.log(" Check :: isDbConnected", isDbConnected);
-        console.log(" Check :: currentDbState", currentDbState);
         if (isDbConnected !== currentDbState) {
-            console.log(`Check ::: Db connected state has changed from ${isDbConnected} to ${currentDbState}`);
+            // console.log(`Check ::: Db connected state has changed from ${isDbConnected} to ${currentDbState}`);
             isDbConnected = currentDbState;
             io.emit('dbConnectivityState', { dbState: isDbConnected });
         }
         await db.destroy();
-    }  catch (e) {
-        console.log("Exception caught in db not available: ", e);
+    } catch (e) {
+        console.log("Exception caught in db check: ", e);
     }
-    setTimeout(dbPing, dbPingInterval * 1000);
 }
-dbPing();
+
+function regularDbCheck() {
+    checkDbConnectivity();
+    setTimeout(regularDbCheck, dbPingInterval);
+}
+
+function immediateDbCheck() {
+    setInterval(() => { checkDbConnectivity(); }, 1000);
+}
+
+regularDbCheck();
+immediateDbCheck();
 //setTimeout(dbAbstraction.destroy, 5000);
 
 PrepAttachments.refreshAttachmentsIntoDb();
