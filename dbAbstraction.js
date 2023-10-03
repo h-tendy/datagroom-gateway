@@ -9,18 +9,6 @@ class DbAbstraction {
         this.url = process.env.DATABASE || 'mongodb://localhost:27017';
         this.client = null;
     }
-    async isdbAvailable () {
-        try {
-            this.client = await MongoClient.connect(this.url, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 4000 }) 
-            // console.log('Connected to MongoDB successfully!');
-            return true;
-        }
-        catch (error){
-            console.error('Error connecting to MongoDB:', error);
-            this.client = null;
-        }
-        return false;
-    }
     async destroy () {
         if (this.client) {
             await this.client.close(true);
