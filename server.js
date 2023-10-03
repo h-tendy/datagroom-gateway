@@ -136,7 +136,7 @@ const basicAuth = (req, res, next) => {
         let request = req.body;
         let dsName = request.dsName;
         // console.log(`AuthHeader not found in request while pushing to ${dsName}. Redirecting to the login page.`);
-        res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: true, });
+        res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: isSecure, });
         res.redirect('/login');
         return;
     }

@@ -281,8 +281,7 @@ async function createFilteredProjectsMetaData() {
             expand: ["projects.issuetypes.fields"]
         })
         filteredProjectsMetaData.projects = [];
-        if ( origProjectsMetaData.projects )
-        {
+        if ( origProjectsMetaData.projects ) {
             for (let i = 0; i < origProjectsMetaData.projects.length; i++) {
                 if (!expectedProjects.includes(origProjectsMetaData.projects[i].key)) continue
                 let currOrigProjectMetaData = origProjectsMetaData.projects[i];
