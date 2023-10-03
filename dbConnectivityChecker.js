@@ -2,42 +2,34 @@ const MongoClient = require('mongodb').MongoClient;
 
 class DbConnectivityChecker {
     constructor(io) {
-        this.url = process.env.DATABASE || 'mongodb://0.0.0.0:27017';
+        this.url = process.env.DATABASE || 'mongodb://localhost:27017';
         this.io = io;
+        this.dbState = null;
     }
-
-    async emitDbAvailable() {
-        if (this.io) {
-            this.io.emit('dbConnectivityState', { dbState: true });
-        } else {
-            console.error("Socket.io instance not available.");
-        }
-    }
-
-    async emitDbUnAvailable() {
-        if (this.io) {
-            this.io.emit('dbConnectivityState', { dbState: false });
-        } else {
-            console.error("Socket.io instance not available.");
-        }
-    }
-
     async checkDbConnectivity( dbCheckInterval ) {
         let heartBeatInterval = (dbCheckInterval * 1000);
-        try {
-            const clientInit = new MongoClient(this.url, { useNewUrlParser: true, useUnifiedTopology: true, 
-                serverSelectionTimeoutMS: 4000, heartbeatFrequencyMS: heartBeatInterval });
-            
-            clientInit.on ("serverHeartbeatSucceeded",() => { this.emitDbAvailable() });
+        const MongoDbClient = new MongoClient(this.url, { useNewUrlParser: true, useUnifiedTopology: true, 
+            serverSelectionTimeoutMS: 4000, heartbeatFrequencyMS: heartBeatInterval });
+        
+        MongoDbClient.on("serverHeartbeatSucceeded", () => {
+            const currentDbState = true; 
+            if (currentDbState !== this.dbState) {
+                this.dbState = currentDbState;
+                this.io.emit('dbConnectivityState', { dbState: currentDbState });
+                console.log(`${Date()} Mongo db server heart beat is success, currentDbState :`, currentDbState);
+            }
+        });
 
-            clientInit.on ("serverHeartbeatFailed",() => { this.emitDbUnAvailable();
-                console.log(`${Date()} Mongo db server heart beat failed`);
-            });
-
-            await clientInit.connect();
-        } catch (error) {
-            console.error('Error connecting to MongoDB:', error);
-        }
+        MongoDbClient.on("serverHeartbeatFailed", () => {
+            const currentDbState = false;
+            if (currentDbState !== this.dbState) {
+                this.dbState = currentDbState;
+                this.io.emit('dbConnectivityState', { dbState: currentDbState });
+                console.log(`${Date()} Mongo db server heart beat has failed, currentDbState :`, currentDbState);
+            }
+        });
+        
+        await MongoDbClient.connect();
     }
 }
 
