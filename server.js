@@ -260,8 +260,6 @@ function dgUnlockForClient (clientId) {
     return {status: false, unlocked: null}
 }
 
-var isDbConnected = false;
-
 (() => {
     /*
     const srv = app.listen(config.express.port, () => {
@@ -271,7 +269,7 @@ var isDbConnected = false;
     */
     io.on('connection', (client) => {
         console.log(`${Date()}: Client connected...`, client.id);
-        client.emit('dbConnectivityState', {dbState: isDbConnected});
+        client.emit('dbConnectivityState', {dbState: dbConnectivityChecker.dbState});
         if (!isAuthorized(client)) return;
         client.on('Hello', function (helloObj) {
             console.log(`${Date()}: Hello from :`, helloObj);
