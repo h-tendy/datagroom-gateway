@@ -280,42 +280,44 @@ async function createFilteredProjectsMetaData() {
             projectKeys: expectedProjects,
             expand: ["projects.issuetypes.fields"]
         })
-        filteredProjectsMetaData.projects = []
-        for (let i = 0; i < origProjectsMetaData.projects.length; i++) {
-            if (!expectedProjects.includes(origProjectsMetaData.projects[i].key)) continue
-            let currOrigProjectMetaData = origProjectsMetaData.projects[i];
-            let currFilteredProjectMetaData = {};
-            currFilteredProjectMetaData.key = currOrigProjectMetaData.key
-            currFilteredProjectMetaData.issuetypes = [];
-            for (let j = 0; j < currOrigProjectMetaData.issuetypes.length; j++) {
-                if (!getIssueTypesForGivenProject(currFilteredProjectMetaData.key).includes(currOrigProjectMetaData.issuetypes[j].name)) continue
-                let currOrigProjectIssueTypeMetaData = currOrigProjectMetaData.issuetypes[j];
-                let currFilteredProjectIssueTypeMetaData = {}
-                currFilteredProjectIssueTypeMetaData.name = currOrigProjectIssueTypeMetaData.name
-                currFilteredProjectIssueTypeMetaData.fields = {}
-                for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
-                    if (field == "project" || field == "issuetype") continue
-                    if (!getFieldsForGivenProjectAndIssueType(currFilteredProjectMetaData.key, currFilteredProjectIssueTypeMetaData.name).includes(field)) continue;
-                    let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
-                    currFilteredProjectIssueTypeMetaData.fields[field] = {}
-                    currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
-                    currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
-                    currFilteredProjectIssueTypeMetaData.fields[field].name = currOrigIssueTypeFieldObj.name
-                    currFilteredProjectIssueTypeMetaData.fields[field].hasDefaultValue = currOrigIssueTypeFieldObj.hasDefaultValue
-                    if (currOrigIssueTypeFieldObj.allowedValues) {
-                        currFilteredProjectIssueTypeMetaData.fields[field].allowedValues = []
-                        for (let k = 0; k < currOrigIssueTypeFieldObj.allowedValues.length; k++) {
-                            if (currOrigIssueTypeFieldObj.allowedValues[k].value) {
-                                currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].value)
-                            } else if (currOrigIssueTypeFieldObj.allowedValues[k].name) {
-                                currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].name)
+        filteredProjectsMetaData.projects = [];
+        if ( origProjectsMetaData.projects ) {
+            for (let i = 0; i < origProjectsMetaData.projects.length; i++) {
+                if (!expectedProjects.includes(origProjectsMetaData.projects[i].key)) continue
+                let currOrigProjectMetaData = origProjectsMetaData.projects[i];
+                let currFilteredProjectMetaData = {};
+                currFilteredProjectMetaData.key = currOrigProjectMetaData.key
+                currFilteredProjectMetaData.issuetypes = [];
+                for (let j = 0; j < currOrigProjectMetaData.issuetypes.length; j++) {
+                    if (!getIssueTypesForGivenProject(currFilteredProjectMetaData.key).includes(currOrigProjectMetaData.issuetypes[j].name)) continue
+                    let currOrigProjectIssueTypeMetaData = currOrigProjectMetaData.issuetypes[j];
+                    let currFilteredProjectIssueTypeMetaData = {}
+                    currFilteredProjectIssueTypeMetaData.name = currOrigProjectIssueTypeMetaData.name
+                    currFilteredProjectIssueTypeMetaData.fields = {}
+                    for (let field of Object.keys(currOrigProjectIssueTypeMetaData.fields)) {
+                        if (field == "project" || field == "issuetype") continue
+                        if (!getFieldsForGivenProjectAndIssueType(currFilteredProjectMetaData.key, currFilteredProjectIssueTypeMetaData.name).includes(field)) continue;
+                        let currOrigIssueTypeFieldObj = currOrigProjectIssueTypeMetaData.fields[field]
+                        currFilteredProjectIssueTypeMetaData.fields[field] = {}
+                        currFilteredProjectIssueTypeMetaData.fields[field].required = currOrigIssueTypeFieldObj.required
+                        currFilteredProjectIssueTypeMetaData.fields[field].type = currOrigIssueTypeFieldObj.schema.type
+                        currFilteredProjectIssueTypeMetaData.fields[field].name = currOrigIssueTypeFieldObj.name
+                        currFilteredProjectIssueTypeMetaData.fields[field].hasDefaultValue = currOrigIssueTypeFieldObj.hasDefaultValue
+                        if (currOrigIssueTypeFieldObj.allowedValues) {
+                            currFilteredProjectIssueTypeMetaData.fields[field].allowedValues = []
+                            for (let k = 0; k < currOrigIssueTypeFieldObj.allowedValues.length; k++) {
+                                if (currOrigIssueTypeFieldObj.allowedValues[k].value) {
+                                    currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].value)
+                                } else if (currOrigIssueTypeFieldObj.allowedValues[k].name) {
+                                    currFilteredProjectIssueTypeMetaData.fields[field].allowedValues.push(currOrigIssueTypeFieldObj.allowedValues[k].name)
+                                }
                             }
                         }
                     }
+                    currFilteredProjectMetaData.issuetypes.push(currFilteredProjectIssueTypeMetaData)
                 }
-                currFilteredProjectMetaData.issuetypes.push(currFilteredProjectIssueTypeMetaData)
+                filteredProjectsMetaData.projects.push(currFilteredProjectMetaData)
             }
-            filteredProjectsMetaData.projects.push(currFilteredProjectMetaData)
         }
     } catch (e) {
         console.log("Error in createFilteredProjectsMetaData", e)

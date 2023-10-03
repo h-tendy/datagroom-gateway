@@ -84,7 +84,7 @@ Bulk editing features are now available. Yet to be documented
 
 1. Run the command `docker build -t dg-image -f datagroom-gateway/Dockerfile .` from the parent directory of datagroom-gateway.
 
-1. After the image is created. Just run the command `docker run -dit -p 8887:8887/tcp -p 8887:8887/udp -p 443:443/tcp -p 443:447/udp -v dg-data:/var/lib/mongodb --name dg-container dg-image`. **Note - If you have skipped the first step of docker volume creation, you can omit the `-v dg-data:/var/lib/mongodb` in the above command.**
+1. After the image is created. Just run the command `docker run -dit -p 8887:8887/tcp -p 8887:8887/udp -p 443:443/tcp -p 443:443/udp -v dg-data:/var/lib/mongodb --name dg-container dg-image`. **Note - If you have skipped the first step of docker volume creation, you can omit the `-v dg-data:/var/lib/mongodb` in the above command.**
 
 1. You can now go to the browser on the link `http://<host-ip>:8887` and see the webapp running.
 
