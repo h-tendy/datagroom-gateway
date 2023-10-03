@@ -14,20 +14,18 @@ class DbConnectivityChecker {
                 serverSelectionTimeoutMS: 4000, heartbeatFrequencyMS: heartBeatInterval });
             
             MongoDbClient.on("serverHeartbeatSucceeded", () => {
-                const currentDbConnectedState = true; 
-                if (currentDbConnectedState !== this.dbConnectedState) {
-                    this.dbConnectedState = currentDbConnectedState;
-                    this.io.emit('dbConnectivityState', { dbState: currentDbConnectedState });
-                    console.log(`${Date()} Mongo db server heart beat is success, currentDbConnectedState :`, currentDbConnectedState);
+                if ( this.dbConnectedState !== true) {
+                    this.dbConnectedState = true;
+                    this.io.emit('dbConnectivityState', { dbState: this.dbConnectedState });
+                    console.log(`${Date()} Mongo db server heart beat is success, dbConnectedState :`, this.dbConnectedState);
                 }
             });
     
             MongoDbClient.on("serverHeartbeatFailed", () => {
-                const currentDbConnectedState = false;
-                if (currentDbConnectedState !== this.dbConnectedState) {
-                    this.dbConnectedState = currentDbConnectedState;
-                    this.io.emit('dbConnectivityState', { dbState: currentDbConnectedState });
-                    console.log(`${Date()} Mongo db server heart beat has failed, currentDbConnectedState :`, currentDbConnectedState);
+                if ( this.dbConnectedState !== false) {
+                    this.dbConnectedState = false;
+                    this.io.emit('dbConnectivityState', { dbState: this.dbConnectedState });
+                    console.log(`${Date()} Mongo db server heart beat has failed, dbConnectedState :`, this.dbConnectedState);
                 }
             });
             
