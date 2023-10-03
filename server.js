@@ -9,6 +9,7 @@ const session = require('express-session');
 const cors = require('cors');
 const jwt = require('jsonwebtoken')
 const DbAbstraction = require('./dbAbstraction');
+const DbConnectivityChecker = require('./dbConnectivityChecker');
 const ExcelUtils = require('./excelUtils');
 const Utils = require('./utils');
 const PrepAttachments = require('./prepAttachments');
@@ -27,7 +28,7 @@ const config = {
 
 // Active directory functionality
 let disableAD = false;
-let dbPingInterval = 60; //in secs
+let dbCheckInterval = 2; // in secs
 
 if (process.argv.length >= 3) {
     for (let i = 2; i < process.argv.length; i++) {
@@ -35,13 +36,11 @@ if (process.argv.length >= 3) {
         if(argkv[0] == 'disableAD' && argkv[1] == "true") {
             disableAD = true;
         }
-        else if(argkv[0] == 'dbPingInterval') {
-            dbPingInterval = argkv[1];
+        else if(argkv[0] == 'dbCheckInterval') {
+            dbCheckInterval = argkv[1];
         }
     }
 }
-
-
 
 const app = express();
 var httpServer, io;
@@ -111,12 +110,9 @@ app.route('/logout').get(logout);
 
 // Define a middleware function to authenticate request
 const authenticate = (req, res, next) => {
-    console.log("Url called: ", req.baseUrl)
-
     const token = req.cookies.jwt;
     if (!token) {
         // If jwt token is not available kick in the basic authentication
-        console.log("No jwt token in cookie. Will forward for basic authentication");
         basicAuth(req, res, next);
     } else {
         try {
@@ -139,8 +135,8 @@ const basicAuth = (req, res, next) => {
     if (!authHeader) {
         let request = req.body;
         let dsName = request.dsName;
-        console.log(`AuthHeader not found in request while pushing to ${dsName}. Redirecting to the login page.`);
-        res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: isSecure, });
+        // console.log(`AuthHeader not found in request while pushing to ${dsName}. Redirecting to the login page.`);
+        res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: true, });
         res.redirect('/login');
         return;
     }
@@ -264,8 +260,6 @@ function dgUnlockForClient (clientId) {
     return {status: false, unlocked: null}
 }
 
-var isDbConnected = false;
-
 (() => {
     /*
     const srv = app.listen(config.express.port, () => {
@@ -275,7 +269,7 @@ var isDbConnected = false;
     */
     io.on('connection', (client) => {
         console.log(`${Date()}: Client connected...`, client.id);
-        client.emit('dbConnectivityState', {dbState: isDbConnected});
+        client.emit('dbConnectivityState', {dbState: dbConnectivityChecker.dbConnectedState});
         if (!isAuthorized(client)) return;
         client.on('Hello', function (helloObj) {
             console.log(`${Date()}: Hello from :`, helloObj);
@@ -444,22 +438,9 @@ function sessionCheck(req, res, next) {
 
 let dbAbstraction = new DbAbstraction();
 dbAbstraction.hello();
-async function dbPing() {
-    try{
-        let db = new DbAbstraction();
-        let currentDbState = await db.isdbAvailable();
-        if (isDbConnected !== currentDbState) {
-            console.log(`Db connected state has changed from ${isDbConnected} to ${currentDbState}`);
-            isDbConnected = currentDbState;
-            io.emit('dbConnectivityState', { dbState: isDbConnected });
-        }
-        await db.destroy();
-    }  catch (e) {
-        console.log("Exception caught in db not available: ", e);
-    }
-    setTimeout(dbPing, dbPingInterval * 1000);
-}
-dbPing();
+
+const dbConnectivityChecker = new DbConnectivityChecker(io);
+dbConnectivityChecker.checkDbConnectivity(dbCheckInterval);
 //setTimeout(dbAbstraction.destroy, 5000);
 
 PrepAttachments.refreshAttachmentsIntoDb();
