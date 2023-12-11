@@ -24,6 +24,13 @@ let customFieldMapping = {
     "sprintName": "customfield_11990",
 }
 
+/**
+ * Given a request body, this function goes onto edit a single field of the whole object.
+ * The single field can be JIRA field. In that case, we have to update the JIRA backend and as well as the DB.
+ * IF the field is not one of the JIRA field, then we have to just update the DB.
+ * @param {object} req 
+ * @returns 
+ */
 async function editSingleAttribute(req) {
     let response = {}
     let request = req.body
@@ -39,6 +46,8 @@ async function editSingleAttribute(req) {
         return response
     }
     let keyBeingEdited = await ifKeyBeingEdited(request)
+    /* If the column being edited is mapped to JIRA, then go in the if block and finally make the request to JIRA backend.
+    Otherwise, skip this block and directly update the db. */
     if (isJiraMappedColumnBeingEdited(editedCol, jiraAgileConfig)) {
         utils.sanitizeData(request.editObj)
         /**Get the incoming edited record parsed */
@@ -163,6 +172,13 @@ async function editSingleAttribute(req) {
     return response
 }
 
+/**
+ * Given a column that is being edited, this function returns true if that column is mappend in jiraConfig.
+ * If the column is mapped in jiraConfig, this means that the column has dependency on JIRA. It's not just between DG and DG backend.
+ * @param {string} columnBeingEdited 
+ * @param {object} jiraConfig 
+ * @returns {boolean}
+ */
 function isJiraMappedColumnBeingEdited(columnBeingEdited, jiraConfig) {
     let isJiraColumnBeingEdited = false;
     let jiraFieldMapping = jiraConfig.jiraFieldMapping
@@ -178,6 +194,13 @@ function isJiraMappedColumnBeingEdited(columnBeingEdited, jiraConfig) {
     return isJiraColumnBeingEdited;
 }
 
+/**
+ * Given the old record and the new record, this function checks if the key that is being edited is supported for edit.
+ * If yes, then returns true. Otherwise, returns false with proper error msg that should be handled at the caller of this function.
+ * @param {object} oldUiParsedRec 
+ * @param {object} newUiParsedRec 
+ * @returns {{isEditable: boolean, errorMsg: string}}
+ */
 function isFieldEditable(oldUiParsedRec, newUiParsedRec) {
     let isEditable = true
     let errorMsg = ''
@@ -195,6 +218,14 @@ function isFieldEditable(oldUiParsedRec, newUiParsedRec) {
     return { isEditable, errorMsg }
 }
 
+/**
+ * Given the 2 different records object, this function checks the difference between both the records.
+ * Returns true if the newRec is the same as oldRec and false otherwise.
+ * Meaning the oldRec and the newRec should be of the same version, then it will return true signifying we have the updated record.
+ * @param {object} oldRec 
+ * @param {object} newRec 
+ * @returns {boolean}
+ */
 function isRecordUpdated(oldRec, newRec) {
     let isUpdated = true
     for (let oldKeys of Object.keys(oldRec)) {
@@ -211,17 +242,30 @@ function isRecordUpdated(oldRec, newRec) {
     return isUpdated
 }
 
+/**
+ * This function takes the oldRec that is existing and newRec that is coming from UI after editing.
+ * Returns an object that contains the edited fields with the key and value in proper format that is required for making the request to JIRA.
+ * Also, it return any errorMsg in string that is to be processed by the caller of this function
+ * @param {object} oldRec 
+ * @param {object} newRec 
+ * @param {string} boardId 
+ * @returns {Promise<object>}
+ */
 async function getEditedFieldsObj(oldRec, newRec, boardId) {
     let editedJiraObj = {}
     let errorMsg = ''
     for (let newKey of Object.keys(newRec)) {
+        // TODO: Give explanation of why are we continuing for jiraSummary
         if (newKey == "jiraSummary") continue
+        // If the the value has not changed for the key, continue
         if (oldRec[newKey] == newRec[newKey]) continue
         let jiraKey = newKey
+        // For some fields the key value coming from the UI will not be same as the jira key, we have to update the jira key for the key here.
         if (customFieldMapping[newKey]) {
             jiraKey = customFieldMapping[newKey]
         }
         if (!oldRec[newKey]) {
+            // Check if the required jira key is among one of the fields that are supported by DG. If not, continue to the next key.
             if (fields.includes(jiraKey)) {
                 if (jiraKey == "assignee") {
                     editedJiraObj[jiraKey] = { "name": newRec[newKey].trim() }
@@ -239,7 +283,10 @@ async function getEditedFieldsObj(oldRec, newRec, boardId) {
                 continue
             }
         }
+        // If the edited jiraKey is not included among the fields that are supported by DG, then continue to the next key.
         if (!fields.includes(jiraKey)) continue
+        // For some edited keys that come from UI has the string value. But, it should be otherwise while making request to JIRA.
+        // Check the required type mapping for those fields in the editableFieldsAndTypeMapping and populate editedJiraObj accordingly with the right type of value.
         if (typeof newRec[newKey] != editableFieldsAndTypeMapping[newKey]) {
             if (editableFieldsAndTypeMapping[newKey] == 'number' && typeof newRec[newKey] == 'string') {
                 editedJiraObj[jiraKey] = parseInt(newRec[newKey])
@@ -370,6 +417,15 @@ function getSingleEditLog(req, isKey, status) {
     return editDoc;
 }
 
+/**
+ * Given a record that is key value supported by the JIRA. This function returns a new object that is written in DB.
+ * The object that is written in DB accounts for the mapping provided in the jiraConfig and forms the new object accordingly.
+ * For example, there can be multiple key in the JIRA rec object that are mapped to the same column in the DG. 
+ * Those types of records are formatted accordingly and put in the fullRec object that is returned.
+ * @param {object} rec 
+ * @param {object} jiraConfig 
+ * @returns {object}
+ */
 function getRecord(rec, jiraConfig) {
     let jiraFieldMapping = jiraConfig.jiraFieldMapping
     let jiraUrl = "https://" + host;
@@ -421,6 +477,13 @@ function getRecord(rec, jiraConfig) {
     return fullRec
 }
 
+/**
+ * Given a dataset name and the jiraConfig, this function checks all the JIRA agile entries of that dataset and return
+ * the set of assignee that are there in those entries.
+ * @param {string} dsName 
+ * @param {object} jiraAgileConfig 
+ * @returns {Promise<Set<any> | Array<any>>} 
+ */
 async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
     let assignees = new Set();
     let dbAbstraction = new DbAbstraction();
@@ -459,6 +522,15 @@ async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
     return Array.from(assignees);
 }
 
+/**
+ * Given a dataset name, type ("EPIC" or "Story") and the jiraConfig, this function checks all the JIRA agile entries of that dataset, 
+ * and returns the list of object of the required issue type in the current dataset.
+ * Each object in the list will be of required type and having "key" and "summary" field.
+ * @param {string} type 
+ * @param {string} dsName 
+ * @param {object} jiraAgileConfig 
+ * @returns {Promise<Array<object> | Set<object>>}
+ */
 async function getIssuesForGivenTypes(type, dsName, jiraAgileConfig) {
     let issues = new Set();
     let dbAbstraction = new DbAbstraction();
