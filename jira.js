@@ -269,6 +269,14 @@ function getSubTasksDetailsInTable(issue) {
     return subtasksDetails;
 }
 
+/**
+ * This function updates a global object filteredProjectsMetaData.
+ * This object contains all the required information and metadata needed for UI to make the JIRA form. 
+ * This will contain different fields that are required. ALso, their types and allowe values, if any. 
+ * This object is refreshed once in a day.
+ * TODO: Can we generate some kind of alert if anything existing has changed in the jirabackend. Let's say some type has changed. We should know it here.
+ * If we know and it's alerted, then we know, we may need to adjust our DG code accordingly to accomodate those changes.
+ */
 async function createFilteredProjectsMetaData() {
     try {
         let defaultTypeFieldsAndValues = JiraSettings.defaultTypeFieldsAndValues
@@ -348,6 +356,13 @@ function getFieldsForGivenProjectAndIssueType(projectKey, issuetype) {
     return []
 }
 
+/**
+ * Given a dataset name and the jiraConfig, this function checks all the JIRA entries of that dataset and return
+ * the set of assignee that are there in those entries.
+ * @param {string} dsName 
+ * @param {object} jiraConfig 
+ * @returns {Promise<Set<any> | Array<any>>} 
+ */
 async function getAllAssigneesForJira(dsName, jiraConfig) {
     let assignees = new Set();
     let dbAbstraction = new DbAbstraction();
@@ -386,6 +401,18 @@ async function getAllAssigneesForJira(dsName, jiraConfig) {
     return Array.from(assignees);
 }
 
+/**
+ * This method adds some dynamic fields over the jira metadata of the project.
+ * For example, the dynamic fields that can be are - assignee, epics, stories.
+ * Let's say when we are creating a story in the DG, we need it to link that story to the existing epic in the DG.
+ * For that purpose, the UI should know that what all epics are there in the current dataset for forming the proper dropdown to select from. 
+ * This function will fetch those epics and returns to the UI as part of metadata. Since the epic list is not static, these are filled as part of dynamic fields.
+ * Similary, for assignee field, it is hard to remember the usernames of the assignee. There is an easy way to form the dropdown in UI for those usernames.
+ * Here, you just fetch the assignees from the required dataset and update it in the allowed values of the metadata before sending it to the UI.
+ * @param {string} dsName 
+ * @param {object} jiraConfig 
+ * @param {object} jiraAgileConfig 
+ */
 async function addDynamicFieldsToProjectsMetaData(dsName, jiraConfig, jiraAgileConfig) {
     let memo = {
         "jiraAssignees": null,

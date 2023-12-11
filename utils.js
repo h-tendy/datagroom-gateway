@@ -389,6 +389,11 @@ function getIssueLinksInList(issueLinks, type, dir) {
   return [dirName, details];
 }
 
+/**
+ * Given an object with key-value pair. This function searches for all the values in the object recursively,
+ * if the value is of string type, it trims the value.
+ * @param {object} objData 
+ */
 function sanitizeData(objData) {
   try {
     if (objData) {
