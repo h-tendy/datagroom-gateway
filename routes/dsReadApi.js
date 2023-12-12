@@ -1255,6 +1255,27 @@ router.post('/getProjectsMetadata', async (req, res, next) => {
     }
 })
 
+router.post('/getProjectsMetaDataForProject', async (req, res, next) => {
+    let request = req.body
+    console.log('Create getProjectsMetaDataForProject:', req.body)
+    const token = req.cookies.jwt;
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
+    if (!allowed) {
+        res.status(403).json({ "Error": "access_denied" });
+        return
+    }
+    if (!request.projectName) {
+        res.status(415).json({})
+        return;
+    }
+    let response = await Jira.getProjectsMetaDataForProject(request.dsName, request.jiraConfig, request.jiraAgileConfig, request.projectName)
+    if (response && Object.keys(response).length != 0) {
+        res.status(200).json(response)
+    } else {
+        res.status(415).json({})
+    }
+})
+
 router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
     let request = req.body
     console.log('Create getDefaultTypeFieldsAndValues:', req.body)
@@ -1265,6 +1286,27 @@ router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
         return
     }
     let response = Jira.getDefaultTypeFieldsAndValues()
+    if (response && Object.keys(response).length != 0) {
+        res.status(200).json(response)
+    } else {
+        res.status(415).json({})
+    }
+})
+
+router.post('/getDefaultTypeFieldsAndValuesForProject', async (req, res, next) => {
+    let request = req.body
+    console.log('Get getDefaultTypeFieldsAndValuesForProject:', req.body)
+    const token = req.cookies.jwt;
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
+    if (!allowed) {
+        res.status(403).json({ "Error": "access_denied" });
+        return
+    }
+    if (!request.projectName) {
+        res.status(415).json({})
+        return;
+    }
+    let response = Jira.getDefaultTypeFieldsAndValuesForProject(request.projectName);
     if (response && Object.keys(response).length != 0) {
         res.status(200).json(response)
     } else {
