@@ -54,8 +54,10 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
             // Do something here and set the columnAttrs?
         }
     } catch (e) {};
+    let jiraProjectName = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraProjectName` }, {});
+    jiraProjectName = (jiraProjectName && jiraProjectName.length == 1 && jiraProjectName[0].jiraProjectName) ? jiraProjectName[0].jiraProjectName : "";
     await dbAbstraction.destroy();
-    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig, jiraAgileConfig });
+    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig, jiraAgileConfig, jiraProjectName });
     return;
 });
 
@@ -674,6 +676,13 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         } else {
             dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "aclConfig" });
             console.log("Remove aclConfig status: ", dbResponse);
+        }
+        if (request.jiraProjectName) {
+            dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraProjectName" }, { "jiraProjectName": request.jiraProjectName });
+            console.log("Add jiraProjectName status: ", dbResponse.result);
+        } else {
+            dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "jiraProjectName" });
+            console.log("Remove jiraProjectName: ", dbResponse);
         }
         //let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", request.selectorObj);
         //console.log ('db update response: ', dbResponse);
