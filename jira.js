@@ -473,16 +473,20 @@ async function getProjectsMetaData(dsName, jiraConfig, jiraAgileConfig) {
  * @param {string} dsName 
  * @param {object} jiraConfig 
  * @param {object} jiraAgileConfig 
- * @param {string} projectName 
+ * @param {string} jiraProjectName 
  * @returns 
  */
-async function getProjectsMetaDataForProject(dsName, jiraConfig, jiraAgileConfig, projectName) {
+async function getProjectsMetaDataForProject(dsName, jiraConfig, jiraAgileConfig, jiraProjectName) {
+    if (!jiraProjectName) {
+        console.log("No jira project name found while calling getProjectsMetaDataForProject");
+        return null;
+    }
     await addDynamicFieldsToProjectsMetaData(dsName, jiraConfig, jiraAgileConfig)
     if (!filteredProjectsMetaData || !filteredProjectsMetaData.projects || filteredProjectsMetaData.projects.length == 0) {
         return null;
     }
     for (let projectObj of filteredProjectsMetaData.projects) {
-        if (projectObj.key == projectName) {
+        if (projectObj.key == jiraProjectName) {
             return projectObj;
         }
     }
@@ -495,17 +499,21 @@ function getDefaultTypeFieldsAndValues() {
 
 /**
  * Given a project name, return the defaultTypeFieldsAndValues for that project alone.
- * @param {string} projectName 
+ * @param {string} jiraProjectName 
  * @returns {object}
  */
-function getDefaultTypeFieldsAndValuesForProject(projectName) {
+function getDefaultTypeFieldsAndValuesForProject(jiraProjectName) {
+    if (!jiraProjectName) {
+        console.log("No jira project name found while calling getDefaultTypeFieldsAndValuesForProject");
+        return null;
+    }
     let defaultTypeFieldsAndValuesForAllProjects = JiraSettings.defaultTypeFieldsAndValues;
     // If there is no jirasetting for defaultTypes or there are no projects defined return null.
     if (!defaultTypeFieldsAndValuesForAllProjects || !defaultTypeFieldsAndValuesForAllProjects.projects || defaultTypeFieldsAndValuesForAllProjects.projects.length == 0) {
         return null;
     }
     for (let projectObj of defaultTypeFieldsAndValuesForAllProjects.projects) {
-        if (projectObj.key == projectName) {
+        if (projectObj.key == jiraProjectName) {
             return projectObj;
         }
     }
