@@ -1273,11 +1273,12 @@ router.post('/getProjectsMetaDataForProject', async (req, res, next) => {
         res.status(403).json({ "Error": "access_denied" });
         return
     }
-    if (!request.projectName) {
+    if (!request.jiraProjectName) {
+        console.log("Expected jiraProjectName in the call to getProjectsMetaDataForProject not found");
         res.status(415).json({})
         return;
     }
-    let response = await Jira.getProjectsMetaDataForProject(request.dsName, request.jiraConfig, request.jiraAgileConfig, request.projectName)
+    let response = await Jira.getProjectsMetaDataForProject(request.dsName, request.jiraConfig, request.jiraAgileConfig, request.jiraProjectName)
     if (response && Object.keys(response).length != 0) {
         res.status(200).json(response)
     } else {
@@ -1311,11 +1312,12 @@ router.post('/getDefaultTypeFieldsAndValuesForProject', async (req, res, next) =
         res.status(403).json({ "Error": "access_denied" });
         return
     }
-    if (!request.projectName) {
+    if (!request.jiraProjectName) {
+        console.log("Expected jiraProjectName in the call to getProjectsMetaDataForProject not found");
         res.status(415).json({})
         return;
     }
-    let response = Jira.getDefaultTypeFieldsAndValuesForProject(request.projectName);
+    let response = Jira.getDefaultTypeFieldsAndValuesForProject(request.jiraProjectName);
     if (response && Object.keys(response).length != 0) {
         res.status(200).json(response)
     } else {
