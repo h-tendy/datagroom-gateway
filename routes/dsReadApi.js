@@ -54,8 +54,10 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
             // Do something here and set the columnAttrs?
         }
     } catch (e) {};
+    let jiraProjectName = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraProjectName` }, {});
+    jiraProjectName = (jiraProjectName && jiraProjectName.length == 1 && jiraProjectName[0].jiraProjectName) ? jiraProjectName[0].jiraProjectName : "";
     await dbAbstraction.destroy();
-    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig, jiraAgileConfig });
+    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig, jiraAgileConfig, jiraProjectName });
     return;
 });
 
@@ -675,6 +677,13 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
             dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "aclConfig" });
             console.log("Remove aclConfig status: ", dbResponse);
         }
+        if (request.jiraProjectName) {
+            dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraProjectName" }, { "jiraProjectName": request.jiraProjectName });
+            console.log("Add jiraProjectName status: ", dbResponse.result);
+        } else {
+            dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "jiraProjectName" });
+            console.log("Remove jiraProjectName: ", dbResponse);
+        }
         //let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", request.selectorObj);
         //console.log ('db update response: ', dbResponse);
         let response = {};
@@ -1255,6 +1264,28 @@ router.post('/getProjectsMetadata', async (req, res, next) => {
     }
 })
 
+router.post('/getProjectsMetaDataForProject', async (req, res, next) => {
+    let request = req.body
+    console.log('Create getProjectsMetaDataForProject:', req.body)
+    const token = req.cookies.jwt;
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
+    if (!allowed) {
+        res.status(403).json({ "Error": "access_denied" });
+        return
+    }
+    if (!request.jiraProjectName) {
+        console.log("Expected jiraProjectName in the call to getProjectsMetaDataForProject not found");
+        res.status(415).json({})
+        return;
+    }
+    let response = await Jira.getProjectsMetaDataForProject(request.dsName, request.jiraConfig, request.jiraAgileConfig, request.jiraProjectName)
+    if (response && Object.keys(response).length != 0) {
+        res.status(200).json(response)
+    } else {
+        res.status(415).json({})
+    }
+})
+
 router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
     let request = req.body
     console.log('Create getDefaultTypeFieldsAndValues:', req.body)
@@ -1265,6 +1296,28 @@ router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
         return
     }
     let response = Jira.getDefaultTypeFieldsAndValues()
+    if (response && Object.keys(response).length != 0) {
+        res.status(200).json(response)
+    } else {
+        res.status(415).json({})
+    }
+})
+
+router.post('/getDefaultTypeFieldsAndValuesForProject', async (req, res, next) => {
+    let request = req.body
+    console.log('Get getDefaultTypeFieldsAndValuesForProject:', req.body)
+    const token = req.cookies.jwt;
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
+    if (!allowed) {
+        res.status(403).json({ "Error": "access_denied" });
+        return
+    }
+    if (!request.jiraProjectName) {
+        console.log("Expected jiraProjectName in the call to getProjectsMetaDataForProject not found");
+        res.status(415).json({})
+        return;
+    }
+    let response = Jira.getDefaultTypeFieldsAndValuesForProject(request.jiraProjectName);
     if (response && Object.keys(response).length != 0) {
         res.status(200).json(response)
     } else {

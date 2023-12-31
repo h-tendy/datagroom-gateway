@@ -365,6 +365,7 @@ function getFieldsForGivenProjectAndIssueType(projectKey, issuetype) {
  */
 async function getAllAssigneesForJira(dsName, jiraConfig) {
     let assignees = new Set();
+    if (!jiraConfig || !jiraConfig.jiraFieldMapping) return Array.from(assignees);
     let dbAbstraction = new DbAbstraction();
     let jiraUrl = "https://" + host;
     let revContentMap = utils.getRevContentMap(jiraConfig)
@@ -466,8 +467,57 @@ async function getProjectsMetaData(dsName, jiraConfig, jiraAgileConfig) {
     return filteredProjectsMetaData
 }
 
+/**
+ * Given all the parameters this function returns the metadata for the given projectName.
+ * This metadata has all the dynamic fields populated like assignee, epics etc. (Dynamic fields are those which we are forming from our dataset entries)
+ * @param {string} dsName 
+ * @param {object} jiraConfig 
+ * @param {object} jiraAgileConfig 
+ * @param {string} jiraProjectName 
+ * @returns 
+ */
+async function getProjectsMetaDataForProject(dsName, jiraConfig, jiraAgileConfig, jiraProjectName) {
+    if (!jiraProjectName) {
+        console.log("No jira project name found while calling getProjectsMetaDataForProject");
+        return null;
+    }
+    await addDynamicFieldsToProjectsMetaData(dsName, jiraConfig, jiraAgileConfig)
+    if (!filteredProjectsMetaData || !filteredProjectsMetaData.projects || filteredProjectsMetaData.projects.length == 0) {
+        return null;
+    }
+    for (let projectObj of filteredProjectsMetaData.projects) {
+        if (projectObj.key == jiraProjectName) {
+            return projectObj;
+        }
+    }
+    return null;
+}
+
 function getDefaultTypeFieldsAndValues() {
     return JiraSettings.defaultTypeFieldsAndValues
+}
+
+/**
+ * Given a project name, return the defaultTypeFieldsAndValues for that project alone.
+ * @param {string} jiraProjectName 
+ * @returns {object}
+ */
+function getDefaultTypeFieldsAndValuesForProject(jiraProjectName) {
+    if (!jiraProjectName) {
+        console.log("No jira project name found while calling getDefaultTypeFieldsAndValuesForProject");
+        return null;
+    }
+    let defaultTypeFieldsAndValuesForAllProjects = JiraSettings.defaultTypeFieldsAndValues;
+    // If there is no jirasetting for defaultTypes or there are no projects defined return null.
+    if (!defaultTypeFieldsAndValuesForAllProjects || !defaultTypeFieldsAndValuesForAllProjects.projects || defaultTypeFieldsAndValuesForAllProjects.projects.length == 0) {
+        return null;
+    }
+    for (let projectObj of defaultTypeFieldsAndValuesForAllProjects.projects) {
+        if (projectObj.key == jiraProjectName) {
+            return projectObj;
+        }
+    }
+    return null;
 }
 
 async function createJiraIssue(jiraFormData) {
@@ -739,7 +789,9 @@ async function getJiraAgileJql(jiraConfig) {
 module.exports = {
     refreshJiraQuery,
     getProjectsMetaData,
+    getProjectsMetaDataForProject,
     getDefaultTypeFieldsAndValues,
+    getDefaultTypeFieldsAndValuesForProject,
     createJiraIssue,
     getJiraRecordFromKey,
     updateJiraRecInDb,

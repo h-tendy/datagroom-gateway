@@ -486,6 +486,7 @@ function getRecord(rec, jiraConfig) {
  */
 async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
     let assignees = new Set();
+    if (!jiraAgileConfig || !jiraAgileConfig.jiraFieldMapping) return Array.from(assignees);
     let dbAbstraction = new DbAbstraction();
     let jiraUrl = "https://" + host;
     let revContentMap = utils.getRevContentMap(jiraAgileConfig)
@@ -533,6 +534,7 @@ async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
  */
 async function getIssuesForGivenTypes(type, dsName, jiraAgileConfig) {
     let issues = new Set();
+    if (!jiraAgileConfig || !jiraAgileConfig.jiraFieldMapping) return Array.from(issues);
     let dbAbstraction = new DbAbstraction();
     let revContentMap = utils.getRevContentMap(jiraAgileConfig)
     try {
