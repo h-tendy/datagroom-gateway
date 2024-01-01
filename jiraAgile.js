@@ -16,13 +16,13 @@ let editableFieldsAndTypeMapping = {
     "Story Points": 'number',
     "summary": 'string',
     "assignee": 'string',
-    "sprintName": 'string',
+    "Sprint Name": 'string',
     "Acceptance Criteria": 'string',
 }
 
 let customFieldMapping = {
     "Story Points": "customfield_11890",
-    "sprintName": "customfield_11990",
+    "Sprint Name": "customfield_11990",
     "Acceptance Criteria": "customfield_25523",
 }
 
@@ -271,10 +271,10 @@ async function getEditedFieldsObj(oldRec, newRec, boardId) {
             if (fields.includes(jiraKey)) {
                 if (jiraKey == "assignee") {
                     editedJiraObj[jiraKey] = { "name": newRec[newKey].trim() }
-                } else if (newKey == "sprintName") {
+                } else if (newKey == "Sprint Name") {
                     let sprintId = await getSprintIdFromSprintName(newRec[newKey], boardId)
                     if (!sprintId) {
-                        errorMsg = `Can't find the sprintId for the sprintName. Maybe you have to create one.`
+                        errorMsg = `Can't find the sprintId for the Sprint Name. Maybe you have to create one.`
                     } else {
                         editedJiraObj[jiraKey] = sprintId
                     }
@@ -300,10 +300,10 @@ async function getEditedFieldsObj(oldRec, newRec, boardId) {
         } else {
             if (jiraKey == "assignee") {
                 editedJiraObj[jiraKey] = { "name": newRec[newKey].trim() }
-            } else if (newKey == "sprintName") {
+            } else if (newKey == "Sprint Name") {
                 let sprintId = await getSprintIdFromSprintName(newRec[newKey], boardId)
                 if (!sprintId) {
-                    errorMsg = `Can't find the sprintId for the sprintName. Maybe you have to create one.`
+                    errorMsg = `Can't find the sprintId for the Sprint Name. Maybe you have to create one.`
                 } else {
                     editedJiraObj[jiraKey] = sprintId
                 }
@@ -330,7 +330,7 @@ async function getSprintIdFromSprintName(sprintName, boardId) {
             }
         }
     } catch (e) {
-        console.log(`Got error while retreiving sprintId for sprintName ${sprintName} for boardId ${boardId}`);
+        console.log(`Got error while retreiving sprintId for Sprint Name ${sprintName} for boardId ${boardId}`);
     }
     return sprintId
 }

@@ -97,10 +97,10 @@ function doJiraMapping(rec, jiraConfig) {
           description: "Description",
           subtasksDetails: "Tags",
           type: "Category",
-          sprintName: "Tags",
+          Sprint Name: "Tags",
           status: "Tags",
           assignee: "Tags",
-          agileCommit: "Tags",
+          Agile Commit: "Tags",
           "Story Points": "Tags",
           "Acceptance Criteria": "Description",
         }
@@ -136,8 +136,8 @@ function doJiraMapping(rec, jiraConfig) {
     for (let key in jiraContentMapping) {
         // Acceptance criteria should be shown in UI only for Story and Epic.
         if (key === 'Acceptance Criteria' && rec.type !== "Story" && rec.type !== "Epic") continue;
-        // We want to sprintName in UI even if it is empty
-        if (!rec[key] && key != "sprintName") continue;
+        // We want to Sprint Name in UI even if it is empty
+        if (!rec[key] && key != "Sprint Name") continue;
         if (!fullRec[jiraContentMapping[key]]) {
             if (revContentMap[jiraContentMapping[key]] > 1)
                 if (key == "subtasksDetails" || key == "dependsLinks" || key == "implementLinks" || key == "packageLinks" || key == "relatesLinks" || key == "testLinks" || key == "coversLinks" || key == "defectLinks" || key == "automatesLinks") {
@@ -176,7 +176,7 @@ function defaultJiraMapping(rec, jiraConfig) {
     let jiraUrl = "https://" + host;
     let jiraKeyMapping = { 'key': 'Work-id' }
     // No need for "Details" links to appear here. 
-    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintName': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description', 'agileCommit': 'Description', "duedate": 'Description', "targetRlsGx": 'Description', "Acceptance Criteria": 'Description' };
+    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'Sprint Name': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description', 'Agile Commit': 'Description', "duedate": 'Description', "targetRlsGx": 'Description', "Acceptance Criteria": 'Description' };
     let selectorObj = {}, fullRec = {};
     if (jiraConfig._id == "jiraAgileConfig") {
         selectorObj[jiraKeyMapping['key']] = `[JIRA_AGILE-${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -206,7 +206,7 @@ async function markAsStale(dsName, jiraConfig) {
     let jiraFieldMapping;
     if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
         // No need for "Details" links to appear here. 
-        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'sprintName': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description', 'agileCommit': 'Description', "duedate": 'Description', "targetRlsGx": 'Description', "Acceptance Criteria": 'Description' };
+        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'Sprint Name': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description', 'Agile Commit': 'Description', "duedate": 'Description', "targetRlsGx": 'Description', "Acceptance Criteria": 'Description' };
     } else {
         jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
     }
