@@ -89,7 +89,31 @@ function doJiraMapping(rec, jiraConfig) {
     jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
     let jiraKeyMapping = { 'key': jiraFieldMapping['key'] };
     delete jiraFieldMapping.key;
+    /**Sample jira Content mapping:-
+     * {
+          summary: "Description",
+          parent: "Tags",
+          epic: "Tags",
+          description: "Description",
+          subtasksDetails: "Tags",
+          type: "Category",
+          sprintName: "Tags",
+          status: "Tags",
+          assignee: "Tags",
+          agileCommit: "Tags",
+          "Story Points": "Tags",
+          "Acceptance Criteria": "Description",
+        }
+     */
     let jiraContentMapping = jiraFieldMapping;
+    /**
+     * Sample revContentMap 
+     * {
+          Description: 3,
+          Tags: 8,
+          Category: 1,
+        }
+     */
     let revContentMap = {};
     for (let key in jiraFieldMapping) {
         let dsField = jiraFieldMapping[key];
@@ -118,6 +142,8 @@ function doJiraMapping(rec, jiraConfig) {
             if (revContentMap[jiraContentMapping[key]] > 1)
                 if (key == "subtasksDetails" || key == "dependsLinks" || key == "implementLinks" || key == "packageLinks" || key == "relatesLinks" || key == "testLinks" || key == "coversLinks" || key == "defectLinks" || key == "automatesLinks") {
                     fullRec[jiraContentMapping[key]] = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
+                } else if (key == "description" || key == "Acceptance Criteria") {
+                    fullRec[jiraContentMapping[key]] = `\n**${key}**:\n ${rec[key]}\n` + "<br/>\n";
                 } else {
                     if (rec[key] == "") {
                         fullRec[jiraContentMapping[key]] = `**${key}**:\n` + "<br/>\n";
@@ -131,6 +157,8 @@ function doJiraMapping(rec, jiraConfig) {
             let recValue;
             if (key == "subtasksDetails" || key == "dependsLinks" || key == "implementLinks" || key == "packageLinks" || key == "relatesLinks" || key == "testLinks" || key == "coversLinks" || key == "defectLinks" || key == "automatesLinks") {
                 recValue = `**${key}**:\n ${rec[key]}\n` + "<br/>\n\n";
+            } else if (key == "description" || key == "Acceptance Criteria") {
+                recValue = `\n**${key}**:\n ${rec[key]}\n` + "<br/>\n";
             } else {
                 if (rec[key] == "") {
                     recValue = `**${key}**:\n` + "<br/>\n";
