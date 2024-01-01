@@ -138,6 +138,11 @@ function getRecFromJiraIssue(issue) {
       rec.fixVersions += issue.fields.fixVersions[i].name + ',';
     }
   }
+  if (issue.fields.customfield_25523) {
+    rec["Acceptance Criteria"] = issue.fields.customfield_25523;
+  } else {
+    rec["Acceptance Criteria"] = "NotSet";
+  }
   if (issue.fields.customfield_28097 && issue.fields.customfield_28097.length) {
     rec.agileCommit = "";
     for (let i = 0; i < issue.fields.customfield_28097.length; i++) {
