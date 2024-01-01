@@ -17,11 +17,13 @@ let editableFieldsAndTypeMapping = {
     "summary": 'string',
     "assignee": 'string',
     "sprintName": 'string',
+    "Acceptance Criteria": 'string',
 }
 
 let customFieldMapping = {
     "Story Points": "customfield_11890",
     "sprintName": "customfield_11990",
+    "Acceptance Criteria": "customfield_25523",
 }
 
 /**
