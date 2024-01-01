@@ -144,10 +144,13 @@ function getRecFromJiraIssue(issue) {
     rec["Acceptance Criteria"] = "NotSet";
   }
   if (issue.fields.customfield_28097 && issue.fields.customfield_28097.length) {
-    rec.agileCommit = "";
+    rec["Agile Commit"] = "";
     for (let i = 0; i < issue.fields.customfield_28097.length; i++) {
-      rec.agileCommit += issue.fields.customfield_28097[i].name + ',';
+      rec["Agile Commit"] += issue.fields.customfield_28097[i].name + ',';
     }
+    rec["Agile Commit"] = rec["Agile Commit"].slice(0, -1);
+  } else {
+    rec["Agile Commit"] = "NotSet";
   }
   if (issue.fields.parent) {
     rec.parentKey = `[${issue.fields.parent.key}](${jiraUrl + '/browse/' + issue.fields.parent.key})`
@@ -189,12 +192,12 @@ function getRecFromJiraIssue(issue) {
     let sprintDetails = issue.fields.customfield_11990[0]
     let sprintNameMatchArr = sprintDetails.match(/name=([^,]*)/)
     if (sprintNameMatchArr && sprintNameMatchArr.length >= 2) {
-      rec.sprintName = sprintNameMatchArr[1]
+      rec["Sprint Name"] = sprintNameMatchArr[1]
     } else {
-      rec.sprintName = ""
+      rec["Sprint Name"] = ""
     }
   } else {
-    rec.sprintName = ""
+    rec["Sprint Name"] = ""
   }
   if (issue.fields.subtasks && issue.fields.subtasks.length) {
     rec.subtasks = "[";
