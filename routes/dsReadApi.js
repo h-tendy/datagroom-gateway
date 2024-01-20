@@ -528,6 +528,73 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
     await dbAbstraction.destroy();
 });
 
+router.post("/dsList/:dsUser", async (req, res, next) => {
+    let request = req.body;
+    if (!request.filter) {
+        res.status(403).json({ Error: "no filter given" });
+        return;
+    }
+    // Do somepreprocessing with the filter
+    let incomingFilter = request.filter;
+    let charArr = incomingFilter.split("-");
+    //Make sure the filter is given in proper format like "A-G", "1-3" etc.
+    if (charArr.length !== 2) {
+        res
+            .status(403)
+            .json({ Error: "bad filter given. Filter should be like A-G, 1-5" });
+        return;
+    }
+    let startChar = charArr[0];
+    let endChar = charArr[1];
+    if (startChar.length !== 1 || endChar.length !== 1) {
+        res
+            .status(403)
+            .json({ Error: "bad filter given. Filter should be like A-G, 1-5" });
+        return;
+    }
+    /* The filter provided to dbAbstraction method should always be in uppercase. 
+      Since, if the user provides something like "A-n", it will also match "S" and "s". Reason being
+      the ascii char value of "S" comes within "A-n" range and the listFilteredDatabases ignores case while matching.
+      */
+    startChar = startChar.toUpperCase();
+    endChar = endChar.toUpperCase();
+    let filter = `${startChar}-${endChar}`;
+    let dbAbstraction = new DbAbstraction();
+    let dbList = await dbAbstraction.listFilteredDatabases(filter);
+    let pruned = [];
+    let sysDbs = ["admin", "config", "local"];
+    for (let i = 0; i < dbList.length; i++) {
+        let j = sysDbs.indexOf(dbList[i].name);
+        // Get rid of system databases
+        if (j > -1) continue;
+
+        let aclConfig = await dbAbstraction.find(dbList[i].name, "metaData", {
+            _id: "aclConfig",
+        });
+        aclConfig = aclConfig[0];
+        // Get rid of dbs for which current user doesn't have access.
+        if (
+            aclConfig &&
+            aclConfig.accessCtrl &&
+            !aclConfig.acl.includes(req.params.dsUser)
+        ) {
+            continue;
+        }
+        pruned.push(dbList[i]);
+    }
+    for (let i = 0; i < pruned.length; i++) {
+        let perms = await dbAbstraction.find(pruned[i].name, "metaData", {
+            _id: "perms",
+        });
+        pruned[i].perms = perms[0];
+    }
+    console.log("Returning: ", pruned);
+    //Make a call to mongodb and get the databases name according to the filter
+    // return the databases list
+    res.json({ dbList: pruned });
+    await dbAbstraction.destroy();
+});
+
 router.post('/deleteDs', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteDs: ", request);

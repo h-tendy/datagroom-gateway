@@ -222,6 +222,20 @@ class DbAbstraction {
         return dbs.databases;
     }
 
+    /**
+   * Lists all the databases/dataset names according to the filter given
+   * @param {string} filter 
+   * @returns {Promise<Array>}
+   */
+    async listFilteredDatabases(filter) {
+        if (!this.client) await this.connect();
+        let dbs = await this.client
+            .db()
+            .admin()
+            .listDatabases({ filter: { name: new RegExp(`^[${filter}]`, "i") } });
+        return dbs.databases;
+    }
+
     async copy (fromDsName, fromTable, toDsName, toTable, fn) {
         if (! this.client ) await this.connect();
         let fromDb = this.client.db(fromDsName);
