@@ -530,12 +530,12 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
 
 router.post("/dsList/:dsUser", async (req, res, next) => {
     let request = req.body;
-    if (!request.filter) {
+    if (!request.dsFilter) {
         res.status(403).json({ Error: "no filter given" });
         return;
     }
     // Do somepreprocessing with the filter
-    let incomingFilter = request.filter;
+    let incomingFilter = request.dsFilter;
     let charArr = incomingFilter.split("-");
     //Make sure the filter is given in proper format like "A-G", "1-3" etc.
     if (charArr.length !== 2) {
@@ -588,8 +588,6 @@ router.post("/dsList/:dsUser", async (req, res, next) => {
         });
         pruned[i].perms = perms[0];
     }
-    console.log("Returning: ", pruned);
-    //Make a call to mongodb and get the databases name according to the filter
     // return the databases list
     res.json({ dbList: pruned });
     await dbAbstraction.destroy();
