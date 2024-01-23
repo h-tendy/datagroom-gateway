@@ -1,0 +1,25 @@
+{
+    "esversion": 3,
+    "jquery": true,
+    "browser": true,
+
+    "devel": true,
+    "undef": true,
+    "unused": true,
+    "nonbsp": true,
+    "latedef": true,
+    "noarg": true,
+    "eqeqeq": true,
+    "forin": true,
+    "freeze": true,
+    "nocomma": true,
+    "nonew": true,
+
+    "globals": {
+        "define": true,
+        "require": true,
+        "module": true,
+        "exports": true,
+        "Raphael": true
+    }
+}

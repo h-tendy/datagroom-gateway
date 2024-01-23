@@ -19,7 +19,7 @@ const Jira = require('./jira')
 
 dotenv.config({ path: './.env' })
 
-const reactuiDir = path.resolve(__dirname, '../datagroom-ui/build');
+const reactuiDir = path.resolve(__dirname, './build');
 const config = {
     express: {
         port: process.env.PORT || 8887,
