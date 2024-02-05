@@ -729,8 +729,28 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
             console.log("Add otherTableAttrs status: ", dbResponse.result);
         }
         if (request.aclConfig) {
+            let aclConfigUsers = "";
             if (typeof request.aclConfig.acl === "string") {
-                request.aclConfig.acl = [];
+                // If there is no value in the aclConfig. we need to remove it.
+                if (request.aclConfig.acl.length === 0) {
+                    dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "aclConfig" });
+                    console.log("Remove aclConfig status: ", dbResponse);
+                } else {
+                    // If there is a value in the aclConfig. we need to add it to the array and update the metadata.
+                    aclConfigUsers = request.aclConfig.acl;
+                    request.aclConfig.acl = [];
+                }
+            }
+            let aclConfigUsersList = aclConfigUsers.split(",");
+            for (let user of aclConfigUsersList) {
+                user = user.trim();
+                if (user.length === 0) {
+                    continue;
+                }
+                if (!request.aclConfig.acl.includes(user)) {
+                    console.log("user is not present in aclConfig, adding: ", user);
+                    request.aclConfig.acl.push(user);
+                }
             }
             if (!request.aclConfig.acl.includes(request.dsUser)) {
                 console.log("dsUser is not present in aclConfig, adding: ", request.dsUser);
