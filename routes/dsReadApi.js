@@ -523,6 +523,7 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
         let perms = await dbAbstraction.find(pruned[i].name, 'metaData', { _id: "perms" });
         pruned[i].perms = perms[0];
     }
+    pruned.sort((a, b) => a.name.localeCompare(b.name));
     console.log("Returning: ", pruned);
     res.json({ dbList: pruned });
     await dbAbstraction.destroy();
@@ -589,6 +590,7 @@ router.post("/dsList/:dsUser", async (req, res, next) => {
         pruned[i].perms = perms[0];
     }
     // return the databases list
+    pruned.sort((a, b) => a.name.localeCompare(b.name));
     res.json({ dbList: pruned });
     await dbAbstraction.destroy();
 });
