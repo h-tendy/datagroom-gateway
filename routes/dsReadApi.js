@@ -740,8 +740,8 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
                 } else {
                     // If there is a value in the aclConfig. we need to add it to the array and update the metadata.
                     aclConfigUsers = request.aclConfig.acl;
-                    request.aclConfig.acl = [];
                 }
+                request.aclConfig.acl = [];
             }
             let aclConfigUsersList = aclConfigUsers.split(",");
             for (let user of aclConfigUsersList) {
