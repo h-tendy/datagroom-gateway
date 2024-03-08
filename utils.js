@@ -138,6 +138,16 @@ function getRecFromJiraIssue(issue) {
       rec.fixVersions += issue.fields.fixVersions[i].name + ',';
     }
   }
+  if (issue.fields.customfield_25800 && issue.fields.customfield_25800.key) {
+    rec["Assignee Manager"] = issue.fields.customfield_25800.key;
+  } else {
+    rec["Assignee Manager"] = "NotSet";
+  }
+  if (issue.fields.customfield_25609 && issue.fields.customfield_25609.length) {
+    rec["Dev RCA Comments"] = issue.fields.customfield_25609;
+  } else {
+    rec["Dev RCA Comments"] = "NotSet";
+  }
   if (issue.fields.customfield_25523) {
     rec["Acceptance Criteria"] = issue.fields.customfield_25523;
   } else {
