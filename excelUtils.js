@@ -158,7 +158,7 @@ class ExcelUtils {
         return { loadStatus, range, rangeIndices, hdrs, hdrErrors }
     }
 
-    static async exportDataFromDbIntoXlsx (dsName, dsView, dsUser, fileName) {
+    static async exportDataFromDbIntoXlsx(dsName, dsView, dsUser, fileName, dataFilters, dataOptions) {
         let dbAbstraction = new DbAbstraction();
         let dbRes = await dbAbstraction.find(dsName, "metaData", { _id: `view_${dsView}` }, {} );
         dbRes = dbRes[0];
@@ -171,8 +171,9 @@ class ExcelUtils {
             hdrs.push(hdr);
         }
         console.log("Hdrs: ", hdrs, "Projection: ", projection);
-        let data = await dbAbstraction.find (dsName, "data", {}, { projection } );
-        console.log(data);
+        dataOptions = { ...dataOptions, projection }
+        let data = await dbAbstraction.find(dsName, "data", dataFilters, dataOptions);
+        // console.log(data);
         // Export logic
         const workbook = new Excel.Workbook();
         const worksheet = workbook.addWorksheet("Data");
