@@ -473,8 +473,9 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
 });
 
 
-router.get('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
+router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
+    let query = request.query;
     console.log("In downloadXlsx: ", req.params);
     console.log("In downloadXlsx: ", req.query);
     const token = req.cookies.jwt;
@@ -483,9 +484,13 @@ router.get('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
         res.status(403).json({ "Error": "access_denied" });
         return
     }
-
+    let [filters, sorters] = getMongoFiltersAndSorters(query, null, null);
+    console.log("In downloadxlsx : mongo filters : ", JSON.stringify(filters, null, 4));
+    let options = {};
+    if (sorters.length)
+        options.sort = sorters;
     let fileName = `export_${req.params.dsName}_${req.params.dsView}_${req.params.dsUser}.xlsx`
-    await ExcelUtils.exportDataFromDbIntoXlsx(req.params.dsName, req.params.dsView, req.params.dsUser, fileName);
+    await ExcelUtils.exportDataFromDbIntoXlsx(req.params.dsName, req.params.dsView, req.params.dsUser, fileName, filters, options);
     try {
         let bits = fs.readFileSync(fileName);
         // convert binary data to base64 encoded string
