@@ -148,6 +148,11 @@ function getRecFromJiraIssue(issue) {
   } else {
     rec["Dev RCA Comments"] = "NotSet";
   }
+  if (issue.fields.customfield_28096 && issue.fields.customfield_28096.value) {
+    rec["Agile Team"] = issue.fields.customfield_28096.value;
+  } else {
+    rec["Agile Team"] = "NotSet";
+  }
   if (issue.fields.customfield_25523) {
     rec["Acceptance Criteria"] = issue.fields.customfield_25523;
   } else {
