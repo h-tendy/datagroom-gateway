@@ -203,7 +203,7 @@ function getRecFromJiraIssue(issue) {
   } else {
     rec['Story Points'] = 0
   }
-  if (issue.fields.customfield_11990) {
+  if (issue.fields.customfield_11990 && issue.fields.customfield_11990.length > 0) {
     let sprintDetails = issue.fields.customfield_11990[0]
     let sprintNameMatchArr = sprintDetails.match(/name=([^,]*)/)
     if (sprintNameMatchArr && sprintNameMatchArr.length >= 2) {
