@@ -16,6 +16,7 @@ const PrepAttachments = require('./prepAttachments');
 let fs = require('fs');
 const dotenv = require('dotenv')
 const Jira = require('./jira')
+const AclCheck = require('./acl');
 
 dotenv.config({ path: './.env' })
 
@@ -109,7 +110,29 @@ app.route('/sessionCheck').get(sessionCheck);
 app.route('/logout').get(logout);
 
 // Define a middleware function to authenticate request
-const authenticate = (req, res, next) => {
+const authenticate = async (req, res, next) => {
+    /**
+     * If the URL starts with /attachments/,
+     * then check for the dataset for which this is being called. 
+     * If the dataset is open (i.e. it doesn't have an access control list), 
+     * then allow the request to go through. Otherwise, go through the basic authentication.
+     * This is done for the following reasons:
+     * When a user tries to copy paste a cell from cliboard to any other place, 
+     * the image in the cell was not getting displayed as it makes a request to DG gateway for using the static dir URL.
+     */
+    let originalUrl = req.originalUrl;
+    // If the URL starts with /attachments/
+    if (originalUrl.startsWith('/attachments')) {
+        // Get the dataset name from the url
+        let dsName = getDatasetNameFromUrl(originalUrl);
+        if (dsName) {
+            let allowed = await AclCheck.aclCheck(dsName, null, null, null);
+            if (allowed) {
+                next();
+                return;
+            }
+        }
+    }
     const token = req.cookies.jwt;
     if (!token) {
         // If jwt token is not available kick in the basic authentication
@@ -127,6 +150,20 @@ const authenticate = (req, res, next) => {
         }
     }
 };
+
+function getDatasetNameFromUrl(originalUrl) {
+    originalUrl = originalUrl.trim();
+    if (!originalUrl) return null;
+    const urlParts = originalUrl.split('\/');
+    if (urlParts.length >= 1 && urlParts[0] === '') {
+        urlParts.shift();
+    }
+    if (urlParts.length >= 3 && urlParts[0] === 'attachments') {
+        return urlParts[1];
+    } else {
+        return null;
+    }
+}
 
 // Basic auth will kick in if someone make an api request without cookie token and just the username and pwd
 const basicAuth = (req, res, next) => {
