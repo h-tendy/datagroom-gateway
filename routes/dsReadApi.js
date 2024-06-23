@@ -112,6 +112,30 @@ function getMongoFiltersAndSorters (qFilters, qSorters, qChronology) {
     return [filters, sorters]
 }
 
+function getMongoFiltersAndSortersForIndividualRow(_id, qSorters, qChronology) {
+    let filters = {}, sorters = [];
+    filters["_id"] = new ObjectId(_id);
+    try {
+        qSorters.map((v) => {
+            let f = [];
+            f.push(v.field); f.push(v.dir);
+            sorters.push(f);
+        })
+    } catch (e) { }
+    // Add a default sorter
+    if (!sorters.length) {
+        let f = []
+        f.push('_id');
+        if (qChronology)
+            f.push(qChronology);
+        else
+            f.push('desc');
+        sorters.push(f);
+    }
+
+    return [filters, sorters]
+}
+
 async function pager (req, res, collectionName) {
     let request = req.body;
     let query;
@@ -514,7 +538,17 @@ router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
         res.status(403).json({ "Error": "access_denied" });
         return
     }
-    let [filters, sorters] = getMongoFiltersAndSorters(query, null, null);
+    let filters, sorters;
+    if (query.length == 1 && query[0].field === '_id') {
+        if (!query[0].value) {
+            console.log("Error: Id not found in download single row");
+            res.status(400).json({ "Error": "Id not found" });
+            return
+        }
+        [filters, sorters] = getMongoFiltersAndSortersForIndividualRow(query[0].value, null, null);
+    } else {
+        [filters, sorters] = getMongoFiltersAndSorters(query, null, null);
+    }
     console.log("In downloadxlsx : mongo filters : ", JSON.stringify(filters, null, 4));
     let options = {};
     if (sorters.length)
