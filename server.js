@@ -146,7 +146,7 @@ const authenticate = async (req, res, next) => {
             next();
         } catch (err) {
             console.log("Error in authenticate middleware: " + err.message)
-            res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: isSecure, });
+            res.cookie('originalUrl', req.originalUrl, { httpOnly: true, path: '/', secure: isSecure, });
             res.redirect('/login');
             return;
         }
@@ -175,7 +175,7 @@ const basicAuth = (req, res, next) => {
         let request = req.body;
         let dsName = request.dsName;
         // console.log(`AuthHeader not found in request while pushing to ${dsName}. Redirecting to the login page.`);
-        res.cookie('originalUrl', req.baseUrl, { httpOnly: true, path: '/', secure: isSecure, });
+        res.cookie('originalUrl', req.originalUrl, { httpOnly: true, path: '/', secure: isSecure, });
         res.redirect('/login');
         return;
     }
