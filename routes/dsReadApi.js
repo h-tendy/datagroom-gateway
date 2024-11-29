@@ -177,36 +177,6 @@ router.get('/view/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "data");
 });
 
-router.get('/view/:dsName/:dsView/:dsUser/:id', async (req, res, next) => {
-    let dsName = req.params.dsName;
-    let dsView = req.params.dsView;
-    let dsUser = req.params.dsUser;
-    let _id = req.params.id;
-    if (!dsName || !dsView || !dsUser || !_id) {
-        res.status(404).json({ "Error": "Invalid request" });
-        return;
-    }
-    let token = req.cookies.jwt;
-    console.log(`Got request for ${dsName} by ${dsUser} for id ${_id} and view ${dsView}`);
-    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
-    if (!allowed) {
-        res.status(403).json({ "Error": "access_denied" });
-        return;
-    }
-    let response = {};
-    let dbAbstraction = new DbAbstraction();
-    try {
-        let data = await dbAbstraction.find(dsName, "data", { "_id": dbAbstraction.getObjectId(_id) }, {});
-        response.reqCount = 0;
-        response.data = data;
-        response.total = 1;
-    } catch (e) {
-        console.log('Exception while getting the data from id:', e);
-    }
-    await dbAbstraction.destroy();
-    res.status(200).json(response);
-});
-
 // To ensure no conflicts. Retaining this for backward compatibility for APIs. 
 // This will only work when there is no ACL for the dataset. 
 router.post('/viewViaPost/:dsName', async (req, res, next) => {
@@ -248,6 +218,36 @@ router.post('/viewViaPost/attachments/:dsName', async (req, res, next) => {
 // Use this for ACL enabled dataset via APIs. 
 router.post('/viewViaPost/attachments/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "attachments");
+});
+
+router.get('/view/:dsName/:dsView/:dsUser/:id', async (req, res, next) => {
+    let dsName = req.params.dsName;
+    let dsView = req.params.dsView;
+    let dsUser = req.params.dsUser;
+    let _id = req.params.id;
+    if (!dsName || !dsView || !dsUser || !_id) {
+        res.status(404).json({ "Error": "Invalid request" });
+        return;
+    }
+    let token = req.cookies.jwt;
+    console.log(`Got request for ${dsName} by ${dsUser} for id ${_id} and view ${dsView}`);
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
+    if (!allowed) {
+        res.status(403).json({ "Error": "access_denied" });
+        return;
+    }
+    let response = {};
+    let dbAbstraction = new DbAbstraction();
+    try {
+        let data = await dbAbstraction.find(dsName, "data", { "_id": dbAbstraction.getObjectId(_id) }, {});
+        response.reqCount = 0;
+        response.data = data;
+        response.total = 1;
+    } catch (e) {
+        console.log('Exception while getting the data from id:', e);
+    }
+    await dbAbstraction.destroy();
+    res.status(200).json(response);
 });
 
 router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) => {
