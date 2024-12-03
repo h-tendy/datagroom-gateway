@@ -172,12 +172,12 @@ async function pager (req, res, collectionName) {
     await dbAbstraction.destroy();
     res.status(200).json(response);
 }
-// Moved the Attachment Route
+
 router.get('/view/attachments/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "attachments");
 });
 
-//Moved the EditLog Route
+
 router.get('/view/editLog/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "editlog");
 });
