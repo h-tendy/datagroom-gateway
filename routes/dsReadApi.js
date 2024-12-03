@@ -172,6 +172,15 @@ async function pager (req, res, collectionName) {
     await dbAbstraction.destroy();
     res.status(200).json(response);
 }
+// Moved the Attachment Route
+router.get('/view/attachments/:dsName/:dsView/:dsUser', async (req, res, next) => {
+    await pager(req, res, "attachments");
+});
+
+//Moved the EditLog Route
+router.get('/view/editLog/:dsName/:dsView/:dsUser', async (req, res, next) => {
+    await pager(req, res, "editlog");
+});
 
 router.get('/view/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "data");
@@ -219,10 +228,6 @@ router.post('/viewViaPost/:dsName/:dsView/:dsUser', async (req, res, next) => {
 });
 
 
-router.get('/view/editLog/:dsName/:dsView/:dsUser', async (req, res, next) => {
-    await pager(req, res, "editlog");
-});
-
 // To ensure no conflicts. Retaining this for backward compatibility for APIs. 
 // This will only work when there is no ACL for the dataset. 
 router.post('/viewViaPost/editLog/:dsName', async (req, res, next) => {
@@ -232,11 +237,6 @@ router.post('/viewViaPost/editLog/:dsName', async (req, res, next) => {
 // Use this for ACL enabled dataset via APIs. 
 router.post('/viewViaPost/editLog/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "editlog");
-});
-
-
-router.get('/view/attachments/:dsName/:dsView/:dsUser', async (req, res, next) => {
-    await pager(req, res, "attachments");
 });
 
 // To ensure no conflicts. Retaining this for backward compatibility for APIs. 
