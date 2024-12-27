@@ -183,6 +183,7 @@ async function editSingleAttribute(req) {
  */
 function isJiraMappedColumnBeingEdited(columnBeingEdited, jiraConfig) {
     let isJiraColumnBeingEdited = false;
+    if (!jiraConfig) return false;
     let jiraFieldMapping = jiraConfig.jiraFieldMapping
     jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
     // iterate over values of jiraFieldMapping

@@ -434,6 +434,7 @@ function sanitizeData(objData) {
 }
 
 function getRevContentMap(jiraConfig) {
+  if (!jiraConfig) return null;
   let jiraFieldMapping = jiraConfig.jiraFieldMapping
   jiraFieldMapping = JSON.parse(JSON.stringify(jiraFieldMapping));
   delete jiraFieldMapping.key;
