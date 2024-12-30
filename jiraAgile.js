@@ -339,7 +339,6 @@ async function getSprintIdFromSprintName(sprintName, boardId) {
 async function ifKeyBeingEdited(request) {
     let dbAbstraction = new DbAbstraction();
     let keys = await dbAbstraction.find(request.dsName, "metaData", { _id: `keys` }, {});
-    console.log(keys[0]);
     let keyBeingEdited = false;
     let editObjKeys = Object.keys(request.editObj)
     for (let i = 0; i < editObjKeys.length; i++) {

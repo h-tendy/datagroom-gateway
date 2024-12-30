@@ -1,4 +1,4 @@
-
+// @ts-check
 function getFilters(str, field) {
     let terms = [], type = '', inBrackets = 0;
     let curTerm = '', mongoFilter = {};
@@ -104,8 +104,67 @@ function getFilters(str, field) {
     return mongoFilter;
 }
 
+function getMongoFiltersAndSorters (qFilters, qSorters, qChronology) {
+    let filters = {}, orFilters = [], andFilters = [], sorters = [];
+    try {
+        // if qFilters is null, we want to return an empty filter list instead of what
+        // we are now returning in the exception path. 
+        if (!qFilters) qFilters = [];
+        qFilters.map((v) => {
+            if (v.type === 'like') {
+                let filter = getFilters(v.value, v.field);
+                if (filter["$or"]) {
+                    orFilters.push(...filter["$or"]);
+                } else if (filter["$and"]) {
+                    andFilters.push(...filter["$and"]);
+                } else {
+                    filters[v.field] = getFilters(v.value, v.field);
+                }
+            } else if (v.type === '=') {
+                let numVal = Number(v.value);
+                filters[v.field] = {$eq: numVal};
+            } else if (v.type === 'eq') {
+                filters[v.field] = {$eq: v.value};
+            }
+            /*
+            if (v.value !== '' && !Number.isNaN(Number(v.value))) {
+                let numVal = Number(v.value);
+                filters[v.field] = {$eq: numVal};
+            }*/
+        })
+    } catch (e) { 
+        console.log("Exception in getMongoFiltersAndSorters: ", e) 
+        filters["_id"] = { $eq: "" };
+    }
+    if (orFilters.length)
+        filters["$or"] = orFilters; 
+    if (andFilters.length) 
+        filters["$and"] = andFilters;
+    try {
+        qSorters.map((v) => {
+            let f = [];
+            f.push(v.field); f.push(v.dir);
+            sorters.push(f);
+        })
+    } catch (e) {}
+    // Add a default sorter
+    if (!sorters.length) {
+        let f = []
+        f.push('_id'); 
+        if (qChronology)
+            f.push(qChronology);
+        else 
+            f.push('desc');
+        sorters.push(f);
+    }
+
+    return [filters, sorters]
+}
+
+
 module.exports = {
-    getFilters
+    getFilters,
+    getMongoFiltersAndSorters
 };
 
 // Working cases

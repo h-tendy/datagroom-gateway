@@ -1,3 +1,4 @@
+// @ts-check
 const router = require('express').Router();
 const DbAbstraction = require('../dbAbstraction');
 const ExcelUtils = require('../excelUtils');
@@ -8,7 +9,9 @@ const JiraSettings = require('../jiraSettings');
 const Utils = require('../utils');
 const PrepAttachments = require('../prepAttachments');
 const AclCheck = require('../acl');
+const PerRowAcessCheck = require('../perRowAccessCheck');
 const MongoFilters = require('./mongoFilters');
+// @ts-ignore
 const { ObjectId } = require('mongodb');
 
 let host = JiraSettings.host;
@@ -54,87 +57,15 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
             // Do something here and set the columnAttrs?
         }
     } catch (e) {};
+    let perRowAccessConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `perRowAccessConfig` }, {} );
+    console.log("perRowAccessConfig: ", perRowAccessConfig);
+    perRowAccessConfig = perRowAccessConfig[0]
     let jiraProjectName = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraProjectName` }, {});
     jiraProjectName = (jiraProjectName && jiraProjectName.length == 1 && jiraProjectName[0].jiraProjectName) ? jiraProjectName[0].jiraProjectName : "";
     await dbAbstraction.destroy();
-    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig, jiraAgileConfig, jiraProjectName });
+    res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig, jiraAgileConfig, jiraProjectName, perRowAccessConfig });
     return;
 });
-
-function getMongoFiltersAndSorters (qFilters, qSorters, qChronology) {
-    let filters = {}, orFilters = [], andFilters = [], sorters = [];
-    try {
-        qFilters.map((v) => {
-            if (v.type === 'like') {
-                let filter = MongoFilters.getFilters(v.value, v.field);
-                if (filter["$or"]) {
-                    orFilters.push(...filter["$or"]);
-                } else if (filter["$and"]) {
-                    andFilters.push(...filter["$and"]);
-                } else {
-                    filters[v.field] = MongoFilters.getFilters(v.value, v.field);
-                }
-            } else if (v.type === '=') {
-                let numVal = Number(v.value);
-                filters[v.field] = {$eq: numVal};
-            } else if (v.type === 'eq') {
-                filters[v.field] = {$eq: v.value};
-            }
-            /*
-            if (v.value !== '' && !Number.isNaN(Number(v.value))) {
-                let numVal = Number(v.value);
-                filters[v.field] = {$eq: numVal};
-            }*/
-        })
-    } catch (e) {}
-    if (orFilters.length)
-        filters["$or"] = orFilters; 
-    if (andFilters.length) 
-        filters["$and"] = andFilters;
-    try {
-        qSorters.map((v) => {
-            let f = [];
-            f.push(v.field); f.push(v.dir);
-            sorters.push(f);
-        })
-    } catch (e) {}
-    // Add a default sorter
-    if (!sorters.length) {
-        let f = []
-        f.push('_id'); 
-        if (qChronology)
-            f.push(qChronology);
-        else 
-            f.push('desc');
-        sorters.push(f);
-    }
-
-    return [filters, sorters]
-}
-
-function getMongoFiltersAndSortersForIndividualRow(_id, qSorters, qChronology) {
-    let filters = {}, sorters = [];
-    filters["_id"] = new ObjectId(_id);
-    try {
-        qSorters.map((v) => {
-            let f = [];
-            f.push(v.field); f.push(v.dir);
-            sorters.push(f);
-        })
-    } catch (e) { }
-    // Add a default sorter
-    if (!sorters.length) {
-        let f = []
-        f.push('_id');
-        if (qChronology)
-            f.push(qChronology);
-        else
-            f.push('desc');
-        sorters.push(f);
-    }
-
-    return [filters, sorters]
-}
 
 async function pager (req, res, collectionName) {
     let request = req.body;
@@ -144,8 +75,8 @@ async function pager (req, res, collectionName) {
     else
         query = request;
     //console.log("In pager, req:", req);
-    console.log("In pager: ", req.params);
-    console.log("In pager: ", query);
+    console.log("In pager, req.params: ", req.params);
+    console.log("In pager, query: ", query);
     console.log("In pager, collectionName:", collectionName)
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
@@ -153,17 +84,21 @@ async function pager (req, res, collectionName) {
         res.status(403).json({ "Error": "access_denied" });
         return
     }
-    let [filters, sorters] = getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
+    query.filters = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
+    console.log("In pager, after enforcePerRow, query:", query);
+    let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
 
     // XXX: Do lots of validation.
-    console.log("mongo filters: ", JSON.stringify(filters, null, 4));
-    console.log("mongo sorters: ", sorters)
+    console.log("In pager, mongo filters: ", JSON.stringify(filters, null, 4));
+    console.log("In pager, mongo sorters: ", sorters)
     let options = {};
+    // @ts-ignore
     if (sorters.length)
         options.sort = sorters;
     let dbAbstraction = new DbAbstraction();
     let response = {};
     try {
+        // @ts-ignore
         response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(query.page), parseInt(query.per_page) );
         response.reqCount = query.reqCount || 0;
     } catch (e) {
@@ -202,13 +137,19 @@ router.get('/view/:dsName/:dsView/:dsUser/:id', async (req, res, next) => {
         res.status(403).json({ "Error": "access_denied" });
         return;
     }
+    let qFilters = [ {field: "_id", type: "eq", value: new ObjectId(_id)} ];
+    qFilters = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, qFilters);
+    console.log("In single-user query end-point, after enforcePerRow, qFilters:", qFilters);
+    let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(qFilters, null, null);
+    console.log("In single-user query end-point, mongoFilters:", filters);
+
     let response = {};
     let dbAbstraction = new DbAbstraction();
     try {
-        let data = await dbAbstraction.find(dsName, "data", { "_id": dbAbstraction.getObjectId(_id) }, {});
+        let data = await dbAbstraction.find(dsName, "data", filters, {});
         response.reqCount = 0;
         response.data = data;
-        response.total = 1;
+        response.total = data.length;
     } catch (e) {
         console.log('Exception while getting the data from id:', e);
     }
@@ -261,15 +202,18 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
         res.status(403).json({ "Error": "access_denied" });
         return
     }
-    let [filters, sorters] = getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
+    query.filters = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
+    let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
     console.log("mongo filters in deleteFromQuery: ", JSON.stringify(filters, null, 4));
     console.log("mongo sorters in deleteFromQuery: ", sorters)
     let options = {};
+    // @ts-ignore
     if (sorters.length)
         options.sort = sorters;
     let dbAbstraction = new DbAbstraction();
     let response = {};
     try {
+        // @ts-ignore
         response = await dbAbstraction.pagedFind(req.params.dsName, "data", filters, options, parseInt(1), parseInt(25) );
     } catch (e) {
         console.log("Exception in pager: ", e);
@@ -277,6 +221,7 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
     if (query.pretend == 'false' || query.pretend == false) {
         let count = 0;
         count = await dbAbstraction.removeFromQuery(req.params.dsName, "data", filters, options);
+        // @ts-ignore
         response = {};
         response.count = count;
     }
@@ -345,7 +290,8 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
     try {
         // XXX: Do lots of validation.
         let response = {}
-        let recs = await dbAbstraction.find(request.dsName, "data", { _id: dbAbstraction.getObjectId(request.selectorObj._id) }, {});
+        let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, request.dsUser, new ObjectId(request.selectorObj._id));
+        // @ts-ignore
         if (recs.length == 1) {
             let isJiraAgileRow = isJiraAgileRec(recs[0])
             if (isJiraAgileRow) {
@@ -358,14 +304,17 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
                 return
             }
         } else {
+            response.status = 'fail';
             response.error = 'Row not found!';
+            res.status(200).send(response);
+            await dbAbstraction.destroy();
+            return
         }
         let keys = await dbAbstraction.find(request.dsName, "metaData", { _id: `keys` }, {} );
-        console.log(keys[0]);
         let keyBeingEdited = false;
         let editObjKeys = Object.keys(request.editObj)
         for (let i = 0; i < editObjKeys.length; i++) {
-            key = editObjKeys[i];
+            let key = editObjKeys[i];
             for (let j = 0; j < keys[0].keys.length; j++) {
                 if (keys[0].keys[j] === key) {
                     keyBeingEdited = true;
@@ -475,7 +424,8 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
     await dbAbstraction.destroy();
 });
 
-
+// XXX: Wonder who uses this api? It doesn't seem to be used from 
+// the front end for sure. 
 router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     let request = req.body;
     //console.log("In insertOrUpdateOneDoc: ", request);
@@ -494,6 +444,14 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
             console.log(`In insertOrUpdateOneDoc: fixing _id to ObjectId format`);
             request.selectorObj._id = dbAbstraction.getObjectId(request.selectorObj._id);
             request.doc._id = request.selectorObj._id;
+            let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, request.dsUser, request.selectorObj._id);
+            // @ts-ignore
+            if (recs.length == 0) {
+                let response = { status: 'fail', error: 'Row not found!'}
+                res.status(200).send(response);
+                await dbAbstraction.destroy();
+                return    
+            }
         }
         let dbResponse = await dbAbstraction.update(request.dsName, "data", request.selectorObj, request.doc);
         //console.log ('insertOrUpdateOneDoc response: ', dbResponse);
@@ -528,33 +486,40 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
 
 
 router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
+    // In this API, the request.query has filters directly. So, you have to use it accordingly.
     let request = req.body;
-    let query = request.query;
-    console.log("In downloadXlsx: ", req.params);
-    console.log("In downloadXlsx: ", req.query);
+    let filters = request.query, sorters; 
+    console.log("In downloadXlsx, req.params: ", req.params);
+    console.log("In downloadXlsx, query: ", filters);
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
     }
-    let filters, sorters;
-    if (query.length == 1 && query[0].field === '_id') {
-        if (!query[0].value) {
+    let mongoFilters;
+    if (filters.length == 1 && filters[0].field === '_id') {
+        // XXX: What is this use-case? I think unnecessary to allow
+        // downloadXlsx for just one row really. Not fully tested. 
+        if (!filters[0].value) {
             console.log("Error: Id not found in download single row");
             res.status(400).json({ "Error": "Id not found" });
             return
         }
-        [filters, sorters] = getMongoFiltersAndSortersForIndividualRow(query[0].value, null, null);
+        let qFilters = [ {field: "_id", type: "eq", value: new ObjectId(filters[0].value)} ];
+        qFilters = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, qFilters);
+        [mongoFilters, sorters] = MongoFilters.getMongoFiltersAndSorters(qFilters, null, null);
     } else {
-        [filters, sorters] = getMongoFiltersAndSorters(query, null, null);
+        filters = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, filters);
+        [mongoFilters, sorters] = MongoFilters.getMongoFiltersAndSorters(filters, null, null);
     }
-    console.log("In downloadxlsx : mongo filters : ", JSON.stringify(filters, null, 4));
+    console.log("In downloadxlsx : mongo filters : ", JSON.stringify(mongoFilters, null, 4));
     let options = {};
+    // @ts-ignore
     if (sorters.length)
         options.sort = sorters;
     let fileName = `export_${req.params.dsName}_${req.params.dsView}_${req.params.dsUser}.xlsx`
-    await ExcelUtils.exportDataFromDbIntoXlsx(req.params.dsName, req.params.dsView, req.params.dsUser, fileName, filters, options);
+    await ExcelUtils.exportDataFromDbIntoXlsx(req.params.dsName, req.params.dsView, req.params.dsUser, fileName, mongoFilters, options);
     try {
         let bits = fs.readFileSync(fileName);
         // convert binary data to base64 encoded string
@@ -678,6 +643,7 @@ router.post('/deleteDs', async (req, res, next) => {
         // XXX: Do lots of validation.
         let dbResponse = await dbAbstraction.deleteDb(request.dsName);
         console.log ('DeleteDs response: ', dbResponse);
+        // @ts-ignore
         fs.rmdirSync(`attachments/${request.dsName}`, { recursive: true });
         let response = {};
         response.status = 'success';
@@ -706,8 +672,15 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
         // First get a copy of the object we are deleting. 
         if (request.selectorObj._id) {
             let _id = dbAbstraction.getObjectId(request.selectorObj._id);
-            let recs = await dbAbstraction.find(request.dsName, "data", { _id }, { });
+            let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, request.dsUser, _id);
+            // @ts-ignore
+            if (recs.length == 0) {
+                res.status(200).send({ status: 'fail', error: 'Row not found!'});
+                await dbAbstraction.destroy();
+                return;
+            }
             deletedObj = recs[0];
+            console.log("In deleteOneDoc end-point, recs: ", recs);
             console.log("Objecting getting deleted: ", deletedObj);
         }
         let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", request.selectorObj);
@@ -745,7 +718,10 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
         for (let i = 0; i < request.objects.length; i++) {
             // First get a copy of the object we are deleting. 
             let _id = dbAbstraction.getObjectId(request.objects[i]);
-            let recs = await dbAbstraction.find(request.dsName, "data", { _id }, { });
+            let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, request.dsUser, _id);
+            // @ts-ignore
+            if (recs.length == 0)
+                continue;
             deletedObj = recs[0];
             console.log("Objecting getting deleted: ", deletedObj);
             let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", { _id : request.objects[i] });
@@ -832,6 +808,10 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         } else {
             dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "aclConfig" });
             console.log("Remove aclConfig status: ", dbResponse);
+        }
+        if (request.perRowAccessConfig) {
+            dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "perRowAccessConfig" }, { ...request.perRowAccessConfig });
+            console.log("Add perRowAccessConfig status: ", dbResponse.result);
         }
         if (request.jiraProjectName) {
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraProjectName" }, { "jiraProjectName": request.jiraProjectName });
@@ -1044,6 +1024,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
     let dbAbstraction = new DbAbstraction();
     try {
         let excelUtils = await ExcelUtils.getExcelUtilsForFile("uploads/" + request.fileName);
+        // @ts-ignore
         let loadStatus = await excelUtils.loadHdrsFromRange(request.sheetName, request.selectedRange);
         if (!loadStatus.loadStatus) {
             res.status(200).send(loadStatus);
@@ -1071,6 +1052,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
             }
         */
         let colsInSheetInRev = {};
+        // @ts-ignore
         Object.entries(loadStatus.hdrs).map((kv) => {
             colsInSheetInRev[kv[1]] = kv[0];
         })
@@ -1316,6 +1298,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
         {
             oprLog.push(`Will update rows specified in sheet`);
             if (request.doIt)
+                // @ts-ignore
                 loadStatus = await excelUtils.bulkUpdateDataIntoDb(request.sheetName, request.selectedRange, loadStatus.hdrs, keys, request.dsName, request.dsUser)
         }
         console.log("Came here #9");
@@ -1599,7 +1582,7 @@ router.post('/view/addJiraRow', async (req, res, next) => {
             response.error = 'unable to update the db with new issue. Please refresh jira.'
         }
         if (request.parentKey) {
-            parentJiraRec = await Jira.getJiraRecordFromKey(request.parentKey)
+            let parentJiraRec = await Jira.getJiraRecordFromKey(request.parentKey)
             let parentSelectorObj = {};
             parentSelectorObj["_id"] = dbAbstraction.getObjectId(request.parentSelectorObj._id);
             let parentUpdateResponse = await Jira.updateJiraRecInDb(request.dsName, parentSelectorObj, parentJiraRec, request.jiraAgileConfig)
