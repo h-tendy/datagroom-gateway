@@ -748,7 +748,7 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
-        res.status(403).json({ "Error": "access_denied" });
+        res.status(403).json({ status: 'fail', message: "Permission denied" });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -824,10 +824,11 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         //console.log ('db update response: ', dbResponse);
         let response = {};
         response.status = 'success';
+        response.message = 'ok';
         res.status(200).send(response);
     } catch (e) {
         console.log("Got exception: ", e);
-        res.status(415).send(e);
+        res.status(415).send({status: 'fail', message: 'Server side exception'});
     }
     await dbAbstraction.destroy();
 });
