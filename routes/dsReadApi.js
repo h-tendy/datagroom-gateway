@@ -1324,12 +1324,12 @@ router.post('/createDsFromDs', async (req, res, next) => {
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.fromDsName, "", request.dsUser, token);
     if (!allowed) {
-        res.status(403).json({ "Error": "access_denied" });
+        res.status(403).json({ status: 'fail', message: "Permission denied" });
         return
     }
     let [ok, message] = await PerRowAcessCheck.checkIfUserCanCopyDs(request.fromDsName, request.dsUser);
     if (!ok) {
-        res.status(403).json({ "Error": "access_denied" });
+        res.status(403).json({ status: 'fail', message });
         return
     }
     let dbAbstraction = new DbAbstraction();
@@ -1340,7 +1340,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
         for (let i = 0; i < dbList.length; i++) {
             if (dbList[i].name === request.toDsName) {
                 console.log('createDsFromDs: Dataset name conflict');
-                res.status(200).send({ createStatus: false, error: 'Dataset name conflict' });
+                res.status(415).send({ status: 'fail', message: 'Dataset name conflict' });
                 return;
             }
         }
@@ -1376,10 +1376,10 @@ router.post('/createDsFromDs', async (req, res, next) => {
             dbResponse = await dbAbstraction.update(request.toDsName, "metaData", { _id: "aclConfig" }, { ...aclConfig });
         }
 
-        res.status(200).send({createStatus: true});
+        res.status(200).send({ status: 'success', message: 'ok' });
     } catch (e) {
         console.log("Got exception: ", e);
-        res.status(415).send(e);
+        res.status(415).send({ status: 'fail', message: 'Server side exception' });
     }
     await dbAbstraction.destroy();
 });
