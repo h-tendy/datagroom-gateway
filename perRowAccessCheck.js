@@ -56,7 +56,48 @@ async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
     return filters;
 }
 
+async function checkIfUserCanEditPerRowAccessConfig(dsName, dsView, dsUser, requestedPerRowAccessConfig) {
+    let ok = true, message = "ok";
+    let dbAbstraction = new DbAbstraction();
+    try {
+        let perms = await dbAbstraction.find(dsName, "metaData", { _id: `perms` }, {} );
+        perms = perms[0];
+        let storedPerRowAccessConfig = await dbAbstraction.find(dsName, "metaData", { _id: `perRowAccessConfig` }, {} );
+        storedPerRowAccessConfig = storedPerRowAccessConfig[0];
+        if (perms.owner !== dsUser) {
+            // If nothing is stored in db, but a non-owner wants to store
+            // something - deny this. 
+            if (!storedPerRowAccessConfig &&
+                requestedPerRowAccessConfig &&
+                (requestedPerRowAccessConfig.enabled ||
+                 requestedPerRowAccessConfig.column)) {
+                ok = false; 
+                message = "No permission to edit Per-row access config!"
+            }
+            // There is something stored and a non-owner wants to change
+            // the enabled flag - deny this. 
+            if (storedPerRowAccessConfig &&
+                requestedPerRowAccessConfig &&
+                (storedPerRowAccessConfig.enabled !== requestedPerRowAccessConfig.enabled)) {
+                ok = false;
+                message = "No permission to edit Per-row access config!"
+            }
+            // There is something stored and a non-owner wants to change
+            // the column - deny this. 
+            if (storedPerRowAccessConfig &&
+                requestedPerRowAccessConfig &&
+                (storedPerRowAccessConfig.column !== requestedPerRowAccessConfig.column)) {
+                ok = false;
+                message = "No permission to edit Per-row access config!"
+            }
+        }
+    } catch (e) { ok = false; message = "Exception in checking edit permissions!" }
+    await dbAbstraction.destroy();
+    return [ok, message];
+}
+
 module.exports = {
     checkAccessForSpecificRow,
-    enforcePerRowAcessCtrl
+    enforcePerRowAcessCtrl,
+    checkIfUserCanEditPerRowAccessConfig
 };

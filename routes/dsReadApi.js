@@ -751,9 +751,14 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         res.status(403).json({ status: 'fail', message: "Permission denied" });
         return
     }
-    let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
+        let [ok, message] = await PerRowAcessCheck.checkIfUserCanEditPerRowAccessConfig(request.dsName, request.dsView, request.dsUser, request.perRowAccessConfig);
+        if (!ok) {
+            res.status(403).json({ status: 'fail', message });
+            return    
+        }
+        let dbAbstraction = new DbAbstraction();
         let dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: `view_${request.dsView}` }, { columnAttrs: request.viewDefs } );
         if (request.jiraConfig) {
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, { ...request.jiraConfig });
@@ -826,11 +831,11 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         response.status = 'success';
         response.message = 'ok';
         res.status(200).send(response);
+        await dbAbstraction.destroy();
     } catch (e) {
         console.log("Got exception: ", e);
         res.status(415).send({status: 'fail', message: 'Server side exception'});
     }
-    await dbAbstraction.destroy();
 });
   
 router.post('/view/refreshJira', async (req, res, next) => {
