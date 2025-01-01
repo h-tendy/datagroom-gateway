@@ -96,8 +96,30 @@ async function checkIfUserCanEditPerRowAccessConfig(dsName, dsView, dsUser, requ
     return [ok, message];
 }
 
+async function checkIfUserCanCopyDs (dsName, dsUser) {
+    let ok = true, message = "ok";
+    let dbAbstraction = new DbAbstraction();
+    try {
+        let perms = await dbAbstraction.find(dsName, "metaData", { _id: `perms` }, {} );
+        perms = perms[0];
+        let storedPerRowAccessConfig = await dbAbstraction.find(dsName, "metaData", { _id: `perRowAccessConfig` }, {} );
+        storedPerRowAccessConfig = storedPerRowAccessConfig[0];
+        if (perms.owner !== dsUser) {
+            // If per-row access controlled, then deny.
+            if (storedPerRowAccessConfig &&
+                storedPerRowAccessConfig.enabled) {
+                ok = false;
+                message = "No permission to copy this Per-row access controlled dataset!"
+            }
+        }
+    } catch (e) { ok = false; message = "Exception in checking copy permissions!" }
+    await dbAbstraction.destroy();
+    return [ok, message];    
+}
+
 module.exports = {
     checkAccessForSpecificRow,
     enforcePerRowAcessCtrl,
-    checkIfUserCanEditPerRowAccessConfig
+    checkIfUserCanEditPerRowAccessConfig,
+    checkIfUserCanCopyDs
 };

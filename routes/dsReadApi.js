@@ -1327,6 +1327,11 @@ router.post('/createDsFromDs', async (req, res, next) => {
         res.status(403).json({ "Error": "access_denied" });
         return
     }
+    let [ok, message] = await PerRowAcessCheck.checkIfUserCanCopyDs(request.fromDsName, request.dsUser);
+    if (!ok) {
+        res.status(403).json({ "Error": "access_denied" });
+        return
+    }
     let dbAbstraction = new DbAbstraction();
     try {
         // XXX: Do lots of validation.
