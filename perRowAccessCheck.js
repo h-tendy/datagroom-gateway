@@ -37,17 +37,17 @@ async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
             for (let i = 0; i < filters.length; i++) {
                 let filter = filters[i]; 
                 if (filter.field == perRowAccessConfig.column) {
-                    filter.value = filter.value + `&&\\b${dsUser}\\b`
+                    filter.value = filter.value + `&&\\b${dsUser}\\b|\\*`
                     found = true;
                     break;
                 }
             }
             if (!found) {
-                filters.push({ field: perRowAccessConfig.column, type: 'like', value: `\\b${dsUser}\\b`})
+                filters.push({ field: perRowAccessConfig.column, type: 'like', value: `\\b${dsUser}\\b|\\*`})
             }
         } else {
             filters = [];
-            filters.push({ field: perRowAccessConfig.column, type: 'like', value: `\\b${dsUser}\\b`})
+            filters.push({ field: perRowAccessConfig.column, type: 'like', value: `\\b${dsUser}\\b|\\*`})
         }
     } catch (e) {
         console.log("In perRowAccessCheck, exception: ", e);
