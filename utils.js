@@ -127,6 +127,10 @@ function getRecFromJiraIssue(issue) {
     rec["Improvement Suggestions"] = issue.fields.customfield_28404.value;
   else
     rec["Improvement Suggestions"] = "NotSet";
+  if (issue.fields.customfield_25695)
+    rec["Root Cause or Defect Category"] = issue.fields.customfield_25695.value;
+  else
+    rec["Root Cause or Defect Category"] = "NotSet";
   if (issue.fields.duedate)
     rec.duedate = issue.fields.duedate.split('T')[0];
   else
