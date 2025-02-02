@@ -99,14 +99,34 @@ function getRecFromJiraIssue(issue) {
     rec.rzFeature = issue.fields.customfield_25791.value;
   else
     rec.rzFeature = "NotSet";
-  if (issue.fields.customfield_25693)
-    rec.phaseBugIntroduced = issue.fields.customfield_25693.value;
-  else
-    rec.phaseBugIntroduced = "NotSet";
-  if (issue.fields.customfield_25518)
+  // Both versions (phaseBugFound and Phase Bug Found) is necessary for backward compatibility.
+  // Later phaseBugFound to be phased out safely.
+  if (issue.fields.customfield_25518) {
+    rec["Phase Bug Found"] = issue.fields.customfield_25518.value;
     rec.phaseBugFound = issue.fields.customfield_25518.value;
-  else
+  } else {
+    rec["Phase Bug Found"] = "NotSet";
     rec.phaseBugFound = "NotSet";
+  }
+  if (issue.fields.customfield_25693) {
+    rec["Phase Bug Introduced"] = issue.fields.customfield_25693.value;
+    rec.phaseBugIntroduced = issue.fields.customfield_25693.value;
+  } else {
+    rec["Phase Bug Introduced"] = "NotSet";
+    rec.phaseBugIntroduced = "NotSet";
+  }
+  if (issue.fields.customfield_28258)
+    rec["Failure Category"] = issue.fields.customfield_28258.value;
+  else
+    rec["Failure Category"] = "NotSet";
+  if (issue.fields.customfield_28403)
+    rec["Failure Subcategory"] = issue.fields.customfield_28403.value;
+  else
+    rec["Failure Subcategory"] = "NotSet";
+  if (issue.fields.customfield_28404)
+    rec["Improvement Suggestions"] = issue.fields.customfield_28404.value;
+  else
+    rec["Improvement Suggestions"] = "NotSet";
   if (issue.fields.duedate)
     rec.duedate = issue.fields.duedate.split('T')[0];
   else
