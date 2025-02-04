@@ -131,6 +131,11 @@ function getRecFromJiraIssue(issue) {
     rec["Root Cause or Defect Category"] = issue.fields.customfield_25695.value;
   else
     rec["Root Cause or Defect Category"] = "NotSet";
+  if (issue.fields.resolution) {
+    rec["Resolution"] = issue.fields.resolution.name;
+  } else {
+    rec["Resolution"] = "NotSet";
+  }
   if (issue.fields.duedate)
     rec.duedate = issue.fields.duedate.split('T')[0];
   else
