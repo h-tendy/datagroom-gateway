@@ -458,8 +458,10 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
         let response = {};
         if (dbResponse.result.ok == 1) {
             response.status = 'success';
-            if (dbResponse.upserted)
-                response._id = dbResponse.upserted[0]._id;
+            if (dbResponse.result.upserted) {
+                //console.log ('insertOrUpdateOneDoc, upserted: ', JSON.stringify(dbResponse.result.upserted, null, 4));
+                response._id = dbResponse.result.upserted[0]._id;
+            }
         } else {
             response.status = 'fail';
             // Assumes that selector definitely has the '_id' field. 
