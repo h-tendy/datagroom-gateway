@@ -202,7 +202,7 @@ class DbAbstraction {
         return count;
     }
 
-    async pagedFind (dbName, tableName, query, options, page, limit, fetchAllMatchingRecords = false) {
+    async pagedFind (dbName, tableName, query, options, page, limit, fetchAllMatchingRecords = false, onlyPerRowAccessCtrlQueried = false) {
         let skip = limit * (page - 1);
         let findOptions = { ...options, limit, skip };
         //console.log(dbName, tableName, query, findOptions);
@@ -211,7 +211,7 @@ class DbAbstraction {
         let total = 0;
         let totalPages = 1;
         let moreMatchingDocs = false;
-        if (query && Object.keys(query).length && !fetchAllMatchingRecords) {
+        if (query && Object.keys(query).length && !fetchAllMatchingRecords && !onlyPerRowAccessCtrlQueried) {
             // If there is incoming query, then countDocuments should have the limit and skip options filled. 
             // Basically, look for limit + 1 matching document. If it is there, we can show correct pagination in UI.
             let countLimit = limit + 1;
