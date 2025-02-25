@@ -202,14 +202,31 @@ class DbAbstraction {
         return count;
     }
 
-    async pagedFind (dbName, tableName, query, options, page, limit) {
+    async pagedFind (dbName, tableName, query, options, page, limit, fetchAllMatchingRecords = false) {
         let skip = limit * (page - 1);
         let findOptions = { ...options, limit, skip };
         //console.log(dbName, tableName, query, findOptions);
         let data = await this.find (dbName, tableName, query, findOptions );
         //console.log(data);
-        let total = await this.countDocuments (dbName, tableName, query, options);
-        let totalPages = Math.ceil(total / limit);
+        let total = 0;
+        let totalPages = 1;
+        if (query && Object.keys(query).length && !fetchAllMatchingRecords) {
+            // If there is incoming query, then countDocuments should have the limit and skip options filled. 
+            // Basically, look for limit + 1 matching document. If it is there, we can show correct pagination in UI.
+            let countLimit = limit + 1;
+            let countOptions = {...options, limit: countLimit, skip};
+            let nextMatchingCount = await this.countDocuments(dbName, tableName, query, countOptions);
+            if (nextMatchingCount > limit) {
+                totalPages = page + 1;
+            } else {
+                totalPages = page;
+            }
+            total = skip + nextMatchingCount;
+        } else {
+            //If there is no incoming query or fetchaAllMatchingRecords is true, get the whole document count
+            total = await this.countDocuments (dbName, tableName, query, options);
+            totalPages = Math.ceil(total / limit);
+        }
         //console.log(total, totalPages);
         let results = { page, per_page: limit, total, total_pages: totalPages, data }
         //console.log(results);
