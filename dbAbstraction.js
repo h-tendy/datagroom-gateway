@@ -210,6 +210,7 @@ class DbAbstraction {
         //console.log(data);
         let total = 0;
         let totalPages = 1;
+        let moreMatchingDocs = false;
         if (query && Object.keys(query).length && !fetchAllMatchingRecords) {
             // If there is incoming query, then countDocuments should have the limit and skip options filled. 
             // Basically, look for limit + 1 matching document. If it is there, we can show correct pagination in UI.
@@ -218,6 +219,7 @@ class DbAbstraction {
             let nextMatchingCount = await this.countDocuments(dbName, tableName, query, countOptions);
             if (nextMatchingCount > limit) {
                 totalPages = page + 1;
+                moreMatchingDocs = true;
             } else {
                 totalPages = page;
             }
@@ -228,7 +230,7 @@ class DbAbstraction {
             totalPages = Math.ceil(total / limit);
         }
         //console.log(total, totalPages);
-        let results = { page, per_page: limit, total, total_pages: totalPages, data }
+        let results = { page, per_page: limit, total, total_pages: totalPages, data, moreMatchingDocs }
         //console.log(results);
         return results;
     }
