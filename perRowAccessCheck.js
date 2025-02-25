@@ -7,7 +7,7 @@ async function checkAccessForSpecificRow(dsName, dsView, dsUser, _id) {
     let dbAbstraction = new DbAbstraction();
     // per-row access control check. 
     let qFilters = [{ field: "_id", type: "eq", value: _id }];
-    qFilters = await enforcePerRowAcessCtrl(dsName, dsView, dsUser, qFilters);
+    [qFilters] = await enforcePerRowAcessCtrl(dsName, dsView, dsUser, qFilters);
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(qFilters, null, null);
     let recs = await dbAbstraction.find(dsName, "data", filters, {});
     return recs;
@@ -15,21 +15,22 @@ async function checkAccessForSpecificRow(dsName, dsView, dsUser, _id) {
 
 async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
     let dbAbstraction = new DbAbstraction();
+    let onlyPerRowAccessCtrlQueried = false;
     try {
         let perRowAccessConfig = await dbAbstraction.find(dsName, "metaData", { _id: `perRowAccessConfig` }, {} );
         perRowAccessConfig = perRowAccessConfig[0];
         console.log("In enforcePerRowAccessCtrl, config is: ", perRowAccessConfig);
         if (!perRowAccessConfig) {
             await dbAbstraction.destroy();            
-            return filters
+            return [filters, onlyPerRowAccessCtrlQueried]
         }
         if (!perRowAccessConfig.enabled) {
             await dbAbstraction.destroy();
-            return filters
+            return [filters, onlyPerRowAccessCtrlQueried]
         }
         if (!perRowAccessConfig.column) {
             await dbAbstraction.destroy();
-            return filters
+            return [filters, onlyPerRowAccessCtrlQueried]
         }
         console.log("In enforcePerRowAccessCtrl, User is: ", dsUser);
         if (filters) {
@@ -47,13 +48,14 @@ async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
             }
         } else {
             filters = [];
-            filters.push({ field: perRowAccessConfig.column, type: 'like', value: `\\b${dsUser}\\b|\\*`})
+            filters.push({ field: perRowAccessConfig.column, type: 'like', value: `\\b${dsUser}\\b|\\*`});
+            onlyPerRowAccessCtrlQueried = true;
         }
     } catch (e) {
         console.log("In perRowAccessCheck, exception: ", e);
     }
     await dbAbstraction.destroy();
-    return filters;
+    return [filters, onlyPerRowAccessCtrlQueried];
 }
 
 async function checkIfUserCanEditPerRowAccessConfig(dsName, dsView, dsUser, requestedPerRowAccessConfig) {
