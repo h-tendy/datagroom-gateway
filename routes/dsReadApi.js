@@ -98,8 +98,9 @@ async function pager (req, res, collectionName) {
     let dbAbstraction = new DbAbstraction();
     let response = {};
     try {
+        let fetchAllMatchingRecords = (query.fetchAllMatchingRecords && query.fetchAllMatchingRecords.toLowerCase() === 'true');
         // @ts-ignore
-        response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(query.page), parseInt(query.per_page) );
+        response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(query.page), parseInt(query.per_page), fetchAllMatchingRecords);
         response.reqCount = query.reqCount || 0;
     } catch (e) {
         console.log("Exception in pager: ", e);
