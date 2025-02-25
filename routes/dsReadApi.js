@@ -84,7 +84,8 @@ async function pager (req, res, collectionName) {
         res.status(403).json({ "Error": "access_denied" });
         return
     }
-    query.filters = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
+    let onlyPerRowAccessCtrlQueried = false;
+    [query.filters, onlyPerRowAccessCtrlQueried] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
     console.log("In pager, after enforcePerRow, query:", query);
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
 
@@ -100,7 +101,7 @@ async function pager (req, res, collectionName) {
     try {
         let fetchAllMatchingRecords = (query.fetchAllMatchingRecords && query.fetchAllMatchingRecords.toLowerCase() === 'true');
         // @ts-ignore
-        response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(query.page), parseInt(query.per_page), fetchAllMatchingRecords);
+        response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(query.page), parseInt(query.per_page), fetchAllMatchingRecords, onlyPerRowAccessCtrlQueried);
         response.reqCount = query.reqCount || 0;
     } catch (e) {
         console.log("Exception in pager: ", e);
@@ -139,7 +140,7 @@ router.get('/view/:dsName/:dsView/:dsUser/:id', async (req, res, next) => {
         return;
     }
     let qFilters = [ {field: "_id", type: "eq", value: new ObjectId(_id)} ];
-    qFilters = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, qFilters);
+    [qFilters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, qFilters);
     console.log("In single-user query end-point, after enforcePerRow, qFilters:", qFilters);
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(qFilters, null, null);
     console.log("In single-user query end-point, mongoFilters:", filters);
@@ -203,7 +204,7 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
         res.status(403).json({ "Error": "access_denied" });
         return
     }
-    query.filters = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
+    [query.filters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
     console.log("mongo filters in deleteFromQuery: ", JSON.stringify(filters, null, 4));
     console.log("mongo sorters in deleteFromQuery: ", sorters)
@@ -510,10 +511,10 @@ router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
             return
         }
         let qFilters = [ {field: "_id", type: "eq", value: new ObjectId(filters[0].value)} ];
-        qFilters = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, qFilters);
+        [qFilters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, qFilters);
         [mongoFilters, sorters] = MongoFilters.getMongoFiltersAndSorters(qFilters, null, null);
     } else {
-        filters = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, filters);
+        [filters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, filters);
         [mongoFilters, sorters] = MongoFilters.getMongoFiltersAndSorters(filters, null, null);
     }
     console.log("In downloadxlsx : mongo filters : ", JSON.stringify(mongoFilters, null, 4));
