@@ -659,6 +659,242 @@ router.post('/deleteDs', async (req, res, next) => {
     await dbAbstraction.destroy();
 });
 
+router.post('/view/addColumn', async (req, res, next) => {
+    try {
+        console.log("Received addColumn request:", req.body);
+
+        const { dsName, dsView, dsUser, columnName, position, referenceColumn } = req.body;
+
+        if (!dsName || !dsView || !dsUser || !columnName || !position || !referenceColumn) {
+            console.error("Missing required parameters!");
+            return res.status(400).json({ error: "Missing required parameters" });
+        }
+
+        // Check User Permissions
+        const token = req.cookies.jwt;
+        let allowed = await AclCheck.aclCheck(dsName, dsView, dsUser, token);
+        if (!allowed) {
+            console.error("Access Denied for user:", dsUser);
+            return res.status(403).json({ error: "Access Denied" });
+        }
+
+        console.log("User is authorized. Fetching metadata...");
+        let dbAbstraction = new DbAbstraction();
+        let viewDefault = await dbAbstraction.find(dsName, "metaData", { _id: "view_default" }, {});
+
+        if (!viewDefault || !viewDefault.length) {
+            console.error("View metadata not found for:", dsName);
+            return res.status(404).json({ error: "View metadata not found" });
+        }
+
+        let metadata = viewDefault[0];
+        let columns = metadata.columns || {};
+        let columnAttrsList = metadata.columnAttrs || [];
+
+        if (Object.values(columns).includes(columnName)) {
+            console.error("Column already exists:", columnName);
+            return res.status(400).json({ error: "Column already exists" });
+        }
+
+        console.log("Processing column addition...");
+        let newColumns = {};
+        let newColumnAttrs = [];
+        let foundReference = false;
+        let counter = 1;
+
+        // Find the reference column's attributes
+        let referenceColumnAttr = columnAttrsList.find(attr => attr.field === referenceColumn);
+        
+        // Construct new column attributes based on reference attributes
+        let newColumnAttr = referenceColumnAttr
+            ? {
+                field: columnName,
+                title: columnName,
+                width: referenceColumnAttr.width || 150,
+                editor: referenceColumnAttr.editor || "textarea",
+                editorParams: { ...referenceColumnAttr.editorParams },
+                formatter: referenceColumnAttr.formatter || "textarea",
+                headerFilterType: referenceColumnAttr.headerFilterType || "input",
+                hozAlign: referenceColumnAttr.hozAlign || "center",
+                vertAlign: referenceColumnAttr.vertAlign || "middle",
+                headerTooltip: referenceColumnAttr.headerTooltip !== undefined ? referenceColumnAttr.headerTooltip : true
+              }
+            : { 
+                field: columnName, title: columnName, width: 150, editor: "textarea",
+                editorParams: {}, formatter: "textarea", headerFilterType: "input",
+                hozAlign: "center", vertAlign: "middle", headerTooltip: true
+              };
+
+        // Rebuilding columns while placing the new column properly
+        Object.entries(columns).forEach(([index, colName]) => {
+            if (colName === referenceColumn) {
+                foundReference = true;
+                if (position === "left") {
+                    newColumns[counter] = columnName;
+                    newColumnAttrs.push(newColumnAttr);
+                    counter++;
+                }
+                newColumns[counter] = colName;
+                newColumnAttrs.push(columnAttrsList.find(attr => attr.field === colName) || {});
+                counter++;
+                if (position === "right") {
+                    newColumns[counter] = columnName;
+                    newColumnAttrs.push(newColumnAttr);
+                    counter++;
+                }
+            } else {
+                newColumns[counter] = colName;
+                newColumnAttrs.push(columnAttrsList.find(attr => attr.field === colName) || {});
+                counter++;
+            }
+        });
+
+        // If reference column was not found, add the new column at the end
+        if (!foundReference) {
+            console.warn(`Reference column '${referenceColumn}' not found. Adding '${columnName}' at the end.`);
+            newColumns[counter] = columnName;
+            newColumnAttrs.push(newColumnAttr);
+        }
+
+        console.log("Updating metadata...");
+        metadata.columns = newColumns;
+        metadata.columnAttrs = newColumnAttrs;
+
+        const updateResult = await dbAbstraction.update(dsName, "metaData", { _id: "view_default" }, metadata);
+        if (!updateResult || updateResult.modifiedCount === 0) {
+            console.error("Failed to update metadata.");
+            return res.status(500).json({ error: "Failed to update metadata" });
+        }
+
+        // Update filters
+        console.log("Updating filters...");
+        let filters = await dbAbstraction.find(dsName, "metaData", { _id: "filters" }, {});
+        filters = filters[0] || {};
+        let filterKeys = Object.keys(filters);
+        
+        for (let filterKey of filterKeys) {
+            if (filterKey === "_id") continue;
+            let filterObj = filters[filterKey];
+            filterObj.filterColumnAttrs = filterObj.filterColumnAttrs || {};
+            filterObj.filterColumnAttrs[columnName] = { hidden: true, width: newColumnAttr.width };
+        }
+
+        if (filterKeys.length)
+            await dbAbstraction.updateOne(dsName, "metaData", { _id: "filters" }, filters, false);
+
+        console.log("Column added successfully:", columnName);
+        return res.status(200).json({ message: "Column added successfully", columnName });
+    } catch (error) {
+        console.error("ERROR in addColumn API:", error);
+        return res.status(500).json({ error: "Internal Server Error", details: error.toString() });
+    }
+});
+
+// deletion of column api
+router.post('/view/deleteColumn', async (req, res) => {
+    let request = req.body;
+    console.log("In deleteColumn: ", request);
+    
+    const token = req.cookies.jwt;
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
+    if (!allowed) {
+        return res.status(403).json({ "Error": "access_denied" });
+    }
+
+    let dbAbstraction = new DbAbstraction();
+    try {
+        let columnName = request.columnName;
+        let oprLog = [];
+
+        // Check if the column is a key column
+        let keys = await dbAbstraction.find(request.dsName, "metaData", { _id: `keys` }, {});
+        if (keys[0].keys.includes(columnName)) {
+            return res.status(400).json({ error: `Cannot delete key column: "${columnName}"` });
+        }
+        let delCols = { [columnName]: true }; // Using delColKeys approach
+
+        // Fetch existing columns
+        let viewDefault = await dbAbstraction.find(request.dsName, "metaData", { _id: `view_default` }, {});
+        let columns = viewDefault[0].columns;
+        let columnAttrs = viewDefault[0].columnAttrs;
+
+        // Remove column from metadata
+        let newColumns = {};
+        let newColumnAttrs = [];
+        let j = 1;
+        for (let i in columns) {
+            if (columns[i] in delCols) continue;
+            newColumns[j] = columns[i];
+            j++;
+        }
+
+        for (let attr of columnAttrs) {
+            if (attr.field in delCols) continue;
+            newColumnAttrs.push(attr);
+        }
+
+        oprLog.push(`Deleted column: "${columnName}"`);
+
+        // Update metadata
+        await dbAbstraction.update(request.dsName, "metaData", { _id: `view_default` }, { columns: newColumns, columnAttrs: newColumnAttrs, userColumnAttrs: viewDefault[0].userColumnAttrs });
+
+        // Remove column from filters
+        let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {});
+        filters = filters[0] || {};
+        let filterKeys = Object.keys(filters);
+
+        for (let filterKey of filterKeys) {
+            if (filterKey === "_id") continue;
+            let filterObj = filters[filterKey];
+            delete filterObj.filterColumnAttrs[columnName];
+
+            filterObj.hdrFilters = filterObj.hdrFilters.filter(f => f.field !== columnName);
+            filterObj.hdrSorters = filterObj.hdrSorters.filter(s => s.column !== columnName);
+        }
+
+        if (filterKeys.length) {
+            await dbAbstraction.updateOne(request.dsName, "metaData", { _id: 'filters' }, filters, false);
+        }
+
+        // Remove column from Jira config
+        let jiraConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraConfig` }, {});
+        jiraConfig = jiraConfig[0];
+        if (jiraConfig) {
+            for (let jiraKey in jiraConfig.jiraFieldMapping) {
+                if (jiraConfig.jiraFieldMapping[jiraKey] === columnName) {
+                    oprLog.push(`Dropped "${columnName}" from jira-mapping for jira-key: "${jiraKey}"`);
+                    delete jiraConfig.jiraFieldMapping[jiraKey];
+                }
+            }
+
+            await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, jiraConfig);
+        }
+
+        // Remove column from Jira Agile config
+        let jiraAgileConfig = await dbAbstraction.find(request.dsName, "metaData", { _id: `jiraAgileConfig` }, {});
+        jiraAgileConfig = jiraAgileConfig[0];
+        if (jiraAgileConfig) {
+            for (let jiraKey in jiraAgileConfig.jiraFieldMapping) {
+                if (jiraAgileConfig.jiraFieldMapping[jiraKey] === columnName) {
+                    oprLog.push(`Dropped "${columnName}" from jira-agile-mapping for jira-key: "${jiraKey}"`);
+                    delete jiraAgileConfig.jiraFieldMapping[jiraKey];
+                }
+            }
+
+            await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraAgileConfig" }, jiraAgileConfig);
+        }
+
+        // Remove column from all data documents
+        await dbAbstraction.removeFieldFromAll(request.dsName, "data", columnName);
+
+        res.status(200).json({ message: `Column "${columnName}" deleted successfully`, oprLog });
+    } catch (e) {
+        console.log("Error in deleteColumn:", e);
+        res.status(500).send(e);
+    } finally {
+        await dbAbstraction.destroy();
+    }
+});
 router.post('/view/deleteOneDoc', async (req, res, next) => {
     let request = req.body;
     console.log("In deleteOneDoc: ", request);
