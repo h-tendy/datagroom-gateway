@@ -700,7 +700,6 @@ router.post('/view/addColumn', async (req, res, next) => {
         let newColumns = {};
         let newColumnAttrs = [];
         let foundReference = false;
-        let counter = 1;
 
         // Find the reference column's attributes
         let referenceColumnAttr = columnAttrsList.find(attr => attr.field === referenceColumn);
@@ -725,34 +724,36 @@ router.post('/view/addColumn', async (req, res, next) => {
                 hozAlign: "center", vertAlign: "middle", headerTooltip: true
               };
 
-        // Rebuilding columns while placing the new column properly
-        Object.entries(columns).forEach(([index, colName]) => {
+        let newColumnsKey = 1;
+        let oldColumnsLen = Object.keys(columns).length;
+        for (let i = 1; i <= oldColumnsLen; i++ ) {
+            let colName = columns[i]; 
             if (colName === referenceColumn) {
                 foundReference = true;
                 if (position === "left") {
-                    newColumns[counter] = columnName;
+                    newColumns[newColumnsKey] = columnName;
                     newColumnAttrs.push(newColumnAttr);
-                    counter++;
+                    newColumnsKey++;
                 }
-                newColumns[counter] = colName;
+                newColumns[`${newColumnsKey}`] = colName;
                 newColumnAttrs.push(columnAttrsList.find(attr => attr.field === colName) || {});
-                counter++;
+                newColumnsKey++;
                 if (position === "right") {
-                    newColumns[counter] = columnName;
+                    newColumns[newColumnsKey] = columnName;
                     newColumnAttrs.push(newColumnAttr);
-                    counter++;
+                    newColumnsKey++;
                 }
             } else {
-                newColumns[counter] = colName;
+                newColumns[newColumnsKey] = colName;
                 newColumnAttrs.push(columnAttrsList.find(attr => attr.field === colName) || {});
-                counter++;
+                newColumnsKey++;
             }
-        });
+        }
 
         // If reference column was not found, add the new column at the end
         if (!foundReference) {
             console.warn(`Reference column '${referenceColumn}' not found. Adding '${columnName}' at the end.`);
-            newColumns[counter] = columnName;
+            newColumns[newColumnsKey] = columnName;
             newColumnAttrs.push(newColumnAttr);
         }
 
