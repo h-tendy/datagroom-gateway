@@ -725,9 +725,9 @@ router.post('/view/addColumn', async (req, res, next) => {
               };
 
         let newColumnsKey = 1;
-        let oldColumnsLen = Object.keys(columns).length;
-        for (let i = 1; i <= oldColumnsLen; i++ ) {
-            let colName = columns[i]; 
+        let oldColumnsAttrsLen = Object.keys(columnAttrsList).length;
+        for (let i = 0; i < oldColumnsAttrsLen; i++ ) {
+            let colName = columnAttrsList[i].field;
             if (colName === referenceColumn) {
                 foundReference = true;
                 if (position === "left") {
