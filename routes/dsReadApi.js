@@ -216,7 +216,7 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
     let response = {};
     try {
         // @ts-ignore
-        response = await dbAbstraction.pagedFind(req.params.dsName, "data", filters, options, parseInt(1), parseInt(25) );
+        response.total = await dbAbstraction.countDocuments(req.params.dsName, "data", filters, options);
     } catch (e) {
         console.log("Exception in pager: ", e);
     }
