@@ -391,6 +391,7 @@ async function writeToDb(request, keyBeingEdited) {
             }
         }
     }
+    await dbAbstraction.destroy();
     return response
 }
 

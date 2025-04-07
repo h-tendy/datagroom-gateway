@@ -10,6 +10,7 @@ async function checkAccessForSpecificRow(dsName, dsView, dsUser, _id) {
     [qFilters] = await enforcePerRowAcessCtrl(dsName, dsView, dsUser, qFilters);
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(qFilters, null, null);
     let recs = await dbAbstraction.find(dsName, "data", filters, {});
+    await dbAbstraction.destroy();
     return recs;
 }
 
