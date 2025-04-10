@@ -5,52 +5,70 @@ const SUPPORTED_EVENT_TYPES = ["ADD", "MODIFY", "DELETE"];
  * @param {string} eventType
  * @param {string} url
  * @param {string} dataset
+ * @returns {[Boolean, Error | null]} 
+ * Returns array containing :-
+ * - True if everything is valid, false if anyone is invalid.
+ * - Error accompanies the reason why it is invalid.
  */
 function isValidSubscriptionMessage(eventType, url, dataset) {
-    try {
-        return isValidEventTypeInRequest(eventType) && isUrlPresentInRequest(url) 
-            && isDataSetPresentInRequest(dataset);
-    } catch (err) {
-        console.log(`${Date()}: Caught error in isValidSubscriptionMessage for eventType: ${eventType}, url: ${url}, dataset:${dataset}`);
-        throw err;
+    let [isValidEventType, eventTypeError] = isValidEventTypeInRequest(eventType);
+    if (eventTypeError) {
+        return [false, eventTypeError];
     }
+    let [isValidUrl, urlError] = isUrlPresentInRequest(url);
+    if (urlError) {
+        return [false, urlError];
+    }
+    let [isValidDataset, datasetError] = isDataSetPresentInRequest(dataset);
+    if (datasetError) {
+        return [false, datasetError];
+    }
+    return [true, null];
 }
 
 /**
  * @description Checks if the evenType is one of the supported event types
  * @param {String} eventType 
- * @returns {true} when eventType is one of SUPPORTED_EVENT_TYPES
- * @returns {false} when eventType is not in the SUPPORTED_EVENT_TYPES
+ * @returns {[Boolean, Error | null]} 
+ * An array containing:-
+ * - true if the eventType is valid, false if eventType is invalid
+ * - Error is also sent when the eventType is invalid.
  */
 function isValidEventTypeInRequest(eventType) {
     if (!eventType || typeof eventType !== "string" || eventType.trim() === '' || !SUPPORTED_EVENT_TYPES.includes(eventType)) {
-        throw new Error(`eventType is not proper. eventType should be one of: ${SUPPORTED_EVENT_TYPES.join(" | ")}`);
+        return [false, new Error(`eventType is not proper. eventType should be one of: ${SUPPORTED_EVENT_TYPES.join(" | ")}`)]
     }
-    return true;
+    return [true, null];
 }
 
 /**
  * @description Checks the url is present or not
  * @param {String} url 
- * @returns {boolean}
+ * @returns {[Boolean, Error | null]} 
+ * An array containing:-
+ * - true if the url is valid, false if url is invalid
+ * - Error is also sent when the url is invalid.
  */
 function isUrlPresentInRequest(url) {
     if (!url || typeof url !== "string" || url.trim() === '') {
-        throw new Error(`url is not proper. url should be non-empty string`);
+        return [false, new Error(`url is not proper. url should be non-empty string`)];
     }
-    return true;
+    return [true, null];
 }
 
 /**
  * @description Checks the dataset is present or not
  * @param {String} dataset 
- * @returns {boolean}
+ * @returns {[Boolean, Error | null]} 
+ * An array containing:-
+ * - true if the dataset name is valid, false if dataset name is invalid
+ * - Error is also sent when the dataset name is invalid.
  */
 function isDataSetPresentInRequest(dataset) {
     if (!dataset || typeof dataset !== "string" || dataset.trim() === '') {
-        throw new Error(`dataset name is not proper. dataset should be a non-empty string`);
+        return [false, new Error(`dataset name is not proper. dataset should be a non-empty string`)];
     }
-    return true;
+    return [true, null];
 }
 
 /**
@@ -65,8 +83,9 @@ function isDataSetPresentInRequest(dataset) {
  * @param {string} username The username of the caller
  * @param {string} url The webhook consumer url
  * @param {boolean} subscribe A falg indicating whether to subscribe (true) or unsubscribe (false)
- * @returns {Object.<string, Subscriber[]>} The updated events object
- * @throws {Error} If unsubscribing from a non-existent event type
+ * @returns {[Object.<string, Subscriber[]> | null, Error | null]}
+ * - Return updated object
+ * - Return error in case when unsubscribing not subscribed thing or subscribing again with same user and url
  */
 function getUpdatedEvents(events, eventType, username, url, subscribe) {
     // Create a deep copy of the events to avoid unintended mutation
@@ -84,7 +103,7 @@ function getUpdatedEvents(events, eventType, username, url, subscribe) {
             );
 
             if (isSubscriberPresent) {
-                throw new Error(`${username} is already subscribed to event ${eventType} with hook ${url}`);
+                return [null, new Error(`${username} is already subscribed to event ${eventType} with hook ${url}`)];
             } else {
                 updatedEvents[eventType].push({username, url});
             }
@@ -92,8 +111,8 @@ function getUpdatedEvents(events, eventType, username, url, subscribe) {
     } else {
         // Unsubscription logic
         if (!updatedEvents[eventType]) {
-            //If the eventType is not in events, throw error
-            throw new Error(`No subscriber present for event type: ${eventType}.`);
+            //If the eventType is not in events, return error
+            return [null, new Error(`No subscriber present for event type: ${eventType}.`)];
         } else {
             const initialHooksCount = updatedEvents[eventType].length;
             updatedEvents[eventType] = updatedEvents[eventType].filter(
@@ -101,8 +120,8 @@ function getUpdatedEvents(events, eventType, username, url, subscribe) {
             );
 
             if (updatedEvents[eventType].length === initialHooksCount) {
-                //If no subscriber was removed, throw an error
-                throw new Error(`${username} is not subscribed with url ${url} to ${eventType} event type yet. Can't unsubscribe.`);
+                //If no subscriber was removed, return an error
+                return [null, new Error(`${username} is not subscribed with url ${url} to ${eventType} event type yet. Can't unsubscribe.`)];
             }
             
             if (updatedEvents[eventType].length === 0) {
@@ -111,7 +130,7 @@ function getUpdatedEvents(events, eventType, username, url, subscribe) {
         }
     }
 
-    return updatedEvents;
+    return [updatedEvents, null];
 }
 
 module.exports ={

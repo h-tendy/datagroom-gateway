@@ -23,6 +23,7 @@ const METADATA_COLLECTION_NAME = "metaData";
  * 500 - Error message for any unexpected server errors
  */
 router.post('/subscribe', async(req, res, next) => {
+    let dbAbstraction = new DbAbstraction();
     try {
         let request = req.body;
         const token = req.cookies.jwt;
@@ -31,9 +32,10 @@ router.post('/subscribe', async(req, res, next) => {
         }
 
         // Validate the incoming request body
-        if (!webhookUtils.isValidSubscriptionMessage(request.eventType, request.url, request.dataset)) {
+        let [isValidRequest, requestError] = webhookUtils.isValidSubscriptionMessage(request.eventType, request.url, request.dataset);
+        if (requestError) {
             return res.status(400).json({
-                errorMsg: "Request body is not proper.",
+                errorMsg: requestError.message,
                 sampleRequestBody: {
                     eventType: webhookUtils.SUPPORTED_EVENT_TYPES.join(" | "),
                     url: "<your consumer webhook url>",
@@ -41,6 +43,7 @@ router.post('/subscribe', async(req, res, next) => {
                 }
             })
         }
+
         let dsName = request.dataset;
         let url = request.url;
         let eventType = request.eventType;
@@ -57,7 +60,6 @@ router.post('/subscribe', async(req, res, next) => {
         }
 
         // Check if the given dataset exists.
-        let dbAbstraction = new DbAbstraction();
         let dbExists = await dbAbstraction.checkIfDbExists(dsName);
         if (!dbExists) {
             return res.status(400).json({
@@ -95,7 +97,12 @@ router.post('/subscribe', async(req, res, next) => {
             events = webhooks[0].events;
         }
 
-        let updatedEvents = webhookUtils.getUpdatedEvents(events, eventType, dsUser, url, true);
+        let [updatedEvents, updatedEventsError] = webhookUtils.getUpdatedEvents(events, eventType, dsUser, url, true);
+        if (updatedEventsError) {
+            return res.status(400).json({
+                error: updatedEventsError.message
+            })
+        }
         console.log(`${Date()} Updated events for dataset: ${dsName} is : ${JSON.stringify(updatedEvents)}`);
 
         // Persist the updated webhooksDetails in Db
@@ -111,29 +118,25 @@ router.post('/subscribe', async(req, res, next) => {
         }
         console.log(`${Date()} Db response for updated events: ${dbResponse}`);
 
-        //Cleanup the connection
-        await dbAbstraction.destroy();
-
         //Send success response
         return res.status(200).json({
             message: `Successfully subscribed to webhook at : ${url} for event: ${eventType} on dataset: ${dsName}`
         })
     } catch(err) {
         console.log(`${Date()} caught error while subscribing the webhook. Err: ${err.stack}`);
-        return res.status(400).json({ 
+        return res.status(500).json({ 
             error: "An unexpected error during subscription", 
-            errorMsg: err.message,
-            sampleRequestBody: {
-                eventType: webhookUtils.SUPPORTED_EVENT_TYPES.join(" | "),
-                url: "<your consumer webhook url>",
-                dataset: "dataset name that you want the subscription for"
-            }
+            errorMsg: err.message
         });
+    } finally {
+        //Cleanup the db connection
+        await dbAbstraction.destroy();
     }
 });
 
 // Route to unsubscribe
 router.post('/unsubscribe', async(req, res, next) => {
+    let dbAbstraction = new DbAbstraction();
     try {
         let request = req.body;
         const token = req.cookies.jwt;
@@ -142,16 +145,18 @@ router.post('/unsubscribe', async(req, res, next) => {
         }
 
         // Validate the incoming request body
-        if (!webhookUtils.isValidSubscriptionMessage(request.eventType, request.url, request.dataset)) {
+        let [isValidRequest, requestError] = webhookUtils.isValidSubscriptionMessage(request.eventType, request.url, request.dataset);
+        if (requestError) {
             return res.status(400).json({
-                errorMsg: "Request body is not proper.",
+                errorMsg: requestError.message,
                 sampleRequestBody: {
                     eventType: webhookUtils.SUPPORTED_EVENT_TYPES.join(" | "),
                     url: "<your consumer webhook url>",
-                    dataset: "dataset name that you want the subscription for"
+                    dataset: "dataset name that you want to unsubscribe from"
                 }
             })
         }
+
         let dsName = request.dataset;
         let url = request.url;
         let eventType = request.eventType;
@@ -168,12 +173,10 @@ router.post('/unsubscribe', async(req, res, next) => {
         }
 
         // Check if the given dataset exists.
-        let dbAbstraction = new DbAbstraction();
         let dbExists = await dbAbstraction.checkIfDbExists(dsName);
         if (!dbExists) {
             return res.status(400).json({
-                error: "Error occured during unsubscribing",
-                errorMsg: `Dataset ${dsName} doesn't exist in the db. Can't unsubscribe to the events of non-existing dataset.`
+                error: `Dataset ${dsName} doesn't exist in the db. Can't unsubscribe to the events of non-existing dataset.`
             });
         }
 
@@ -191,15 +194,19 @@ router.post('/unsubscribe', async(req, res, next) => {
         let events = {};
         if (!webhooks.length) {
             return res.status(400).json({
-                error: "Error occured during unsubscribing",
-                errorMsg: `Dataset ${dsName} doesn't have any webhooks enabled right now.`
+                error: `Dataset ${dsName} doesn't have any webhooks enabled right now.`
             })
         } else {
             //Get the webhooksDetails with subscription
             events = webhooks[0].events;
         }
 
-        let updatedEvents = webhookUtils.getUpdatedEvents(events, eventType, dsUser, url, false);
+        let [updatedEvents, updatedEventsError] = webhookUtils.getUpdatedEvents(events, eventType, dsUser, url, false);
+        if (updatedEventsError) {
+            return res.status(400).json({
+                error: updatedEventsError.message
+            })
+        }
         console.log(`${Date()} Updated events for dataset: ${dsName} is : ${JSON.stringify(updatedEvents)}`);
 
         // Persist the updated webhooksDetails in Db
@@ -215,24 +222,19 @@ router.post('/unsubscribe', async(req, res, next) => {
         }
         console.log(`${Date()} Db response for updated events: ${dbResponse}`);
 
-        //Cleanup the connection
-        await dbAbstraction.destroy();
-
         //Send success response
         return res.status(200).json({
             message: `Successfully unsubscribed to webhook at : ${url} for event: ${eventType} on dataset: ${dsName}`
         })
     } catch(err) {
         console.log(`${Date()} caught error while unsubscribing the webhook. Err: ${err.stack}`);
-        return res.status(400).json({ 
+        return res.status(500).json({ 
             error: "An unexpected error during unsubscribing", 
-            errorMsg: err.message,
-            sampleRequestBody: {
-                eventType: webhookUtils.SUPPORTED_EVENT_TYPES.join(" | "),
-                url: "<your consumer webhook url>",
-                dataset: "dataset name that you want the subscription for"
-            }
+            errorMsg: err.message
         });
+    } finally {
+        //Cleanup the db connection
+        await dbAbstraction.destroy();
     }
 });
 
