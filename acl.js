@@ -20,6 +20,7 @@ async function aclCheck(dsName, dsView, dsUser, token = null) {
             try {
                 const decode = jwt.verify(token, Utils.jwtSecret)
                 dsUser = decode.user;
+                console.log("User is: ", dsUser);
                 if (aclConfig.acl.includes(dsUser)) {
                     await dbAbstraction.destroy();
                     return true
