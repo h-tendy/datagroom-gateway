@@ -1,7 +1,10 @@
 // @ts-check
+const { aclCheck } = require('../acl');
 const DbAbstraction = require('../dbAbstraction');
 const webhookUtils = require('./webhookUtils');
 const router = require('express').Router();
+const jwt = require('jsonwebtoken');
+const Utils = require('../utils');
 
 const WEBHOOK_ID_IN_DB = "webhooks";
 const METADATA_COLLECTION_NAME = "metaData";
@@ -14,14 +17,16 @@ const METADATA_COLLECTION_NAME = "metaData";
  *      url: <your consumer webhook url>
  *      dataset: <dataset to subscribe to>
  * }
- * @returns {200} - Success message if the subscription is succesfull
- * @returns {400} - Error message if the request body is not proper.
- * @returns {500} - Error message for any unexpected server errors
+ * @returns {200 | 400 | 500}
+ * 200 - Success message if the subscription is succesfull
+ * 400 - Error message if the request body is not proper.
+ * 500 - Error message for any unexpected server errors
  */
 router.post('/subscribe', async(req, res, next) => {
     try {
         let request = req.body;
-        if (!request) {
+        const token = req.cookies.jwt;
+        if (!request || !token) {
             return res.status(400).json({error: "invalid request"});
         }
 
@@ -40,6 +45,17 @@ router.post('/subscribe', async(req, res, next) => {
         let url = request.url;
         let eventType = request.eventType;
 
+        // Get user from token and validate
+        const decode = jwt.verify(token, Utils.jwtSecret);
+        // @ts-ignore
+        let dsUser = decode.user;
+
+        if (!dsUser || typeof dsUser !== "string" || dsUser.trim() === '') {
+            return res.status(403).json({
+                error: `Couldn't determine the user making the request. Access denied.`
+            })
+        }
+
         // Check if the given dataset exists.
         let dbAbstraction = new DbAbstraction();
         let dbExists = await dbAbstraction.checkIfDbExists(dsName);
@@ -50,14 +66,22 @@ router.post('/subscribe', async(req, res, next) => {
             });
         }
 
+        //Check if the user has permission to view the dataset.
+        let userAccessAllowed = await aclCheck(dsName, "default", dsUser, token);
+        if (!userAccessAllowed) {
+            return res.status(403).json({
+                error: `${dsUser} doesn't have access to ${dsName}. Access denied. `
+            })
+        }
+
         // Find the existing webhooks. If there isn't any, make an empty one before proceeding ahead.
         let webhooks = await dbAbstraction.find(dsName, METADATA_COLLECTION_NAME, { _id: WEBHOOK_ID_IN_DB }, {} );
         console.log(`${Date()} Existing Webhooks for dataset: ${dsName} is : ${JSON.stringify(webhooks)}`);
-        let webhooksDetails = [];
+        let events = {};
         if (!webhooks.length) {
             console.log(`${Date()} No existing webhooks enabled for dataset: ${dsName}. Going to create one..`);
             let dbResponse = await dbAbstraction.update(dsName, METADATA_COLLECTION_NAME, { _id: WEBHOOK_ID_IN_DB }, {
-                "webhooksDetails": []
+                "events": {}
             });
             if (dbResponse.modifiedCount == 0 && dbResponse.upsertedCount == 0) { //Nothing got updated
                 console.log(`${Date()}: Couldn't make the intial webhooksDetails in the db`);
@@ -68,24 +92,24 @@ router.post('/subscribe', async(req, res, next) => {
             }
         } else {
             //Get the webhooksDetails with subscription
-            webhooksDetails = webhooks[0].webhooksDetails;
+            events = webhooks[0].events;
         }
 
-        let updatedWebhooksDetails = webhookUtils.getUpdatedWebhooksDetails(webhooksDetails, eventType, url, true);
-        console.log(`${Date()} Updated WebhooksDetails for dataset: ${dsName} is : ${JSON.stringify(updatedWebhooksDetails)}`);
+        let updatedEvents = webhookUtils.getUpdatedEvents(events, eventType, dsUser, url, true);
+        console.log(`${Date()} Updated events for dataset: ${dsName} is : ${JSON.stringify(updatedEvents)}`);
 
         // Persist the updated webhooksDetails in Db
         let dbResponse = await dbAbstraction.update(dsName, METADATA_COLLECTION_NAME, {_id: WEBHOOK_ID_IN_DB}, {
-            "webhooksDetails": updatedWebhooksDetails
+            "events": updatedEvents
         })
         if (dbResponse.modifiedCount == 0 && dbResponse.upsertedCount == 0) { // Nothing got updated
-            console.log(`${Date()}: Couldn't modify the updatedWebhooksDetails in the db`);
+            console.log(`${Date()}: Couldn't modify the updated events in the db`);
             return res.status(500).json({
                 error: "Error occured during subscription",
                 errorMsg: "Unable to update the subscription info in DB."
             })
         }
-        console.log(`${Date()} Db response for updated webhooks details: ${dbResponse}`);
+        console.log(`${Date()} Db response for updated events: ${dbResponse}`);
 
         //Cleanup the connection
         await dbAbstraction.destroy();
@@ -112,7 +136,8 @@ router.post('/subscribe', async(req, res, next) => {
 router.post('/unsubscribe', async(req, res, next) => {
     try {
         let request = req.body;
-        if (!request) {
+        const token = req.cookies.jwt;
+        if (!request || !token) {
             return res.status(400).json({error: "invalid request"});
         }
 
@@ -130,6 +155,17 @@ router.post('/unsubscribe', async(req, res, next) => {
         let dsName = request.dataset;
         let url = request.url;
         let eventType = request.eventType;
+        
+        // Get user from token and validate
+        const decode = jwt.verify(token, Utils.jwtSecret);
+        // @ts-ignore
+        let dsUser = decode.user;
+
+        if (!dsUser || typeof dsUser !== "string" || dsUser.trim() === '') {
+            return res.status(403).json({
+                error: `Couldn't determine the user making the request. Access denied.`
+            })
+        }
 
         // Check if the given dataset exists.
         let dbAbstraction = new DbAbstraction();
@@ -141,10 +177,18 @@ router.post('/unsubscribe', async(req, res, next) => {
             });
         }
 
+        //Check if the user has permission to view the dataset.
+        let userAccessAllowed = await aclCheck(dsName, "default", dsUser, token);
+        if (!userAccessAllowed) {
+            return res.status(403).json({
+                error: `${dsUser} doesn't have access to ${dsName}. Access denied.`
+            })
+        }
+
         // Find the existing webhooks. If there isn't any, make an empty one before proceeding ahead.
         let webhooks = await dbAbstraction.find(dsName, METADATA_COLLECTION_NAME, { _id: WEBHOOK_ID_IN_DB }, {} );
         console.log(`${Date()} Existing Webhooks for dataset: ${dsName} is : ${JSON.stringify(webhooks)}`);
-        let webhooksDetails = [];
+        let events = {};
         if (!webhooks.length) {
             return res.status(400).json({
                 error: "Error occured during unsubscribing",
@@ -152,24 +196,24 @@ router.post('/unsubscribe', async(req, res, next) => {
             })
         } else {
             //Get the webhooksDetails with subscription
-            webhooksDetails = webhooks[0].webhooksDetails;
+            events = webhooks[0].events;
         }
 
-        let updatedWebhooksDetails = webhookUtils.getUpdatedWebhooksDetails(webhooksDetails, eventType, url, false);
-        console.log(`${Date()} Updated WebhooksDetails for dataset: ${dsName} is : ${JSON.stringify(updatedWebhooksDetails)}`);
+        let updatedEvents = webhookUtils.getUpdatedEvents(events, eventType, dsUser, url, false);
+        console.log(`${Date()} Updated events for dataset: ${dsName} is : ${JSON.stringify(updatedEvents)}`);
 
         // Persist the updated webhooksDetails in Db
         let dbResponse = await dbAbstraction.update(dsName, METADATA_COLLECTION_NAME, {_id: WEBHOOK_ID_IN_DB}, {
-            "webhooksDetails": updatedWebhooksDetails
+            "events": updatedEvents
         })
         if (dbResponse.modifiedCount == 0 && dbResponse.upsertedCount == 0) { // Nothing got updated
-            console.log(`${Date()}: Couldn't modify the updatedWebhooksDetails in the db`);
+            console.log(`${Date()}: Couldn't modify the updated events in the db`);
             return res.status(500).json({
                 error: "Error occured during unsubscribing",
-                errorMsg: "Unable to update the webhooksDetails info in DB."
+                errorMsg: "Unable to update the webhook details info in DB."
             })
         }
-        console.log(`${Date()} Db response for updated webhooks details: ${dbResponse}`);
+        console.log(`${Date()} Db response for updated events: ${dbResponse}`);
 
         //Cleanup the connection
         await dbAbstraction.destroy();

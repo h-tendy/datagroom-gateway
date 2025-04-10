@@ -1,8 +1,15 @@
+// @ts-check
 const SUPPORTED_EVENT_TYPES = ["ADD", "MODIFY", "DELETE"];
 
+/**
+ * @param {string} eventType
+ * @param {string} url
+ * @param {string} dataset
+ */
 function isValidSubscriptionMessage(eventType, url, dataset) {
     try {
-        return isValidEventTypeInRequest(eventType) && isUrlPresentInRequest(url) && isDataSetPresentInRequest(dataset)
+        return isValidEventTypeInRequest(eventType) && isUrlPresentInRequest(url) 
+            && isDataSetPresentInRequest(dataset);
     } catch (err) {
         console.log(`${Date()}: Caught error in isValidSubscriptionMessage for eventType: ${eventType}, url: ${url}, dataset:${dataset}`);
         throw err;
@@ -47,66 +54,68 @@ function isDataSetPresentInRequest(dataset) {
 }
 
 /**
- * Based on subscribe or unsubscribe, this function updates or removes the url from the webhooksDetails
- * and returns the updated webhooksDetails
- * @param {Array<{eventType: String, urls: Array<String>}>} webhooksDetails 
- * @param {String} eventType 
- * @param {String} url 
- * @param {boolean} subscribe 
- * @returns {Object}
+ * @typedef {object} Subscriber
+ * @property {string} username
+ * @property {string} url
  */
-function getUpdatedWebhooksDetails(webhooksDetails, eventType, url, subscribe) {
-    if (!Array.isArray(webhooksDetails)) {
-        console.log(`${Date()}: webhooksDetails must be an array`);
-        throw new Error("webhooksDetails must be an array.");
-    }
+/**
+ * 
+ * @param {Object.<String, Subscriber[]>} events The persisted object containing all the events details
+ * @param {string} eventType The event type to subscribe to or unsubscribe from
+ * @param {string} username The username of the caller
+ * @param {string} url The webhook consumer url
+ * @param {boolean} subscribe A falg indicating whether to subscribe (true) or unsubscribe (false)
+ * @returns {Object.<string, Subscriber[]>} The updated events object
+ * @throws {Error} If unsubscribing from a non-existent event type
+ */
+function getUpdatedEvents(events, eventType, username, url, subscribe) {
+    // Create a deep copy of the events to avoid unintended mutation
+    let updatedEvents = JSON.parse(JSON.stringify(events));
 
-    let updatedWebhooksDetails = {};
-    let eventTypeFound = false;
-    updatedWebhooksDetails = webhooksDetails.map(item => {
-        if (item.eventType === eventType) {
-            eventTypeFound = true;
-            let copyOfUrls = [...item.urls];
+    if (subscribe) {
+        //Subscription logic
+        if (!updatedEvents[eventType]) {
+            // If the event type doesn't exist, create a new entry
+            updatedEvents[eventType] = [{username, url}];
+        } else {
+            //If the event type exists, add the subscriber if not already present
+            const isSubscriberPresent = updatedEvents[eventType].some(
+                (sub) => sub.username === username && sub.url === url
+            );
 
-            if (subscribe) {
-                // Subscribe: Add URL if not already preset
-                if (!copyOfUrls.includes(url)) {
-                    copyOfUrls.push(url);
-                } else {
-                    throw new Error(`Provided url: ${url} already is subscribed for the eventType :${eventType}`);
-                }
+            if (isSubscriberPresent) {
+                throw new Error(`${username} is already subscribed to event ${eventType} with hook ${url}`);
             } else {
-                // Unsubscribe: Remove URL if present
-                let urlIndex = copyOfUrls.indexOf(url);
-                if (urlIndex > -1) {
-                    copyOfUrls.splice(urlIndex, 1);
-                } else {
-                    throw new Error(`Provided url: ${url} is not subscribed for the eventType: ${eventType}`);
-                }
+                updatedEvents[eventType].push({username, url});
             }
-            return {...item, urls: copyOfUrls}; //Return updated object.
         }
-        return item;
-    });
-    
-    //If eventType not found then first time this eventType has come, we need to make a new entry
-    if (subscribe && !eventTypeFound) {
-        updatedWebhooksDetails.push({
-            eventType: eventType,
-            urls: [url]
-        })
+    } else {
+        // Unsubscription logic
+        if (!updatedEvents[eventType]) {
+            //If the eventType is not in events, throw error
+            throw new Error(`No subscriber present for event type: ${eventType}.`);
+        } else {
+            const initialHooksCount = updatedEvents[eventType].length;
+            updatedEvents[eventType] = updatedEvents[eventType].filter(
+                (sub) => !(sub.username === username && sub.url === url)
+            );
+
+            if (updatedEvents[eventType].length === initialHooksCount) {
+                //If no subscriber was removed, throw an error
+                throw new Error(`${username} is not subscribed with url ${url} to ${eventType} event type yet. Can't unsubscribe.`);
+            }
+            
+            if (updatedEvents[eventType].length === 0) {
+                delete updatedEvents[eventType];
+            }
+        }
     }
 
-    if (!subscribe && !eventTypeFound) {
-        console.log(`${Date()} Provided eventType: ${eventType} is not subscribed yet.`);
-        throw new Error("Can't unsubscribe for the event which is not subscribed yet.");
-    }
-
-    return updatedWebhooksDetails;
+    return updatedEvents;
 }
 
 module.exports ={
     isValidSubscriptionMessage,
     SUPPORTED_EVENT_TYPES,
-    getUpdatedWebhooksDetails
+    getUpdatedEvents
 }
