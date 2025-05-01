@@ -6,7 +6,7 @@ var ObjectId = require('mongodb').ObjectId;
 
 class DbAbstraction {
     constructor () {
-        this.url = process.env.DATABASE || 'mongodb://localhost:27017';
+        this.url = process.env.DATABASE || 'mongodb://127.0.0.1:27017';
         this.client = null;
     }
     async destroy () {
@@ -228,6 +228,9 @@ class DbAbstraction {
             //If there is no incoming query or fetchaAllMatchingRecords is true, get the whole document count
             total = await this.countDocuments (dbName, tableName, query, options);
             totalPages = Math.ceil(total / limit);
+            if (page < totalPages) {
+                moreMatchingDocs = true;
+            }
         }
         //console.log(total, totalPages);
         let results = { page, per_page: limit, total, total_pages: totalPages, data, moreMatchingDocs }
