@@ -1,4 +1,8 @@
 // @ts-check
+
+//@ts-ignore
+var ObjectId = require('mongodb').ObjectId; 
+
 function getFilters(str, field) {
     let terms = [], type = '', inBrackets = 0;
     let curTerm = '', mongoFilter = {};
@@ -111,7 +115,14 @@ function getMongoFiltersAndSorters (qFilters, qSorters, qChronology) {
         // we are now returning in the exception path. 
         if (!qFilters) qFilters = [];
         qFilters.map((v) => {
-            if (v.type === 'like') {
+            if (v.field === "_id") {
+                // Don't entertain any other type other than greater or less than.
+                if (v.type === "gt") {
+                    filters[v.field] = {$gt: new ObjectId(v.value)};
+                } else if (v.type === "lt") {
+                    filters[v.field] = {$lt: new ObjectId(v.value)};
+                }
+            } else if (v.type === 'like') {
                 let filter = getFilters(v.value, v.field);
                 if (filter["$or"]) {
                     orFilters.push(...filter["$or"]);

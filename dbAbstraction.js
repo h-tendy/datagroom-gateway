@@ -217,12 +217,23 @@ class DbAbstraction {
             let countLimit = limit + 1;
             let countOptions = {...options, limit: countLimit, skip};
             let nextMatchingCount = await this.countDocuments(dbName, tableName, query, countOptions);
+            // If there are documents more than the asked limit, it signifies there is a next page and more matching docs
             if (nextMatchingCount > limit) {
                 totalPages = page + 1;
                 moreMatchingDocs = true;
             } else {
-                totalPages = page;
+                // If there are no documents more than the limit. The asked page is the last page or there are no pages at all.
+                if (data.length) {
+                    // If the asked page has data then it is the last page
+                    totalPages = page;
+                } else {
+                    // If the asked page does not have data, then the previous page is total number of page.
+                    if (page - 1 >= 0) {
+                        totalPages = page - 1;
+                    }
+                }
             }
+            //TODO: This total count is misleading in someways.
             total = skip + nextMatchingCount;
         } else {
             //If there is no incoming query or fetchaAllMatchingRecords is true, get the whole document count
