@@ -115,7 +115,7 @@ function getMongoFiltersAndSorters (qFilters, qSorters, qChronology) {
         // we are now returning in the exception path. 
         if (!qFilters) qFilters = [];
         qFilters.map((v) => {
-            if (v.field === "_id") {
+            if (v.field === "_id" && (v.type === "gt" || v.type === "lt") && typeof v.value == "string") {
                 // Don't entertain any other type other than greater or less than.
                 if (v.type === "gt") {
                     filters[v.field] = {$gt: new ObjectId(v.value)};
