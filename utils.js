@@ -463,7 +463,7 @@ function sanitizeData(objData) {
       }
     }
   } catch (e) {
-    console.log("Failed to sanitize data", e);
+    logger.error(e, "Failed to sanitize data");
   }
 }
 
