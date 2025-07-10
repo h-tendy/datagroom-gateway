@@ -1,4 +1,8 @@
 // @ts-check
+
+const logger = require('./logger');
+
+// @ts-ignore
 const MongoClient = require('mongodb').MongoClient;
 
 class MongoDbClientWrapper {
@@ -8,7 +12,7 @@ class MongoDbClientWrapper {
     }
     async connect () {
         this.client = await MongoClient.connect(this.url, { useNewUrlParser: true, useUnifiedTopology: true })
-            .catch(err => { console.log(err); this.client = null; });
+            .catch(err => { logger.error(err, "Error while connecting to Mongodb"); this.client = null; });
     }
     async deleteDb (dbName) {
         if (! this.client ) await this.connect();
@@ -38,7 +42,7 @@ async function deleteAll(url) {
             continue;
         await dgVd.deleteDb(dbList[i].name);
     }
-    console.log(`Done delete all`);
+    logger.info(`Done delete all`);
 }
 
 async function doIt(fromUrl, toUrl) {
@@ -48,7 +52,6 @@ async function doIt(fromUrl, toUrl) {
     let toClient = await to.getClient();
 
     let dbList = await from.listDatabases();
-    //console.log("List: ", dbList);
     let sysDbs = ['admin', 'config', 'local'];
     let collections = ['data', 'metaData', 'editlog', 'attachments'];
     for (let i = 0; i < dbList.length; i++) {
@@ -62,22 +65,21 @@ async function doIt(fromUrl, toUrl) {
 
             const cursor = fromCol.find();
             for await (let doc of cursor) {
-                //console.log(`Found record: ${JSON.stringify(doc, null, 4)}`);
                 if (fn) {
                     // @ts-ignore
                     doc = fn(doc);
                 }
                 let ret = await toCol.insertOne(doc);
                 if (ret.result.ok !== 1) {
-                    console.log(`InsertOne failed: ${ret.result}`);
+                    logger.fatal(`InsertOne failed: ${ret.result}`);
                 }
             }
         }
-        console.log(`Done copying: ${dbList[i].name}`);
+        logger.info(`Done copying: ${dbList[i].name}`);
     }
 
     dbList = await to.listDatabases();
-    console.log("Done copy. Database List on destination: ", dbList);
+    logger.info(dbList, "Copy done to destination");
 }
 
 // First, make sure no dbs are there in the destination. Use the below
