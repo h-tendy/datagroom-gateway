@@ -17,6 +17,7 @@ let fs = require('fs');
 const dotenv = require('dotenv')
 const Jira = require('./jira')
 const AclCheck = require('./acl');
+const logger = require('./logger');
 
 dotenv.config({ path: './.env' })
 
@@ -61,14 +62,14 @@ try {
     httpServer = require('https').createServer(options, app);
     io = require('socket.io')(httpServer, { pingTimeout: 60000 });
     httpServer.listen(443);
-    console.log('https server listening on port : 443');
+    logger.info('https server listening on port : 443');
     isSecure = true;
 } catch (e) {
-    console.log("Trouble with cert reading: ", e);
+    logger.error(e, "Trouble with certificate reading");
     httpServer = require('http').createServer(app);
     io = require('socket.io')(httpServer, { pingTimeout: 60000 });
-    httpServer.listen(config.express.port);
-    console.log('http server listening on port : ', config.express.port);    
+    httpServer.listen(config.express.port);  
+    logger.info('http server listening on port : %d', config.express.port);    
 }
 httpServer.timeout = 60 * 60 * 1000;
 
@@ -145,7 +146,7 @@ const authenticate = async (req, res, next) => {
             req.user = decoded.user;
             next();
         } catch (err) {
-            console.log("Error in authenticate middleware: " + err.message)
+            logger.error(err, "Error in authenticate middleware")
             res.cookie('originalUrl', req.originalUrl, { httpOnly: true, path: '/', secure: isSecure, });
             res.redirect('/login');
             return;
@@ -174,7 +175,6 @@ const basicAuth = (req, res, next) => {
     if (!authHeader) {
         let request = req.body;
         let dsName = request.dsName;
-        // console.log(`AuthHeader not found in request while pushing to ${dsName}. Redirecting to the login page.`);
         res.cookie('originalUrl', req.originalUrl, { httpOnly: true, path: '/', secure: isSecure, });
         res.redirect('/login');
         return;
@@ -183,7 +183,7 @@ const basicAuth = (req, res, next) => {
     const [scheme, encodedCredentials] = authHeader.split(' ');
 
     if (scheme.toLowerCase() !== 'basic') {
-        console.log('Invalid authentication scheme: ' + scheme);
+        logger.warn('Invalid authentication scheme: %s', scheme);
         res.status(401).send('Invalid authentication scheme');
         return;
     }
@@ -257,7 +257,7 @@ function dgLock (lockReq, clientId) {
             if (JSON.stringify(clientLocks[clientId]) !== JSON.stringify(lockReq)) {
                 // previous lock
                 prevLockReq = clientLocks[clientId];
-                console.log("Previous lock doesn't match, releasing lock: ", prevLockReq);
+                logger.warn("Previous lock doesn't match, releasing lock: %o", prevLockReq);
                 delete clientLocks[clientId];
                 dgUnlock(prevLockReq, clientId);
             } else {
@@ -275,16 +275,15 @@ function dgUnlock(unlockReq, clientId) {
             if (! Object.keys(locks[unlockReq.dsName][unlockReq._id]).length) 
                 delete locks[unlockReq.dsName][unlockReq._id];
             delete clientLocks[clientId];
-            //console.log("Returning true in dgUnLock: 1");
             return {status: true}
         } 
-    } catch (e) { console.log("Exception in dgUnlock", unlockReq)}
+    } catch (e) { 
+        logger.error(unlockReq, "Exception in dgUnlock");
+    }
 
     if (unlockReq.newVal) { // XXX: Should it have more stringent checks here?
-        //console.log("Returning true in dgUnlock: 2");
         return {status: true}
     }
-    //console.log("Returning false in dgUnlock.")
     return {status: false}
 }
 
@@ -302,20 +301,19 @@ function dgUnlockForClient (clientId) {
 (() => {
     /*
     const srv = app.listen(config.express.port, () => {
-        console.log('Listening on port ' + config.express.port);
         srv.timeout = 60 * 60 * 1000;
     })
     */
     io.on('connection', (client) => {
-        console.log(`${Date()}: Client connected...`, client.id);
+        logger.info(`Client connected... ${client.id}`);
         client.emit('dbConnectivityState', {dbState: dbConnectivityChecker.dbConnectedState});
         if (!isAuthorized(client)) return;
         client.on('Hello', function (helloObj) {
-            console.log(`${Date()}: Hello from :`, helloObj);
+            logger.info(helloObj, "Received hello from client");
             client.emit('Hello', { server: "Hi there!" });
         });
         client.on('lockReq', (lockReq) => {
-            console.log(`${Date()}: lockReq: `, lockReq);
+            logger.info(lockReq, "Received Lock request");
             let {status, unlocked} = dgLock(lockReq, client.id);
             if (status) {
                 client.broadcast.emit('locked', lockReq);
@@ -324,30 +322,28 @@ function dgUnlockForClient (clientId) {
                 client.broadcast.emit('unlocked', unlocked);
             }
             let dsLocks = locks[lockReq.dsName];
-            console.log('active locks after lockReq:', JSON.stringify(dsLocks));
-    
+            logger.info(dsLocks, "Active locks after lockReq");
         });
         client.on('unlockReq', (unlockReq) => {
-            console.log(`${Date()}: unlockReq: `, unlockReq);
+            logger.info(unlockReq, `Received Unlock Request`);
             let {status} = dgUnlock(unlockReq, client.id);
             if (status) {
                 client.broadcast.emit('unlocked', unlockReq);
-                //console.log("Emitted this unlock request.");
             } else {
-                ; //console.log("Not emitting this unlock request. ")
+                ;
             }
             let dsLocks = locks[unlockReq.dsName];
-            console.log('active locks after unlockReq:', JSON.stringify(dsLocks));
+            logger.info(dsLocks, 'Active locks after unlock request');
         });
         client.on('getActiveLocks', (dsName) => {
-            console.log(`${Date()}: getActiveLocks: `, dsName);
+            logger.info(`GetActiveLocks for ${dsName}`);
             let dsLocks = locks[dsName];
             if (!dsLocks) dsLocks = {};
-            console.log('Active Locks: ', dsLocks);
+            logger.info(dsLocks, `Active locks for ${dsName}`);
             client.emit('activeLocks', JSON.stringify(dsLocks));
         });
         client.on('disconnect', (mySocket) => {
-            console.log(`${Date()}: disconnect: `, client.id);
+            logger.info(`Client disconnected... ${client.id}`);
             let {status, unlocked} = dgUnlockForClient(client.id);
             if (status) {
                 client.broadcast.emit('unlocked', unlocked);
@@ -365,9 +361,9 @@ function dgUnlockForClient (clientId) {
 
 function isAuthorized(client) {
     let clientCookie = client && client.handshake && client.handshake.headers && client.handshake.headers.cookie;
-    console.log(`${Date()}: Client connected cookie...`, clientCookie);
+    logger.info(clientCookie, `Client cookie`);
     if (!clientCookie) {
-        console.log("No client cookie found");
+        logger.warn("No client cookie found");
         client.emit('exception', 'Authentication failed. Reload the page or login again.');
         client.disconnect(true);
         return false;
@@ -375,7 +371,7 @@ function isAuthorized(client) {
     let clientCookieArray = clientCookie.split(';');
     let requiredClientCookieArray = clientCookieArray.filter((cookie) => cookie.trim().startsWith("jwt="));
     if (requiredClientCookieArray.length != 1) {
-        console.log("No jwt cookie found.")
+        logger.warn("No jwt cookie found")
         client.emit('exception', 'Authentication failed. Reload the page or login again.');
         client.disconnect(true);
         return false;
@@ -385,9 +381,9 @@ function isAuthorized(client) {
     // Verify that the token is valid
     try {
         const decoded = jwt.verify(token, Utils.jwtSecret);
-        console.log("Token is valid");
+        logger.info("Token is valid");
     } catch (err) {
-        console.log("Error in verifying authentication in socket connection: " + err.message)
+        logger.error(err, "Error in verifying authentication in socket connection");
         client.emit('exception', 'Authentication failed. Reload the page or login again.');
         client.disconnect(true);
         return false;
@@ -398,7 +394,7 @@ function isAuthorized(client) {
 function loginAuthenticateForReact(req, res, next) {
     req.session.user = req.body.username;
     let pageToLand = req.query.page;
-    console.log("Login Authenticate: ", req.session.user, pageToLand ? pageToLand : '');
+    logger.info({user : req.session.user}, `Login request`);
     let reqObj = {};
     reqObj.time = Date();
     reqObj.user = req.session.user;
@@ -448,7 +444,7 @@ function loginAuthenticateForReact(req, res, next) {
                 token: jwtToken
             };
             reqObj.req = "Login Successfull";
-            console.log(req.session.user, ' logged in successfully');
+            logger.info({user: req.session.user}, 'Login success');
             res.cookie('jwt', jwtToken, { httpOnly: true, path: '/', secure: isSecure, });
             res.clearCookie('originalUrl');
             res.send({ ok: true, user: JSON.stringify(retUser), redirectUrl: redirectUrl });
@@ -470,7 +466,7 @@ function sessionCheck(req, res, next) {
         const decoded = jwt.verify(token, Utils.jwtSecret);
         res.status(200).json({})
     } catch (err) {
-        console.log("session check error: " + err.message)
+        logger.error(err, "Session check error");
         return res.status(401).json({ message: 'Invalid token' });
     }
 };
