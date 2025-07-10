@@ -2,6 +2,7 @@
 const DbAbstraction = require('./dbAbstraction');
 const Utils = require('./utils');
 const MongoFilters = require('./routes/mongoFilters');
+const logger = require('./logger');
 
 async function checkAccessForSpecificRow(dsName, dsView, dsUser, _id) {
     let dbAbstraction = new DbAbstraction();
@@ -20,7 +21,7 @@ async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
     try {
         let perRowAccessConfig = await dbAbstraction.find(dsName, "metaData", { _id: `perRowAccessConfig` }, {} );
         perRowAccessConfig = perRowAccessConfig[0];
-        console.log("In enforcePerRowAccessCtrl, config is: ", perRowAccessConfig);
+        logger.info(perRowAccessConfig, "EnforcePerRowAccessCtrl config");
         if (!perRowAccessConfig) {
             await dbAbstraction.destroy();            
             return [filters, onlyPerRowAccessCtrlQueried]
@@ -33,7 +34,7 @@ async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
             await dbAbstraction.destroy();
             return [filters, onlyPerRowAccessCtrlQueried]
         }
-        console.log("In enforcePerRowAccessCtrl, User is: ", dsUser);
+        logger.info(`In enforcePerRowAccessCtrl, User is: ${dsUser}`);
         if (filters) {
             let found = false;
             for (let i = 0; i < filters.length; i++) {
@@ -53,7 +54,7 @@ async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
             onlyPerRowAccessCtrlQueried = true;
         }
     } catch (e) {
-        console.log("In perRowAccessCheck, exception: ", e);
+        logger.error(e, "Exception in perRowAccessCheck");
     }
     await dbAbstraction.destroy();
     return [filters, onlyPerRowAccessCtrlQueried];
