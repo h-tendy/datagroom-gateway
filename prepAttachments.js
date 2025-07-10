@@ -2,6 +2,7 @@
 const { readdir } = require('fs').promises;
 const { stat } = require('fs').promises;
 const DbAbstraction = require('./dbAbstraction');
+const logger = require('./logger');
 
 async function getFiles(dir) {
   const dirents = await readdir(dir, { withFileTypes: true });
@@ -19,7 +20,7 @@ async function refreshAttachmentsIntoDbForOne(dsName) {
         //let dir = path.resolve(__dirname, `./attachments/${dbList[i].name}`);
         let dir = `attachments/${dsName}`;
         let files = await getFiles(dir);
-        console.log(`Files under: ${dir}`);
+        logger.info(`Total number of Files under: ${dir} is ${files.length}`);
         for (let j = 0; j < files.length; j++) {
             let stats = await stat(files[j]);
             let rec = {};
@@ -28,10 +29,11 @@ async function refreshAttachmentsIntoDbForOne(dsName) {
             rec.size = stats.size;
             rec.time = stats.ctimeMs;
             let insertResp = await dbAbstraction.insertOne(dsName, "attachments", rec);
-            console.log('attachment insert response: ', insertResp);
-            //console.log(`  ${files[j]}, ${stats.size}, ${stats.ctimeMs}`);
+            logger.info(`Attachment insert response: ${insertResp}`);
         }
-    } catch (e) { console.log(e) }
+    } catch (e) { 
+        logger.error(e, "Error in refreshAttachmentsIntoDbForOne");
+    }
     await dbAbstraction.destroy();
 }
 
