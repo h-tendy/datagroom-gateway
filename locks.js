@@ -1,3 +1,5 @@
+const logger = require("./logger");
+
 var lockMap = {};
 
 async function wait(ms) {
@@ -37,7 +39,7 @@ var unlock = async (key) => {
             //console.log("Last unlock done! : ", key);
         }
     } else {
-        console.log("Spurious unlock! : ", key);
+        logger.warn(`Spurious unlock! : ${key}`);
     }
 }
 
