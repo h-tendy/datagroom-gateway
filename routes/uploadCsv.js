@@ -2,6 +2,7 @@ const router = require('express').Router();
 const multer = require('multer');
 const ExcelUtils = require('../excelUtils');
 const CsvUtils = require('../csvUtils');
+const logger = require('../logger');
 
 var upload = multer({
     storage: multer.diskStorage({
@@ -14,7 +15,7 @@ var upload = multer({
 }).single('file');
 
 function fileFilter(r, f, cb) {
-    console.log("Received request for upload: ", f.mimetype)
+    logger.info(`Received request for upload: ${f.mimetype}`);
     let supportedMimeTypes = [
         'application/vnd.ms-excel',
         'text/csv'
@@ -40,13 +41,13 @@ router.post('/', (req, res, next) => {
         else if (err) {
             return res.send(err);
         }
-        console.log("Upload complete. File: ", JSON.stringify(req.file, null, 4));
+        logger.info(req.file, "Upload complete. File");
         try {
             let hdrs = await CsvUtils.findHdrs(req.file.path);
-            console.log("Hdrs: ", hdrs);
+            logger.info(hdrs, "Headers for the give file");
             res.status(200).send(hdrs);
         } catch (e) {
-            console.log("Caught exception: ", e);
+            logger.error(e, "Exception in uploading csv");
             res.status(415).send(e);
         }
     });    
@@ -55,7 +56,7 @@ router.post('/', (req, res, next) => {
 
 router.post('/createDs', async (req, res, next) => {
     let request = req.body;
-    console.log("In createDs: ", request);
+    logger.info(request, "Incoming request in createDs");
     try {
 
         let loadStatus = await CsvUtils.loadDataIntoDb("uploads/" + request.fileName, request.selectedKeys, request.dsName, request.dsUser);
@@ -64,7 +65,7 @@ router.post('/createDs', async (req, res, next) => {
 
         res.status(200).send(loadStatus);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in createDs in from uploadCsv");
         res.status(415).send(e);
     }
 });
