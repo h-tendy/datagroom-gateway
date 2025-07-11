@@ -4,6 +4,7 @@ const JiraSettings = require('./jiraSettings');
 const utils = require('./utils')
 const fetch = require('node-fetch')
 const JIRA_AGILE = require('./jiraAgile')
+const logger = require('./logger')
 // Initialize
 
 let host = JiraSettings.host;
@@ -34,7 +35,7 @@ async function refreshJiraQuery(dsName, jiraConfig) {
     //TODO: Better error msg to frontend. For now, it's ok.
     if (!jql) return
     do {
-        console.log("Fetching from: ", startAt);
+        logger.info("Fetching from: ", startAt);
         // Comment out 'fields' below for getting all fields for field exploration. 
         results = await jira.searchJira(jql, { startAt, fields, expand: ["names"] });
         startAt += results.issues.length;
@@ -45,14 +46,13 @@ async function refreshJiraQuery(dsName, jiraConfig) {
             resultRecords.push(rec);
             // Use this for new field explorations.
             if (issue.fields.customfield_25588) {
-                console.log("\n\n\nGOT a non-null: ", issue.fields.customfield_25588);
-                console.log("\n\n\n");
+                logger.info(issue.fields.customfield_25588, "GOT a non-null:");
             }
 
             if (i == 0) {
                 //if (true) {
-                console.log(JSON.stringify(issue, null, 4));
-                console.log("Do figure out jira names: ", names)
+                logger.info(issue, "First fetched jira Record");
+                logger.info(names, "Figure out jira names");
             }
         }
     } while (startAt < results.total)
@@ -77,7 +77,7 @@ async function refreshJiraQuery(dsName, jiraConfig) {
         try {
             await dbAbstraction.update(dsName, "data", r.selectorObj, r.fullRec);
         } catch (e) {
-            console.log("Db update error refreshJiraQuery: ", e);
+            logger.error(e, "Db update error refreshJiraQuery");
         }
     }
     await dbAbstraction.destroy();
@@ -269,7 +269,7 @@ async function markAsStale(dsName, jiraConfig) {
                 try {
                     await dbAbstraction.update(dsName, "data", selectorObj, jiraColumns);
                 } catch (e) {
-                    console.log("Db update error in markAsStale : ", e);
+                    logger.error(e, "Db update error in markAsStale");
                 }
             }
         } while (page <= response.total_pages)
@@ -358,9 +358,9 @@ async function createFilteredProjectsMetaData() {
             }
         }
     } catch (e) {
-        console.log("Error in createFilteredProjectsMetaData", e)
+        logger.error(e, "Error in createFilteredProjectsMetaData")
     }
-    console.log("Filtered meta data updated", filteredProjectsMetaData)
+    logger.info(filteredProjectsMetaData, "Filtered meta data updated");
     setTimeout(createFilteredProjectsMetaData, JiraSettings.jiraMetaDataRefreshIntervalInMs)
 }
 
@@ -412,10 +412,9 @@ async function getAllAssigneesForJira(dsName, jiraConfig) {
             response = await dbAbstraction.pagedFind(dsName, "data", filters, {}, page, perPage)
             page += 1;
             for (let i = 0; i < response.data.length; i++) {
-                console.log(response.data[i]);
                 let ret = utils.parseRecord(response.data[i], revContentMap, jiraConfig.jiraFieldMapping)
                 if (!ret.parseSuccess) {
-                    console.log('unable to parse the record while getting assignees for all jiraAgileRows')
+                    logger.warn('Unable to parse the record while getting assignees for all jiraAgileRows');
                     return assignees
                 }
                 let jiraRec = ret.rec
@@ -426,7 +425,7 @@ async function getAllAssigneesForJira(dsName, jiraConfig) {
             }
         } while (page <= response.total_pages)
     } catch (e) {
-        console.log("Error in getAllAssigneesForJiraAgile", e)
+        logger.error(e, "Error in getAllAssigneesForJiraAgile");
     }
     dbAbstraction.destroy();
     return Array.from(assignees);
@@ -488,7 +487,7 @@ async function addDynamicFieldsToProjectsMetaData(dsName, jiraConfig, jiraAgileC
             }
         }
     } catch (e) {
-        console.log("Error in addDynamicFieldsToProjectsMetaData", e)
+        logger.error(e, "Error in addDynamicFieldsToProjectsMetaData")
     }
 }
 
@@ -508,7 +507,7 @@ async function getProjectsMetaData(dsName, jiraConfig, jiraAgileConfig) {
  */
 async function getProjectsMetaDataForProject(dsName, jiraConfig, jiraAgileConfig, jiraProjectName) {
     if (!jiraProjectName) {
-        console.log("No jira project name found while calling getProjectsMetaDataForProject");
+        logger.warn("No jira project name found while calling getProjectsMetaDataForProject");
         return null;
     }
     await addDynamicFieldsToProjectsMetaData(dsName, jiraConfig, jiraAgileConfig)
@@ -534,7 +533,7 @@ function getDefaultTypeFieldsAndValues() {
  */
 function getDefaultTypeFieldsAndValuesForProject(jiraProjectName) {
     if (!jiraProjectName) {
-        console.log("No jira project name found while calling getDefaultTypeFieldsAndValuesForProject");
+        logger.warn("No jira project name found while calling getDefaultTypeFieldsAndValuesForProject");
         return null;
     }
     let defaultTypeFieldsAndValuesForAllProjects = JiraSettings.defaultTypeFieldsAndValues;
@@ -743,7 +742,7 @@ async function createJiraIssue(jiraFormData) {
             response.error = 'unable to determine jira key after the update to JIRA'
         }
     } catch (e) {
-        console.log(e)
+        logger.error(e, "Unable to create issue in JIRA backend");
         response.status = 'fail'
         response.error = `Unable to create issue in JIRA backend. Error: ${e.message}`
     }
@@ -776,7 +775,7 @@ async function updateJiraRecInDb(dsName, selectorObj, jiraRec, jiraConfig) {
     } catch (e) {
         response.status = 'fail'
         response.error = 'unable to update the jiraRec in db'
-        console.log("Db update error refreshJiraQuery: ", e);
+        logger.error(e, "Db update error refreshJiraQuery");
     }
     await dbAbstraction.destroy();
     return response
@@ -811,7 +810,7 @@ async function getJiraAgileJql(jiraConfig) {
             }
         }
     } catch (e) {
-        console.log("Error encountered while retreiving the jql for JIRA_AGILE config", e)
+        logger.error(e, "Error encountered while retreiving the jql for JIRA_AGILE config");
     }
     return jql
 }
