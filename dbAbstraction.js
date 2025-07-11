@@ -1,6 +1,8 @@
 // Can't use strict because of certain mongodb API will be too rigid otherwise. 
 // "use strict";
 
+const logger = require('./logger');
+
 const MongoClient = require('mongodb').MongoClient;
 var ObjectId = require('mongodb').ObjectId;
 
@@ -17,7 +19,7 @@ class DbAbstraction {
     }
     async connect () {
         this.client = await MongoClient.connect(this.url, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 5000 })
-            .catch(err => { console.log(err); this.client = null; });
+            .catch(err => { logger.error(err, "Error while connecting to Mongodb"); this.client = null; });
     }
     async createDb (dbName) {
         if (! this.client ) await this.connect();
@@ -55,7 +57,7 @@ class DbAbstraction {
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         if (selector["_id"]) {
-            console.log('insertOneUniquely error: Must not have _id');
+            logger.warn('insertOneUniquely error: Must not have _id');
             return { result: { ok: 0 }, message: 'setObj must not have _id' }
         }
         let ret = await collection.updateOne(selector, { $setOnInsert: setObj }, { upsert: true });
@@ -101,9 +103,9 @@ class DbAbstraction {
                 delete query["_id"];
                 // See if the new object already exists
                 query = {...query, ...updateObj};
-                console.log("Query obj: ", query);
+                logger.info(query, "Query object");
                 let data = await this.find (dbName, tableName, query, {} );
-                console.log("Find result: ", data);
+                logger.info(data, "Find result for query object");
                 if (data.length) {
                     ret.result = { nModified: 0, error: "Key conflict" }
                 } else {
@@ -117,7 +119,7 @@ class DbAbstraction {
         } finally {
             await session.endSession();
         }
-        console.log("UpdateOneKeyInTransaction result:", ret.result);
+        logger.info(`UpdateOneKeyInTransaction result: ${ret.result}`);
         return ret.result;
     }
 
@@ -205,9 +207,9 @@ class DbAbstraction {
     async pagedFind (dbName, tableName, query, options, page, limit, fetchAllMatchingRecords = false, onlyPerRowAccessCtrlQueried = false) {
         let skip = limit * (page - 1);
         let findOptions = { ...options, limit, skip };
-        //console.log(dbName, tableName, query, findOptions);
+        //logger.info(dbName, tableName, query, findOptions);
         let data = await this.find (dbName, tableName, query, findOptions );
-        //console.log(data);
+        //logger.info(data);
         let total = 0;
         let totalPages = 1;
         let moreMatchingDocs = false;
@@ -243,9 +245,9 @@ class DbAbstraction {
                 moreMatchingDocs = true;
             }
         }
-        //console.log(total, totalPages);
+        //logger.info(total, totalPages);
         let results = { page, per_page: limit, total, total_pages: totalPages, data, moreMatchingDocs }
-        //console.log(results);
+        //logger.info(results);
         return results;
     }
 
@@ -278,22 +280,22 @@ class DbAbstraction {
 
         const cursor = fromCollection.find();
         for await (let doc of cursor) {
-            //console.log(`Found record: ${JSON.stringify(doc, null, 4)}`);
+            //logger.info(`Found record: ${JSON.stringify(doc, null, 4)}`);
             if (fn) {
                 doc = fn(doc);
             }
             let ret = await toCollection.insertOne(doc);
             if (ret.result.ok !== 1) {
-                console.log(`InsertOne failed: ${ret.result}`);
+                logger.warn(`InsertOne failed: ${ret.result}`);
             }
         }
     }
 
     async hello () {
-        console.log("Hello from DbAbstraction!");
+        logger.info("Hello from DbAbstraction!");
         if (! this.client ) await this.connect();
         let dbs = await this.client.db().admin().listDatabases();        
-        console.log("dbs: ", dbs.databases);
+        logger.info(dbs.databases, "Databases list");
         return;
     }
 }
