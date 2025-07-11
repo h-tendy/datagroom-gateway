@@ -664,7 +664,7 @@ router.post('/view/addColumn', async (req, res, next) => {
         const { dsName, dsView, dsUser, columnName, position, referenceColumn } = req.body;
 
         if (!dsName || !dsView || !dsUser || !columnName || !position || !referenceColumn) {
-            console.error("Missing required parameters!");
+            logger.warn("Missing required parameters!");
             return res.status(400).json({ error: "Missing required parameters" });
         }
 
@@ -679,7 +679,7 @@ router.post('/view/addColumn', async (req, res, next) => {
         let viewDefault = await dbAbstraction.find(dsName, "metaData", { _id: "view_default" }, {});
 
         if (!viewDefault || !viewDefault.length) {
-            console.error("View metadata not found for:", dsName);
+            logger.warn(`View metadata not found for: ${dsName}`);
             return res.status(404).json({ error: "View metadata not found" });
         }
 
@@ -688,7 +688,7 @@ router.post('/view/addColumn', async (req, res, next) => {
         let columnAttrsList = metadata.columnAttrs || [];
 
         if (Object.values(columns).includes(columnName)) {
-            console.error("Column already exists:", columnName);
+            logger.error(`Column already exists: ${columnName}`);
             return res.status(400).json({ error: "Column already exists" });
         }
 
@@ -748,7 +748,7 @@ router.post('/view/addColumn', async (req, res, next) => {
 
         // If reference column was not found, add the new column at the end
         if (!foundReference) {
-            console.warn(`Reference column '${referenceColumn}' not found. Adding '${columnName}' at the end.`);
+            logger.warn(`Reference column '${referenceColumn}' not found. Adding '${columnName}' at the end.`);
             newColumns[newColumnsKey] = columnName;
             newColumnAttrs.push(newColumnAttr);
         }
@@ -759,7 +759,7 @@ router.post('/view/addColumn', async (req, res, next) => {
 
         const updateResult = await dbAbstraction.update(dsName, "metaData", { _id: "view_default" }, metadata);
         if (!updateResult || updateResult.modifiedCount === 0) {
-            console.error("Failed to update metadata.");
+            logger.error("Failed to update metadata.");
             return res.status(500).json({ error: "Failed to update metadata" });
         }
 
