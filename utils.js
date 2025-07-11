@@ -36,10 +36,10 @@ async function execCmdExecutor (cmdStr, maxBuffer = 1024 * 1024 * 10) {
     let p, f;
     exec(cmdStr, { maxBuffer: maxBuffer }, (error, stdout, stderr) => {
         if (error) {
-            //console.log(`\n${Date()}: execCmdExecutor failed!: ${cmdStr}: ${error}\n`);
+            //logger.info(`\n${Date()}: execCmdExecutor failed!: ${cmdStr}: ${error}\n`);
             //throw error;
             //XXX: need to send error alert in a better way
-            //console.log(stdout);
+            //logger.info(stdout);
             f("err");
             return;
         }
@@ -463,7 +463,7 @@ function sanitizeData(objData) {
       }
     }
   } catch (e) {
-    console.log("Failed to sanitize data", e);
+    logger.error(e, "Failed to sanitize data");
   }
 }
 

@@ -1,6 +1,7 @@
 const Fs = require('fs');
 const DbAbstraction = require('./dbAbstraction');
 const CsvReadableStream = require('csv-reader');
+const logger = require('./logger');
 
 class CsvUtils {
 
@@ -10,13 +11,13 @@ class CsvUtils {
              inputStream
                 .pipe(new CsvReadableStream({ parseNumbers: true, parseBooleans: true, trim: true }))
                 .on('data', function (row) {
-                    console.log('A row arrived: ', row);
+                    logger.info(row, "A row data arrived");
                 })
                 .on('end', function (data) {
-                    console.log('No more rows!');
+                    logger.info('No more rows!');
                 })
                 .on ('header', function (hdr) {
-                    console.log('Header: ', hdr);
+                    logger.info(hdr, 'Header');
                     inputStream.destroy();
                     resolve(hdr);
                 });
@@ -26,13 +27,13 @@ class CsvUtils {
     static async loadDataIntoDb (file, keys, dsName, dsUser) {
 
         return new Promise(async (resolve, reject) => {
-            console.log("file, keys, dsName, dsUser: ", file, keys, dsName, dsUser);
+            logger.info(`File: ${file} keys: ${keys} dsName: ${dsName} dsUser: ${dsUser}`);
             let dbAbstraction = new DbAbstraction();
             // Check if db already exists...
             let dbList = await dbAbstraction.listDatabases();
             for (let i = 0; i < dbList.length; i++) {
                 if (dbList[i].name === dsName) {
-                    console.log('Dataset name conflict');
+                    logger.warn(`${dsName} Dataset name conflict`);
                     reject ({ loadStatus: false, error: 'Dataset name conflict' });
                     dbAbstraction.destroy();
                     return;
@@ -44,20 +45,20 @@ class CsvUtils {
                 .pipe(new CsvReadableStream({ asObject: true, parseNumbers: true, parseBooleans: true, trim: true }))
                 .on('data', async function (rowObjForDb) {
                     // From here on, you can insert the rows into database. 
-                    console.log("Row object: ", rowObjForDb);
+                    logger.info(rowObjForDb, "Row object");
                     let rowSelectorObj = {};
                     keys.map((k) => {
                         rowSelectorObj[k] = rowObjForDb[k];
                     });
-                    console.log("Row selector obj: ", rowSelectorObj);
+                    logger.info(rowSelectorObj, "Row selector obj");
                     try {
                         await dbAbstraction.update(dsName, "data", rowSelectorObj, rowObjForDb);
                     } catch (e) {
-                        console.log("Db update error: ", e);
+                        logger.error(e, "Db update error in loadDataInDb");
                     }
                 })
                 .on ('header', function (h) {
-                    console.log('Header: ', h);
+                    logger.info(h, 'Header');
                     hdrs = h;
                 })
                 .on('end', async function (data) {
@@ -84,7 +85,7 @@ class CsvUtils {
                         }
                         await dbAbstraction.update(dsName, "metaData", { _id: `view_default` }, { columns, columnAttrs, userColumnAttrs: { } } );
                     } catch (e) {
-                        console.log("Db metaData update error: ", e)
+                        logger.error(e, "Db metaData update error");
                     }            
                     resolve ({ loadStatus: true, hdrs })
                     await dbAbstraction.destroy();

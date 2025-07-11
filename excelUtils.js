@@ -8,6 +8,7 @@ require('regenerator-runtime/runtime');
 const DbAbstraction = require('./dbAbstraction');
 
 const Excel = require('exceljs/dist/es5');
+const logger = require('./logger');
 let excelUtilsMap = {};
 class ExcelUtils {
     constructor (fileName) {
@@ -18,24 +19,24 @@ class ExcelUtils {
     static async getExcelUtilsForFile (fileName) {
         try {
             let newObj = new ExcelUtils (fileName);
-            console.log('About to call init..');
+            logger.info('About to call init');
             await newObj.init();
             excelUtilsMap[fileName] = newObj;
             return newObj
         } catch (e) {
-            console.log("Exception in ExcelUtils...", e);
+            logger.error(e, "Exception in ExcelUtils");
         }
         return null;
     }
     async init () {
         this.wBook = new Excel.Workbook();
-        console.log('In init, about to call readFile:', this.fileName);
+        logger.info(`In init, about to call readFile: ${this.fileName}`);
         try {
             await this.wBook.xlsx.readFile(this.fileName);
         } catch (e) {
             /* Ignore this exception. Sometimes, it throws an 
             exception, but reads the file alright */
-            console.log("Whoops, couldn't read the file: ", e);
+            logger.error(e, "Couldn't read the file");
         }
         this.wBook.eachSheet((sheet, sheetId) => {
             let rC = sheet.rowCount;
@@ -44,7 +45,7 @@ class ExcelUtils {
                 columns: [],
                 rows: []
             }
-            console.log("Sheet's name is: ", sheet.name);
+            logger.info(`Sheet's name is: ${sheet.name} row count: ${rC} column count: ${cC}`);
             for (let i = 1; i <= rC; i++) {
                 let str = '';
                 let currRow = sheet.getRow(i);
@@ -53,13 +54,12 @@ class ExcelUtils {
                     this.workBook[sheet.name].columns[j] = j;
                     row[j] = currRow.getCell(j).value || '';
                 }
-                console.log("Row id: ", i);
                 this.workBook[sheet.name].rows.push(Object.getOwnPropertyNames(row).reduce((a, c) => {
                     //a[c] = typeof(row[c]) == 'object' ? getVal(row[c]) : row[c].toString();
                     a[c] = typeof(row[c]) == 'object' ? getVal(row[c]) : row[c];
                     return a;
                 }, {}));
-                //console.log(this.workBook[sheet.name].rows[i-1]);
+                //logger.info(this.workBook[sheet.name].rows[i-1]);
             }
             let entries = Object.entries(this.workBook[sheet.name].columns);
             this.workBook[sheet.name].columns = entries.reduce((a, c) => {
@@ -88,7 +88,7 @@ class ExcelUtils {
     findHeadersInSheet (sheet) {
         if (!this.workBook[sheet])
             return {};
-        console.log(this.workBook[sheet].rows);
+        // logger.info(this.workBook[sheet].rows);
         return {};
     }
 
@@ -109,8 +109,8 @@ class ExcelUtils {
             ret.toCol = translateToColumnId(e[3]);
             ret.fromRow = parseInt(e[2]) - 1;
             ret.toRow = parseInt(e[4]) - 1;
-            console.log(`Alphabets: ..${e[1]}.. && ${e[3]}`);
-            console.log(`Digits: ..${e[2]}.. && ${e[4]}`);
+            logger.info(`Alphabets: ..${e[1]}.. && ${e[3]}`);
+            logger.info(`Digits: ..${e[2]}.. && ${e[4]}`);
         } else {
             ret.status = false;
         }
@@ -121,7 +121,7 @@ class ExcelUtils {
         await this.init();
         if (!this.workBook[sheet])
             return { loadStatus: false, error: 'Sheet not found' };
-        console.log(`Sheet is: ${sheet}, range is: ${range}`);
+        logger.info(`Sheet is: ${sheet}, range is: ${range}`);
         let rangeIndices = this.getRangeIndices(range);
         if (!rangeIndices.status)
             return { loadStatus: false, error: 'Bad range' };
@@ -131,9 +131,9 @@ class ExcelUtils {
         
         let rowCount = this.workBook[sheet].rows.length;
         let columnCount = this.workBook[sheet].columns.length;
-        console.log("Row count: ", this.workBook[sheet].rows.length);
-        console.log("Col count: ", this.workBook[sheet].columns.length);
-        console.log("RangeIndicies: ", rangeIndices);
+        logger.info(`Row count: ${this.workBook[sheet].rows.length}`);
+        logger.info(`Col count: ${this.workBook[sheet].columns.length}`);
+        logger.info(rangeIndices, "RangeIndices");
         if (rangeIndices.fromRow >= rowCount ||
             rangeIndices.toRow >= rowCount)
             return {loadStatus: false, error: `Max row count is ${rowCount}`};
@@ -144,7 +144,7 @@ class ExcelUtils {
             return {loadStatus: false, error: `Max column count is ${columnCount}`};
             
         let hdrRow = this.workBook[sheet].rows[rangeIndices.fromRow];
-        console.log("hdrRow: ", JSON.stringify(hdrRow, null, 4));
+        logger.info(hdrRow, "Header Row");
         let hdrs = {}, hdrErrors = {}, loadStatus = true;
         for (let j = rangeIndices.fromCol; j <= rangeIndices.toCol; j++) {
             //hdrs[hdrRow[j]] = j;
@@ -162,7 +162,7 @@ class ExcelUtils {
         let dbAbstraction = new DbAbstraction();
         let dbRes = await dbAbstraction.find(dsName, "metaData", { _id: `view_${dsView}` }, {} );
         dbRes = dbRes[0];
-        //console.log(dbRes.columns);
+        //logger.info(dbRes.columns);
         let projection = {}, hdrs = [], columnKeys = Object.keys(dbRes.columns);
         for (let i = 0; i < columnKeys.length; i++) {
             let column = dbRes.columns[columnKeys[i]]; 
@@ -170,10 +170,11 @@ class ExcelUtils {
             let hdr = { header: column, key: column, width: 15 };
             hdrs.push(hdr);
         }
-        console.log("Hdrs: ", hdrs, "Projection: ", projection);
+        logger.info(hdrs, "Headers");
+        logger.info(projection, "Projection");
         dataOptions = { ...dataOptions, projection }
         let data = await dbAbstraction.find(dsName, "data", dataFilters, dataOptions);
-        // console.log(data);
+        // logger.info(data);
         // Export logic
         const workbook = new Excel.Workbook();
         const worksheet = workbook.addWorksheet("Data");
@@ -232,7 +233,7 @@ class ExcelUtils {
         await this.init();
         if (!this.workBook[sheet])
             return { loadStatus: false, error: 'Sheet not found' };
-        console.log(`Sheet is: ${sheet}, range is: ${range}`);
+        logger.info(`Sheet is: ${sheet}, range is: ${range}`);
         let rangeIndices = this.getRangeIndices(range);
 
         if (!rangeIndices.status)
@@ -258,7 +259,7 @@ class ExcelUtils {
         let dbList = await dbAbstraction.listDatabases();
         for (let i = 0; i < dbList.length; i++) {
             if (dbList[i].name === dsName) {
-                console.log('Dataset name conflict');
+                logger.warn(`${dsName} Dataset name already exists`);
                 return { loadStatus: false, error: 'Dataset name conflict' }
             }
         }
@@ -277,12 +278,12 @@ class ExcelUtils {
             keys.map((k) => {
                 rowSelectorObj[k] = row[hdrsRev[k]];
             })
-            console.log(`rowObjForDb: ${JSON.stringify(rowObjForDb, null, 4)}`)
-            console.log(`rowSelectorObj: ${JSON.stringify(rowSelectorObj, null, 4)}`);
+            logger.info(rowObjForDb, `rowObjForDb`);
+            logger.info(rowSelectorObj, `rowSelectorObj`);
             try {
                 await dbAbstraction.update(dsName, "data", rowSelectorObj, rowObjForDb);
             } catch (e) {
-                console.log("Db update error: ", e);
+                logger.error(e, "Db update error while loading data in DB");
             }
         }
         // Load metaDeta
@@ -341,7 +342,7 @@ class ExcelUtils {
                 await dbAbstraction.update(dsName, "metaData", { _id: "aclConfig" }, value);
             }
         } catch (e) {
-            console.log("Db metaData update error: ", e)
+            logger.error(e, "Db metaData update error");
         }
         await dbAbstraction.destroy();
         return { loadStatus: true, range, rangeIndices, hdrs }
@@ -351,7 +352,7 @@ class ExcelUtils {
         await this.init();
         if (!this.workBook[sheet])
             return { loadStatus: false, error: 'Sheet not found' };
-        console.log(`Sheet is: ${sheet}, range is: ${range}`);
+        logger.info(`Sheet is: ${sheet}, range is: ${range}`);
         let rangeIndices = this.getRangeIndices(range);
 
         if (!rangeIndices.status)
@@ -388,12 +389,12 @@ class ExcelUtils {
             keys.map((k) => {
                 rowSelectorObj[k] = row[hdrsRev[k]];
             })
-            console.log(`rowObjForDb: ${JSON.stringify(rowObjForDb, null, 4)}`)
-            console.log(`rowSelectorObj: ${JSON.stringify(rowSelectorObj, null, 4)}`);
+            logger.info(rowObjForDb, `rowObjForDb`)
+            logger.info(rowSelectorObj, `rowSelectorObj`);
             try {
                 await dbAbstraction.update(dsName, "data", rowSelectorObj, rowObjForDb);
             } catch (e) {
-                console.log("Db update error: ", e);
+                logger.error(e, "Db update error in bulkUpdateDataInDb");
             }
         }
         await dbAbstraction.destroy();

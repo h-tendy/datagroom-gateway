@@ -13,13 +13,15 @@ const PerRowAcessCheck = require('../perRowAccessCheck');
 const MongoFilters = require('./mongoFilters');
 // @ts-ignore
 const { ObjectId } = require('mongodb');
+const logger = require('../logger');
 
 let host = JiraSettings.host;
 
 router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
-    console.log("In columns: ", req.params);
-    console.log("In columns: ", req.query);
+    //logger check
+    logger.info(req.params, `Params In columns`);
+    logger.info(req.query, `Query In columns`);
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
@@ -33,9 +35,7 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
         res.status(200).json({});
         return
     }
-    console.log(response[0].columns);
     let keys = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `keys` }, {} );
-    console.log(keys[0]);
     let jiraConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraConfig` }, {} );
     jiraConfig = jiraConfig[0]
     let jiraAgileConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraAgileConfig` }, {});
@@ -46,10 +46,10 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     if (otherTableAttrs.length)
         otherTableAttrs = otherTableAttrs[0];
     let filters = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `filters` }, {} );
-    console.log("Filters: ", filters);
+    logger.info(filters, "Filters in view columns");
     filters = filters[0]
     let aclConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `aclConfig` }, {} );
-    console.log("aclConfig: ", aclConfig);
+    logger.info(aclConfig, "AclConfig in view columns");
     if (aclConfig.length)
         aclConfig = aclConfig[0]
     try {
@@ -58,7 +58,7 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
         }
     } catch (e) {};
     let perRowAccessConfig = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `perRowAccessConfig` }, {} );
-    console.log("perRowAccessConfig: ", perRowAccessConfig);
+    logger.info(perRowAccessConfig, "PerRowAccessConfig in view columns");
     perRowAccessConfig = perRowAccessConfig[0]
     let jiraProjectName = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraProjectName` }, {});
     jiraProjectName = (jiraProjectName && jiraProjectName.length == 1 && jiraProjectName[0].jiraProjectName) ? jiraProjectName[0].jiraProjectName : "";
@@ -74,10 +74,10 @@ async function pager (req, res, collectionName) {
         query = req.query;
     else
         query = request;
-    //console.log("In pager, req:", req);
-    console.log("In pager, req.params: ", req.params);
-    console.log("In pager, query: ", query);
-    console.log("In pager, collectionName:", collectionName)
+    //logger.info("In pager, req:", req);
+    logger.info(req.params, "In pager, req.params");
+    logger.info(query, "In pager, query");
+    logger.info(`In pager, collectionName: ${collectionName}`);
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
@@ -86,12 +86,12 @@ async function pager (req, res, collectionName) {
     }
     let onlyPerRowAccessCtrlQueried = false;
     [query.filters, onlyPerRowAccessCtrlQueried] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
-    console.log("In pager, after enforcePerRow, query:", query);
+    logger.info(query, "In pager, after enforcePerRow query");
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
 
     // XXX: Do lots of validation.
-    console.log("In pager, mongo filters: ", JSON.stringify(filters, null, 4));
-    console.log("In pager, mongo sorters: ", sorters)
+    logger.info(filters, "In pager, mongo filters");
+    logger.info(sorters, "In pager, mongo sorters");
     let options = {};
     // @ts-ignore
     if (sorters.length)
@@ -104,7 +104,7 @@ async function pager (req, res, collectionName) {
         response = await dbAbstraction.pagedFind(req.params.dsName, collectionName, filters, options, parseInt(query.page), parseInt(query.per_page), fetchAllMatchingRecords, onlyPerRowAccessCtrlQueried);
         response.reqCount = query.reqCount || 0;
     } catch (e) {
-        console.log("Exception in pager: ", e);
+        logger.error(e, "Exception in pager: ");
     }
     await dbAbstraction.destroy();
     res.status(200).json(response);
@@ -133,7 +133,7 @@ router.get('/view/:dsName/:dsView/:dsUser/:id', async (req, res, next) => {
         return;
     }
     let token = req.cookies.jwt;
-    console.log(`Got request for ${dsName} by ${dsUser} for id ${_id} and view ${dsView}`);
+    logger.info(`Got request for ${dsName} by ${dsUser} for id ${_id} and view ${dsView}`);
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
@@ -141,9 +141,9 @@ router.get('/view/:dsName/:dsView/:dsUser/:id', async (req, res, next) => {
     }
     let qFilters = [ {field: "_id", type: "eq", value: new ObjectId(_id)} ];
     [qFilters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, qFilters);
-    console.log("In single-user query end-point, after enforcePerRow, qFilters:", qFilters);
+    logger.info(qFilters, "In single-user query end-point, after enforcePerRow, qFilters");
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(qFilters, null, null);
-    console.log("In single-user query end-point, mongoFilters:", filters);
+    logger.info(filters, "In single-user query end-point, mongoFilters");
 
     let response = {};
     let dbAbstraction = new DbAbstraction();
@@ -153,7 +153,7 @@ router.get('/view/:dsName/:dsView/:dsUser/:id', async (req, res, next) => {
         response.data = data;
         response.total = data.length;
     } catch (e) {
-        console.log('Exception while getting the data from id:', e);
+        logger.error(e, 'Exception while getting the data from id');
     }
     await dbAbstraction.destroy();
     res.status(200).json(response);
@@ -196,8 +196,8 @@ router.post('/viewViaPost/attachments/:dsName/:dsView/:dsUser', async (req, res,
 router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
     let query = req.query;
-    console.log("In deleteFromQuery: ", req.params);
-    console.log("In deleteFromQuery: ", query);
+    logger.info(req.params, "Request params in deleteFromQuery:");
+    logger.info(query, "Incoming query In deleteFromQuery");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
@@ -206,8 +206,8 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
     }
     [query.filters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
-    console.log("mongo filters in deleteFromQuery: ", JSON.stringify(filters, null, 4));
-    console.log("mongo sorters in deleteFromQuery: ", sorters)
+    logger.info(filters, "Mongo filters in deleteFromQuery");
+    logger.info(sorters, "Mongo sorters in deleteFromQuery");
     let options = {};
     // @ts-ignore
     if (sorters.length)
@@ -218,7 +218,7 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
         // @ts-ignore
         response.total = await dbAbstraction.countDocuments(req.params.dsName, "data", filters, options);
     } catch (e) {
-        console.log("Exception in pager: ", e);
+        logger.error(e, "Exception in pager");
     }
     if (query.pretend == 'false' || query.pretend == false) {
         let count = 0;
@@ -229,7 +229,7 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
     }
 
     await dbAbstraction.destroy();
-    console.log("Response in deleteFromQuery: ", response);
+    logger.info(response, "Response in deleteFromQuery");
     res.status(200).json(response);
 });
 
@@ -265,7 +265,7 @@ function getInsertLog (req, status) {
 
 function getDeleteLog (req, _doc, status) {
     let selectorObj = JSON.parse(JSON.stringify(req.selectorObj));
-    console.log(`In getDeleteLog: `, _doc);
+    logger.info(_doc, `In getDeleteLog`);
     let doc = JSON.parse(JSON.stringify(_doc));
     let deleteDoc = {};
     deleteDoc.opr = "delete";
@@ -281,7 +281,7 @@ function getDeleteLog (req, _doc, status) {
 
 router.post('/view/editSingleAttribute', async (req, res, next) => {
     let request = req.body;
-    console.log("In editSingleAttribute: ", request);
+    logger.info(request, "Incoming Request in editSingleAttribute");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -325,7 +325,7 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
             }
         }
         if (keyBeingEdited) {
-            console.log("A key is being edited: Do in transaction");
+            logger.info("A key is being edited: Do in transaction");
             // Selector obj must contain all the keys for this case. Send this from the UI. 
             // Look for an obj with all those keys. If one exists, then fail the edit. Else
             // update the object. 
@@ -338,7 +338,7 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
             }
         } else {
             let dbResponse = await dbAbstraction.updateOne(request.dsName, "data", request.selectorObj, request.editObj);
-            console.log ('Edit response: ', dbResponse);
+            logger.info(dbResponse, 'Edit response');
             if (dbResponse.nModified == 1) {
                 response.status = 'success';
             } else {
@@ -360,11 +360,11 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
         }
         let editLog = getSingleEditLog(request, keyBeingEdited, response.status);
         let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
-        console.log('editLog (edit) response: ', editLogResp);
+        logger.info(editLogResp, 'editLog (edit) response');
         // XXX: If response fails, do a 'find' query and return the updated attribute.
         res.status(200).send(response);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in editing singleAttribute");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -386,7 +386,7 @@ function isJiraAgileRec(rec) {
 
 router.post('/view/insertOneDoc', async (req, res, next) => {
     let request = req.body;
-    console.log("In insertOneDoc: ", request);
+    logger.info(request, "Incoming request in insertOneDoc");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -397,7 +397,7 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
     try {
         // XXX: Do lots of validation.
         let dbResponse = await dbAbstraction.insertOneUniquely(request.dsName, "data", request.selectorObj, request.doc);
-        console.log ('insertOneUniquely response: ', dbResponse);
+        logger.info(dbResponse, 'DB response after insertOneUniquely');
         let response = {};
         if (dbResponse.ok == 1 && dbResponse.upserted && dbResponse.upserted.length == 1) {
             response.status = 'success';
@@ -416,11 +416,11 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
         }
         let editLog = getInsertLog(request, response.status);
         let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
-        console.log('editLog (insert) response: ', editLogResp);
+        logger.info(editLogResp, 'editLog (insert) response');
         // XXX: If response fails, do a 'find' query and return the updated attribute.
         res.status(200).send(response);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in insertOneDoc");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -430,7 +430,7 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
 // the front end for sure. 
 router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     let request = req.body;
-    //console.log("In insertOrUpdateOneDoc: ", request);
+    logger.info(request, "Incoming request in insertOrUpdateOneDoc");
     //res.status(200).send({status: 'success'});
     //return;
     const token = req.cookies.jwt;
@@ -443,7 +443,6 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     try {
         // XXX: Do lots of validation.
         if (request.selectorObj._id) {
-            console.log(`In insertOrUpdateOneDoc: fixing _id to ObjectId format`);
             request.selectorObj._id = dbAbstraction.getObjectId(request.selectorObj._id);
             request.doc._id = request.selectorObj._id;
             let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, request.dsUser, request.selectorObj._id);
@@ -456,12 +455,11 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
             }
         }
         let dbResponse = await dbAbstraction.update(request.dsName, "data", request.selectorObj, request.doc);
-        //console.log ('insertOrUpdateOneDoc response: ', dbResponse);
         let response = {};
         if (dbResponse.result.ok == 1) {
             response.status = 'success';
             if (dbResponse.result.upserted) {
-                //console.log ('insertOrUpdateOneDoc, upserted: ', JSON.stringify(dbResponse.result.upserted, null, 4));
+                //logger.info ('insertOrUpdateOneDoc, upserted: ', JSON.stringify(dbResponse.result.upserted, null, 4));
                 response._id = dbResponse.result.upserted[0]._id;
             }
         } else {
@@ -478,11 +476,11 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
         }
         //let editLog = getInsertLog(request, response.status);
         //let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
-        //console.log('editLog (insert) response: ', editLogResp);
+        //logger.info('editLog (insert) response: ', editLogResp);
         // XXX: If response fails, do a 'find' query and return the updated attribute.
         res.status(200).send(response);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Got exception: ");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -493,8 +491,8 @@ router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
     // In this API, the request.query has filters directly. So, you have to use it accordingly.
     let request = req.body;
     let filters = request.query, sorters; 
-    console.log("In downloadXlsx, req.params: ", req.params);
-    console.log("In downloadXlsx, query: ", filters);
+    logger.info(req.params, "In downloadXlsx, req.params");
+    logger.info(filters, "In downloadXlsx, query");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
@@ -506,7 +504,7 @@ router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
         // XXX: What is this use-case? I think unnecessary to allow
         // downloadXlsx for just one row really. Not fully tested. 
         if (!filters[0].value) {
-            console.log("Error: Id not found in download single row");
+            logger.warn("Error: Id not found in download single row");
             res.status(400).json({ "Error": "Id not found" });
             return
         }
@@ -517,7 +515,7 @@ router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
         [filters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, filters);
         [mongoFilters, sorters] = MongoFilters.getMongoFiltersAndSorters(filters, null, null);
     }
-    console.log("In downloadxlsx : mongo filters : ", JSON.stringify(mongoFilters, null, 4));
+    logger.info(mongoFilters, "In downloadxlsx : mongo filters");
     let options = {};
     // @ts-ignore
     if (sorters.length)
@@ -531,15 +529,15 @@ router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
         res.json({output: base64Str});
         fs.unlinkSync(fileName);
     } catch (e) {
-        console.log("downloadXlsx exception: ", e)
+        logger.error(e, "Exception in DownloadXlsx");
     }
 });
 
 
 router.get('/dsList/:dsUser', async (req, res, next) => {
     let request = req.body;
-    console.log("In dsList: ", req.params);
-    console.log("In dsList: ", req.query);
+    logger.info(req.params, "Params in dsList");
+    logger.info(req.query, "Query in dsList");
 
     let dbAbstraction = new DbAbstraction();
     let dbList = await dbAbstraction.listDatabases();
@@ -562,7 +560,7 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
         pruned[i].perms = perms[0];
     }
     pruned.sort((a, b) => a.name.localeCompare(b.name));
-    console.log("Returning: ", pruned);
+    logger.info(pruned, "Returning dsList");
     res.json({ dbList: pruned });
     await dbAbstraction.destroy();
 });
@@ -635,7 +633,7 @@ router.post("/dsList/:dsUser", async (req, res, next) => {
 
 router.post('/deleteDs', async (req, res, next) => {
     let request = req.body;
-    console.log("In deleteDs: ", request);
+    logger.info(request, "Incoming request in deleteDs");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -646,14 +644,14 @@ router.post('/deleteDs', async (req, res, next) => {
     try {
         // XXX: Do lots of validation.
         let dbResponse = await dbAbstraction.deleteDb(request.dsName);
-        console.log ('DeleteDs response: ', dbResponse);
+        logger.info(dbResponse, 'DeleteDs response from DB');
         // @ts-ignore
         fs.rmdirSync(`attachments/${request.dsName}`, { recursive: true });
         let response = {};
         response.status = 'success';
         res.status(200).send(response);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in deleteDs");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -661,12 +659,12 @@ router.post('/deleteDs', async (req, res, next) => {
 
 router.post('/view/addColumn', async (req, res, next) => {
     try {
-        console.log("Received addColumn request:", req.body);
+        logger.info(req.body, "Incoming request in addColumn");
 
         const { dsName, dsView, dsUser, columnName, position, referenceColumn } = req.body;
 
         if (!dsName || !dsView || !dsUser || !columnName || !position || !referenceColumn) {
-            console.error("Missing required parameters!");
+            logger.warn("Missing required parameters!");
             return res.status(400).json({ error: "Missing required parameters" });
         }
 
@@ -674,16 +672,14 @@ router.post('/view/addColumn', async (req, res, next) => {
         const token = req.cookies.jwt;
         let allowed = await AclCheck.aclCheck(dsName, dsView, dsUser, token);
         if (!allowed) {
-            console.error("Access Denied for user:", dsUser);
+            logger.warn(`Access Denied for user: ${dsUser}`);
             return res.status(403).json({ error: "Access Denied" });
         }
-
-        console.log("User is authorized. Fetching metadata...");
         let dbAbstraction = new DbAbstraction();
         let viewDefault = await dbAbstraction.find(dsName, "metaData", { _id: "view_default" }, {});
 
         if (!viewDefault || !viewDefault.length) {
-            console.error("View metadata not found for:", dsName);
+            logger.warn(`View metadata not found for: ${dsName}`);
             return res.status(404).json({ error: "View metadata not found" });
         }
 
@@ -692,11 +688,11 @@ router.post('/view/addColumn', async (req, res, next) => {
         let columnAttrsList = metadata.columnAttrs || [];
 
         if (Object.values(columns).includes(columnName)) {
-            console.error("Column already exists:", columnName);
+            logger.error(`Column already exists: ${columnName}`);
             return res.status(400).json({ error: "Column already exists" });
         }
 
-        console.log("Processing column addition...");
+        logger.info("Processing column addition...");
         let newColumns = {};
         let newColumnAttrs = [];
         let foundReference = false;
@@ -752,23 +748,23 @@ router.post('/view/addColumn', async (req, res, next) => {
 
         // If reference column was not found, add the new column at the end
         if (!foundReference) {
-            console.warn(`Reference column '${referenceColumn}' not found. Adding '${columnName}' at the end.`);
+            logger.warn(`Reference column '${referenceColumn}' not found. Adding '${columnName}' at the end.`);
             newColumns[newColumnsKey] = columnName;
             newColumnAttrs.push(newColumnAttr);
         }
 
-        console.log("Updating metadata...");
+        logger.info("Updating metadata...");
         metadata.columns = newColumns;
         metadata.columnAttrs = newColumnAttrs;
 
         const updateResult = await dbAbstraction.update(dsName, "metaData", { _id: "view_default" }, metadata);
         if (!updateResult || updateResult.modifiedCount === 0) {
-            console.error("Failed to update metadata.");
+            logger.error("Failed to update metadata.");
             return res.status(500).json({ error: "Failed to update metadata" });
         }
 
         // Update filters
-        console.log("Updating filters...");
+        logger.info("Updating filters...");
         let filters = await dbAbstraction.find(dsName, "metaData", { _id: "filters" }, {});
         filters = filters[0] || {};
         let filterKeys = Object.keys(filters);
@@ -783,10 +779,10 @@ router.post('/view/addColumn', async (req, res, next) => {
         if (filterKeys.length)
             await dbAbstraction.updateOne(dsName, "metaData", { _id: "filters" }, filters, false);
 
-        console.log("Column added successfully:", columnName);
+        logger.info(`Column added successfully: ${columnName}`);
         return res.status(200).json({ message: "Column added successfully", columnName });
     } catch (error) {
-        console.error("ERROR in addColumn API:", error);
+        logger.error(error, "Error in addColumn API");
         return res.status(500).json({ error: "Internal Server Error", details: error.toString() });
     }
 });
@@ -794,7 +790,7 @@ router.post('/view/addColumn', async (req, res, next) => {
 // deletion of column api
 router.post('/view/deleteColumn', async (req, res) => {
     let request = req.body;
-    console.log("In deleteColumn: ", request);
+    logger.info(request, "Incoming request in deleteColumn");
     
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
@@ -890,7 +886,7 @@ router.post('/view/deleteColumn', async (req, res) => {
 
         res.status(200).json({ message: `Column "${columnName}" deleted successfully`, oprLog });
     } catch (e) {
-        console.log("Error in deleteColumn:", e);
+        logger.error(e, "Error in deleteColumn");
         res.status(500).send(e);
     } finally {
         await dbAbstraction.destroy();
@@ -898,7 +894,7 @@ router.post('/view/deleteColumn', async (req, res) => {
 });
 router.post('/view/deleteOneDoc', async (req, res, next) => {
     let request = req.body;
-    console.log("In deleteOneDoc: ", request);
+    logger.info(request, "Incoming request in deleteOneDoc");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -921,21 +917,21 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
                 return;
             }
             deletedObj = recs[0];
-            console.log("In deleteOneDoc end-point, recs: ", recs);
-            console.log("Objecting getting deleted: ", deletedObj);
+            logger.info(recs, "In deleteOneDoc end-point, recs");
+            logger.info(deletedObj, "Object getting deleted");
         }
         let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", request.selectorObj);
-        console.log ('deleteOne response: ', dbResponse);
+        logger.info(dbResponse, 'DeleteOne response in deleteOneDoc');
         let response = {};
         response.status = 'success';
 
         let editLog = getDeleteLog(request, deletedObj, response.status);
         let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
-        console.log('editLog (delete) response: ', editLogResp);
+        logger.info(editLogResp, 'editLog (delete) response');
         // XXX: If response fails, do a 'find' query and return the updated attribute.
         res.status(200).send(response);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in deleteOneDoc");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -943,7 +939,7 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
 
 router.post('/view/deleteManyDocs', async (req, res, next) => {
     let request = req.body;
-    console.log("In deleteManyDocs: ", request);
+    logger.info(request, "Incoming request in deleteManyDocs");
     //res.status(200).send({status: 'success'});
     //return;
     const token = req.cookies.jwt;
@@ -964,19 +960,19 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
             if (recs.length == 0)
                 continue;
             deletedObj = recs[0];
-            console.log("Objecting getting deleted: ", deletedObj);
+            logger.info(deletedObj, "Object getting deleted");
             let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", { _id : request.objects[i] });
-            console.log (`deleteManyDocs response for ${request.objects[i]}: `, dbResponse);
+            logger.info(dbResponse, `deleteManyDocs response for ${request.objects[i]}`);
             let editLog = getDeleteLog({ selectorObj: { _id: request.objects[i] } }, deletedObj, "success");
             let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
-            console.log(`editLog (delete) response for ${request.objects[i]}: `, editLogResp);
+            logger.info(editLogResp, `editLog (delete) response for ${request.objects[i]}`);
         }
 
         let response = {};
         response.status = 'success';
         res.status(200).send(response);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in deleteManyDocs");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -985,7 +981,7 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
 
 router.post('/view/setViewDefinitions', async (req, res, next) => {
     let request = req.body;
-    console.log("In setViewDefinitions: ", request);
+    logger.info(request, "Incoming request in setViewDefinitions");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1003,23 +999,23 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         let dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: `view_${request.dsView}` }, { columnAttrs: request.viewDefs } );
         if (request.jiraConfig) {
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, { ...request.jiraConfig });
-            console.log("Add jiraConfig status: ", dbResponse.result);
+            logger.info(dbResponse, "Add jiraConfig status");
         } else {
             dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "jiraConfig" });
-            console.log("Remove jiraConfig status: ", dbResponse);
+            logger.info(dbResponse, "Remove jiraConfig status");
         }
         if (request.jiraAgileConfig) {
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraAgileConfig" }, { ...request.jiraAgileConfig });
-            console.log("Add jiraAgileConfig status: ", dbResponse.result);
+            logger.info(dbResponse, "Add jiraAgileConfig status");
         } else {
             dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "jiraAgileConfig" });
-            console.log("Remove jiraAgileConfig status: ", dbResponse);
+            logger.info(dbResponse, "Remove jiraAgileConfig status");
         }
         dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "dsDescription" }, { ...request.dsDescription });
-        console.log("Update dsDescription status: ", dbResponse.result);
+        logger.info(dbResponse, "Update dsDescription status");
         if (request.otherTableAttrs && Object.keys(request.otherTableAttrs).length) {
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "otherTableAttrs" }, { ...request.otherTableAttrs });
-            console.log("Add otherTableAttrs status: ", dbResponse.result);
+            logger.info(dbResponse, "Add otherTableAttrs status");
         }
         if (request.aclConfig) {
             let aclConfigUsers = "";
@@ -1027,7 +1023,7 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
                 // If there is no value in the aclConfig. we need to remove it.
                 if (request.aclConfig.acl.length === 0) {
                     dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "aclConfig" });
-                    console.log("Remove aclConfig status: ", dbResponse);
+                    logger.info(dbResponse, "Remove aclConfig status");
                 } else {
                     // If there is a value in the aclConfig. we need to add it to the array and update the metadata.
                     aclConfigUsers = request.aclConfig.acl;
@@ -1041,47 +1037,47 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
                     continue;
                 }
                 if (!request.aclConfig.acl.includes(user)) {
-                    console.log("user is not present in aclConfig, adding: ", user);
+                    logger.info(`user is not present in aclConfig, adding: ${user}`);
                     request.aclConfig.acl.push(user);
                 }
             }
             if (!request.aclConfig.acl.includes(request.dsUser)) {
-                console.log("dsUser is not present in aclConfig, adding: ", request.dsUser);
+                logger.info(`dsUser is not present in aclConfig, adding: ${request.dsUser}`);
                 request.aclConfig.acl.push(request.dsUser);
             }
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "aclConfig" }, { ...request.aclConfig });
-            console.log("Add aclConfig status: ", dbResponse.result);
+            logger.info(dbResponse, "Add aclConfig status");
         } else {
             dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "aclConfig" });
-            console.log("Remove aclConfig status: ", dbResponse);
+            logger.info(dbResponse, "Remove aclConfig status");
         }
         if (request.perRowAccessConfig) {
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "perRowAccessConfig" }, { ...request.perRowAccessConfig });
-            console.log("Add perRowAccessConfig status: ", dbResponse.result);
+            logger.info(dbResponse, "Add perRowAccessConfig status");
         }
         if (request.jiraProjectName) {
             dbResponse = await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraProjectName" }, { "jiraProjectName": request.jiraProjectName });
-            console.log("Add jiraProjectName status: ", dbResponse.result);
+            logger.info(dbResponse, "Add jiraProjectName status");
         } else {
             dbResponse = await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "jiraProjectName" });
-            console.log("Remove jiraProjectName: ", dbResponse);
+            logger.info(dbResponse, "Remove jiraProjectName");
         }
         //let dbResponse = await dbAbstraction.removeOne(request.dsName, "data", request.selectorObj);
-        //console.log ('db update response: ', dbResponse);
+        //logger.info ('db update response: ', dbResponse);
         let response = {};
         response.status = 'success';
         response.message = 'ok';
         res.status(200).send(response);
         await dbAbstraction.destroy();
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in setViewDefinitions");
         res.status(415).send({status: 'fail', message: 'Server side exception'});
     }
 });
   
 router.post('/view/refreshJira', async (req, res, next) => {
     let request = req.body;
-    console.log("In refreshJira: ", request);
+    logger.info(request, "Incoming request in refreshJira");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1107,12 +1103,12 @@ router.post('/view/refreshJira', async (req, res, next) => {
             response.status = 'success'
         }
         if (!response.status) {
-            console.log('refreshJira Failed');
+            logger.warn('RefreshJira Failed');
             response.status = 'fail';
         }
         res.status(200).send(response);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in refereshJira");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -1120,7 +1116,7 @@ router.post('/view/refreshJira', async (req, res, next) => {
 
 router.post('/view/addFilter', async (req, res, next) => {
     let request = req.body;
-    console.log("In addFilter: ", request);
+    logger.info(request, "Incoming request in addFilter");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1132,7 +1128,7 @@ router.post('/view/addFilter', async (req, res, next) => {
         // XXX: Do lots of validation.
         // First check if a filters doc is present. If not, add one. 
         let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
-        console.log("Filters: ", filters);
+        logger.info(filters, "Filters in addFilter");
         if (!filters.length) {
             await dbAbstraction.update(request.dsName, "metaData", { _id: "filters" }, { _id: "filters" });
         }
@@ -1143,10 +1139,10 @@ router.post('/view/addFilter', async (req, res, next) => {
         selectorObj[request.filter.name] = null;
         let editObj = {};
         editObj[request.filter.name] = request.filter;
-        console.log('SelectorObj: ', JSON.stringify(selectorObj, null, 4));
-        console.log('editObj: ', JSON.stringify(editObj, null, 4));
+        logger.info(selectorObj, 'SelectorObj in addFilter ');
+        logger.info(editObj, 'EditObj in addFilter ');
         let dbResponse = await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, editObj, false);
-        console.log ('Edit response: ', dbResponse);
+        logger.info(dbResponse, 'Edit response in addFilter');
         let response = {};
         if (dbResponse.nModified == 1) {
             response.status = 'success';
@@ -1154,11 +1150,11 @@ router.post('/view/addFilter', async (req, res, next) => {
             response.status = 'fail';
         }
         filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
-        console.log("Filters: ", filters);
+        logger.info(filters, "Filters after adding filter");
         // XXX: If response fails, do a 'find' query and return the updated attribute.
         res.status(200).send(response);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in addFilter");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -1167,7 +1163,7 @@ router.post('/view/addFilter', async (req, res, next) => {
 
 router.post('/view/editFilter', async (req, res, next) => {
     let request = req.body;
-    console.log("In editFilter: ", request);
+    logger.info(request, "Incoming request in editFilter");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1179,7 +1175,7 @@ router.post('/view/editFilter', async (req, res, next) => {
         // XXX: Do lots of validation.
         // First check if a filters doc is present. If not, add one. 
         let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
-        console.log("Filters: ", filters);
+        logger.info(filters, "Filters in editFilter");
         if (!filters.length) {
             await dbAbstraction.update(request.dsName, "metaData", { _id: "filters" }, { _id: "filters" });
         }
@@ -1189,10 +1185,10 @@ router.post('/view/editFilter', async (req, res, next) => {
         };
         let editObj = {};
         editObj[request.filter.name] = request.filter;
-        console.log('SelectorObj: ', JSON.stringify(selectorObj, null, 4));
-        console.log('editObj: ', JSON.stringify(editObj, null, 4));
+        logger.info(selectorObj, 'SelectorObj in editFilter');
+        logger.info(editObj, 'EditObj in editFilter');
         let dbResponse = await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, editObj, false);
-        console.log ('Edit response: ', dbResponse);
+        logger.info(dbResponse, 'Edit response in editFilter');
         let response = {};
         if (dbResponse.nModified == 1) {
             response.status = 'success';
@@ -1200,11 +1196,11 @@ router.post('/view/editFilter', async (req, res, next) => {
             response.status = 'fail';
         }
         filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
-        console.log("Filters: ", filters);
+        logger.info(filters, "Filters after editing filter");
         // XXX: If response fails, do a 'find' query and return the updated attribute.
         res.status(200).send(response);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in editFilter");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -1212,7 +1208,7 @@ router.post('/view/editFilter', async (req, res, next) => {
 
 router.post('/view/deleteFilter', async (req, res, next) => {
     let request = req.body;
-    console.log("In deleteFilter: ", request);
+    logger.info(request, "Incoming request in deleteFilter");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1224,7 +1220,7 @@ router.post('/view/deleteFilter', async (req, res, next) => {
         // XXX: Do lots of validation.
         // First check if a filters doc is present. If not, add one. 
         let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
-        console.log("Filters: ", filters);
+        logger.info(filters, "Filters in deleteFilter");
         if (!filters.length) {
             await dbAbstraction.update(request.dsName, "metaData", { _id: "filters" }, { _id: "filters" });
         }
@@ -1234,10 +1230,10 @@ router.post('/view/deleteFilter', async (req, res, next) => {
         };
         let unsetObj = {};
         unsetObj[request.filter.name] = "";
-        console.log('SelectorObj: ', JSON.stringify(selectorObj, null, 4));
-        console.log('unsetObj: ', JSON.stringify(unsetObj, null, 4));
+        logger.info(selectorObj, 'SelectorObj in deleteFilter');
+        logger.info(unsetObj, 'UnsetObj in deleteFilter');
         let dbResponse = await dbAbstraction.unsetOne(request.dsName, "metaData", selectorObj, unsetObj, false);
-        console.log ('Unset response: ', dbResponse);
+        logger.info(dbResponse, 'Unset response in deleteFilter');
         let response = {};
         if (dbResponse.nModified == 1) {
             response.status = 'success';
@@ -1245,11 +1241,11 @@ router.post('/view/deleteFilter', async (req, res, next) => {
             response.status = 'fail';
         }
         filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
-        console.log("Filters: ", filters);
+        logger.info(filters, "Filters after deleting filter");
         // XXX: If response fails, do a 'find' query and return the updated attribute.
         res.status(200).send(response);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in deleteFilter");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -1261,10 +1257,11 @@ router.post('/view/deleteFilter', async (req, res, next) => {
 
 router.post('/doBulkEdit', async (req, res, next) => {
     let request = req.body;
-    console.log("In doBulkEdit: ", request);
+    logger.info(request, "Incoming request in doBulkEdit");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
+        logger.warn(`${request.dsUser} doesn't have access to do bulk edit`);
         res.status(403).json({ "Error": "access_denied" });
         return
     }
@@ -1285,7 +1282,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
         Object.entries(curCols).map((kv) => {
             curColsInRev[kv[1]] = kv[0];
         })
-        console.log("Came here #1");
+        logger.info("Came here #1");
         /*
             keys are:  [ 'Work-id' ]
             loadStatus.hdrs are:  {
@@ -1310,7 +1307,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
             if (!colsInSheetInRev[key]) {
                 loadStatus.loadStatus = false;
                 loadStatus.error = `key: ${key} is not present in edit sheet`;
-                console.log(`Bulk edit error: ${loadStatus.error}`);
+                logger.warn(`Bulk edit error: ${loadStatus.error}`);
                 res.status(200).send(loadStatus);
                 return;
             }
@@ -1365,7 +1362,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
             if (request.doIt)
                 await dbAbstraction.update(request.dsName, "metaData", { _id: `view_default` }, { columns, columnAttrs, userColumnAttrs: viewDefault[0].userColumnAttrs } );
         }
-        console.log("Came here #2");
+        logger.info("Came here #2");
         // Now add the new column to all filters
         {
             let filters = await dbAbstraction.find(request.dsName, "metaData", { _id: `filters` }, {} );
@@ -1387,7 +1384,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
             if (request.doIt && filterKeys.length)
                 await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, filters, false);                
         }
-        console.log("Came here #3");
+        logger.info("Came here #3");
         // Nothing more to be done for addition of new columns. Jira config doesn't
         // require any changes. 
 
@@ -1442,11 +1439,11 @@ router.post('/doBulkEdit', async (req, res, next) => {
 
             let delColKeys = Object.keys(delCols);
             if (delColKeys.length) oprLog.push(`Deleting columns: ${JSON.stringify(delColKeys)}`);
-            console.log("New columns: ", JSON.stringify(newColumns, null, 4));
+            logger.info(newColumns, "New columns");
             if (request.doIt)
                 await dbAbstraction.update(request.dsName, "metaData", { _id: `view_default` }, { columns: newColumns, columnAttrs: newColumnAttrs, userColumnAttrs: viewDefault[0].userColumnAttrs } );
         }
-        console.log("Came here #4");
+        logger.info("Came here #4");
 
         // Now scrub from all the filters... 
         {
@@ -1493,7 +1490,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
             if (request.doIt && filterKeys.length)
                 await dbAbstraction.updateOne(request.dsName, "metaData", selectorObj, filters, false);
         }
-        console.log("Came here #5");
+        logger.info("Came here #5");
 
         // Scrub jiraConfig now. 
         {
@@ -1518,7 +1515,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
                     await dbAbstraction.update(request.dsName, "metaData", { _id: "jiraConfig" }, jiraConfig);
             }
         }
-        console.log("Came here #6");
+        logger.info("Came here #6");
 
         // Finally, scrub the data documents and rid them of all the deleted columns        
         {
@@ -1529,7 +1526,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
                     await dbAbstraction.removeFieldFromAll(request.dsName, "data", delCol);
             }
         }
-        console.log("Came here #7");
+        logger.info("Came here #7");
 
         // Delete all rows if asked.
         {
@@ -1539,7 +1536,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
                     await dbAbstraction.removeMany(request.dsName, "data", {});
             }
         }
-        console.log("Came here #8");
+        logger.info("Came here #8");
 
         // Finally update the rows as in the sheet. 
         {
@@ -1548,12 +1545,12 @@ router.post('/doBulkEdit', async (req, res, next) => {
                 // @ts-ignore
                 loadStatus = await excelUtils.bulkUpdateDataIntoDb(request.sheetName, request.selectedRange, loadStatus.hdrs, keys, request.dsName, request.dsUser)
         }
-        console.log("Came here #9");
+        logger.info("Came here #9");
 
         loadStatus.oprLog = oprLog;
         res.status(200).send(loadStatus);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in bulkEdit");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -1561,7 +1558,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
 
 router.post('/createDsFromDs', async (req, res, next) => {
     let request = req.body;
-    console.log("In createDsFromDs:", request);
+    logger.info(request, "Incoming request in createDsFromDs");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.fromDsName, "", request.dsUser, token);
     if (!allowed) {
@@ -1580,7 +1577,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
         let dbList = await dbAbstraction.listDatabases();
         for (let i = 0; i < dbList.length; i++) {
             if (dbList[i].name === request.toDsName) {
-                console.log('createDsFromDs: Dataset name conflict');
+                logger.warn('createDsFromDs: Dataset name conflict');
                 res.status(415).send({ status: 'fail', message: 'Dataset name conflict' });
                 return;
             }
@@ -1619,7 +1616,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
 
         res.status(200).send({ status: 'success', message: 'ok' });
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in createDsFromDs");
         res.status(415).send({ status: 'fail', message: 'Server side exception' });
     }
     await dbAbstraction.destroy();
@@ -1628,7 +1625,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
 
 // router.post('/createJiraIssue', async (req, res, next) => {
 //     let request = req.body
-//     console.log('Create jira issue request:', req.body)
+//     logger.info('Create jira issue request:', req.body)
 //     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser);
 //     if (!allowed) {
 //         res.status(415).json({});
@@ -1640,7 +1637,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
 
 router.post('/getProjectsMetadata', async (req, res, next) => {
     let request = req.body
-    console.log('Create getProjectsMetadata:', req.body)
+    logger.info(request, 'Incoming request in getProjectsMetadata')
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1657,7 +1654,7 @@ router.post('/getProjectsMetadata', async (req, res, next) => {
 
 router.post('/getProjectsMetaDataForProject', async (req, res, next) => {
     let request = req.body
-    console.log('Create getProjectsMetaDataForProject:', req.body)
+    logger.info(request, 'Incoming request in getProjectsMetaDataForProject')
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1665,7 +1662,7 @@ router.post('/getProjectsMetaDataForProject', async (req, res, next) => {
         return
     }
     if (!request.jiraProjectName) {
-        console.log("Expected jiraProjectName in the call to getProjectsMetaDataForProject not found");
+        logger.warn("Expected jiraProjectName in the call to getProjectsMetaDataForProject not found");
         res.status(415).json({})
         return;
     }
@@ -1679,7 +1676,7 @@ router.post('/getProjectsMetaDataForProject', async (req, res, next) => {
 
 router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
     let request = req.body
-    console.log('Create getDefaultTypeFieldsAndValues:', req.body)
+    logger.info(request, 'Incoming request in getDefaultTypeFieldsAndValues');
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1696,7 +1693,7 @@ router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
 
 router.post('/getDefaultTypeFieldsAndValuesForProject', async (req, res, next) => {
     let request = req.body
-    console.log('Get getDefaultTypeFieldsAndValuesForProject:', req.body)
+    logger.info(request, 'Incoming request in getDefaultTypeFieldsAndValuesForProject');
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1704,7 +1701,7 @@ router.post('/getDefaultTypeFieldsAndValuesForProject', async (req, res, next) =
         return
     }
     if (!request.jiraProjectName) {
-        console.log("Expected jiraProjectName in the call to getProjectsMetaDataForProject not found");
+        logger.warn("Expected jiraProjectName in the call to getProjectsMetaDataForProject not found");
         res.status(415).json({})
         return;
     }
@@ -1718,7 +1715,7 @@ router.post('/getDefaultTypeFieldsAndValuesForProject', async (req, res, next) =
 
 router.post('/view/convertToJira', async (req, res, next) => {
     let request = req.body;
-    console.log("In convertToJira: ", request);
+    logger.info(request, "Incoming request in convertToJira");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1766,7 +1763,7 @@ router.post('/view/convertToJira', async (req, res, next) => {
         res.status(200).send(response)
         return
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in convertToJira");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();
@@ -1774,7 +1771,7 @@ router.post('/view/convertToJira', async (req, res, next) => {
 
 router.post('/view/addJiraRow', async (req, res, next) => {
     let request = req.body;
-    console.log("In addJiraRow: ", request);
+    logger.info(request, "Incoming request in addJiraRow");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -1823,7 +1820,7 @@ router.post('/view/addJiraRow', async (req, res, next) => {
         }
         let dbAbstraction = new DbAbstraction();
         let dbResponse = await dbAbstraction.insertOneUniquely(request.dsName, "data", selectorObj, fullRec);
-        console.log('insertOneUniquely response: ', dbResponse);
+        logger.info(dbResponse, 'insertOneUniquely db response in addJiraRow');
         if (dbResponse.ok == 1 && dbResponse.upserted && dbResponse.upserted.length == 1) {
             response.status = 'success';
             response._id = dbResponse.upserted[0]._id;
@@ -1845,7 +1842,7 @@ router.post('/view/addJiraRow', async (req, res, next) => {
         res.status(200).send(response)
         return
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in addJiraRow");
         res.status(415).send(e);
     }
     await dbAbstraction.destroy();

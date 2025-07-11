@@ -3,7 +3,8 @@ var JiraApi = require('jira-client');
 const { async } = require('regenerator-runtime');
 const DbAbstraction = require('./dbAbstraction');
 const JiraSettings = require('./jiraSettings');
-const utils = require('./utils')
+const utils = require('./utils');
+const logger = require('./logger');
 // Initialize
 
 let host = JiraSettings.host;
@@ -148,7 +149,7 @@ async function editSingleAttribute(req) {
             if (Object.keys(editedObj).length != 0) {
                 try {
                     let ret = await jira.updateIssue(jiraIssueName, { "fields": editedObj })
-                    console.log(ret)
+                    logger.info(ret, "Record updated in JIRA");
                 } catch (e) {
                     response.status = 'fail'
                     response.error = `unable to update the record to JIRA. Error: ${e.message}`
@@ -331,7 +332,7 @@ async function getSprintIdFromSprintName(sprintName, boardId) {
             }
         }
     } catch (e) {
-        console.log(`Got error while retreiving sprintId for Sprint Name ${sprintName} for boardId ${boardId}`);
+        logger.error(e, `Got error while retreiving sprintId for Sprint Name ${sprintName} for boardId ${boardId}`);
     }
     return sprintId
 }
@@ -358,7 +359,7 @@ async function writeToDb(request, keyBeingEdited) {
     let dbAbstraction = new DbAbstraction();
     let response = {}
     if (keyBeingEdited) {
-        console.log("A key is being edited: Do in transaction");
+        logger.info("A key is being edited: Do in transaction");
         // Selector obj must contain all the keys for this case. Send this from the UI. 
         // Look for an obj with all those keys. If one exists, then fail the edit. Else
         // update the object. 
@@ -371,7 +372,7 @@ async function writeToDb(request, keyBeingEdited) {
         }
     } else {
         let dbResponse = await dbAbstraction.updateOne(request.dsName, "data", request.selectorObj, request.editObj);
-        console.log('Edit response: ', dbResponse);
+        logger.info(dbResponse, "Edit response from DB");
         if (dbResponse.nModified == 1) {
             response.status = 'success';
         } else {
@@ -399,7 +400,7 @@ async function insertInEditLog(request, keyBeingEdited, status) {
     let dbAbstraction = new DbAbstraction();
     let editLog = getSingleEditLog(request, keyBeingEdited, status);
     let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
-    console.log('editLog (edit) response: ', editLogResp);
+    logger.info(editLogResp, "Edit log response from DB");
     await dbAbstraction.destroy()
 }
 
@@ -510,10 +511,9 @@ async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
             response = await dbAbstraction.pagedFind(dsName, "data", filters, {}, page, perPage)
             page += 1;
             for (let i = 0; i < response.data.length; i++) {
-                console.log(response.data[i]);
                 let ret = utils.parseRecord(response.data[i], revContentMap, jiraAgileConfig.jiraFieldMapping)
                 if (!ret.parseSuccess) {
-                    console.log('unable to parse the record while getting assignees for all jiraAgileRows')
+                    logger.warn('Unable to parse the record while getting assignees for all jiraAgileRows');
                     return assignees
                 }
                 let jiraRec = ret.rec
@@ -524,7 +524,7 @@ async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
             }
         } while (page <= response.total_pages)
     } catch (e) {
-        console.log("Error in getAllAssigneesForJiraAgile", e)
+        logger.error(e, "Error in getAllAssigneesForJiraAgile");
     }
     dbAbstraction.destroy();
     return Array.from(assignees);
@@ -557,7 +557,7 @@ async function getIssuesForGivenTypes(type, dsName, jiraAgileConfig) {
             for (let i = 0; i < response.data.length; i++) {
                 let ret = utils.parseRecord(response.data[i], revContentMap, jiraAgileConfig.jiraFieldMapping)
                 if (!ret.parseSuccess) {
-                    console.log('unable to parse the record while getting assignees for all jiraAgileRows')
+                    logger.warn('Unable to parse the record while getting assignees for all jiraAgileRows')
                     return issues
                 }
                 let jiraRec = ret.rec
@@ -572,7 +572,7 @@ async function getIssuesForGivenTypes(type, dsName, jiraAgileConfig) {
             }
         } while (page <= response.total_pages)
     } catch (e) {
-        console.log("Error in getIssuesForGivenTypes", e)
+        logger.error(e, "Error in getIssuesForGivenTypes");
     }
     dbAbstraction.destroy();
     return Array.from(issues);

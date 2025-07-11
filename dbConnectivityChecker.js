@@ -1,3 +1,5 @@
+const logger = require('./logger');
+
 const MongoClient = require('mongodb').MongoClient;
 
 class DbConnectivityChecker {
@@ -17,7 +19,7 @@ class DbConnectivityChecker {
                 if ( this.dbConnectedState !== true) {
                     this.dbConnectedState = true;
                     this.io.emit('dbConnectivityState', { dbState: this.dbConnectedState });
-                    console.log(`${Date()} Mongo db server heart beat is success, dbConnectedState :`, this.dbConnectedState);
+                    logger.info(`Mongo db server heart beat is success, dbConnectedState : ${this.dbConnectedState}`);
                 }
             });
     
@@ -25,13 +27,13 @@ class DbConnectivityChecker {
                 if ( this.dbConnectedState !== false) {
                     this.dbConnectedState = false;
                     this.io.emit('dbConnectivityState', { dbState: this.dbConnectedState });
-                    console.log(`${Date()} Mongo db server heart beat has failed, dbConnectedState :`, this.dbConnectedState);
+                    logger.info(`Mongo db server heart beat has failed, dbConnectedState : ${this.dbConnectedState}`);
                 }
             });
             
             await MongoDbClient.connect();
         } catch (error) {
-            console.error('Db is not up.. Exiting the process');
+            logger.error(error, 'Db is not up.. Exiting the process');
             process.exit(0);
         }
     }

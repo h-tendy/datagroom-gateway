@@ -1,12 +1,14 @@
 // @ts-check
 
+const logger = require('../logger');
+
 //@ts-ignore
 var ObjectId = require('mongodb').ObjectId; 
 
 function getFilters(str, field) {
     let terms = [], type = '', inBrackets = 0;
     let curTerm = '', mongoFilter = {};
-    console.log("getFilters with: ", str);
+    logger.info(`getFilters with: ${str}`);
     try {
         for (let i = 0; i < str.length; i++) {
             if (str[i] == '(') { inBrackets++ }
@@ -38,10 +40,10 @@ function getFilters(str, field) {
                 terms.push(curTerm.trim()); curTerm = '';
             }
         }
-        console.log('Found terms: ', terms);
-        console.log('Type is: ', type);
+        logger.info(terms, `Found terms`);
+        logger.info(type, 'Type is');
     } catch (e) {
-        console.log(e);
+        logger.error(e, "Exception in getFilters");
         mongoFilter = {}; terms = []; type = ''
     }
     if (terms.length == 1) {
@@ -104,7 +106,7 @@ function getFilters(str, field) {
         }
         mongoFilter = { $or: [ ...childFilters ] };
     }
-    console.log("Final mongoFilter: ", JSON.stringify(mongoFilter, null, 4));
+    logger.info(mongoFilter, "Final mongoFilter");
     return mongoFilter;
 }
 
@@ -144,7 +146,7 @@ function getMongoFiltersAndSorters (qFilters, qSorters, qChronology) {
             }*/
         })
     } catch (e) { 
-        console.log("Exception in getMongoFiltersAndSorters: ", e) 
+        logger.error(e, "Exception in getMongoFiltersAndSorters");
         filters["_id"] = { $eq: "" };
     }
     if (orFilters.length)
