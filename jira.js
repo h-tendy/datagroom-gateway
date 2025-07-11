@@ -61,7 +61,7 @@ async function refreshJiraQuery(dsName, jiraConfig) {
     let dbAbstraction = new DbAbstraction();
     /*
     let keys = await dbAbstraction.find(dsName, "metaData", { _id: `keys` }, {} );
-    console.log("keys: ", keys[0]);
+    logger.info("keys: ", keys[0]);
     keys = keys[0].keys; 
     let keysMapping = {'Work-id' : 'key'} */
     for (let i = 0; i < resultRecords.length; i++) {
@@ -72,8 +72,8 @@ async function refreshJiraQuery(dsName, jiraConfig) {
         } else {
             r = doJiraMapping(rec, jiraConfig);
         }
-        // console.log("selectorObj: ", r.selectorObj);
-        // console.log("FullRec: ", r.fullRec);
+        // logger.info("selectorObj: ", r.selectorObj);
+        // logger.info("FullRec: ", r.fullRec);
         try {
             await dbAbstraction.update(dsName, "data", r.selectorObj, r.fullRec);
         } catch (e) {
@@ -224,14 +224,14 @@ async function markAsStale(dsName, jiraConfig) {
         //filters[jiraKeyMapping['key']] = {$regex: `IQN-`, $options: 'i'};
     } catch (e) { }
     // XXX: Do lots of validation.
-    //console.log("mongo filters: ", filters);
+    //logger.info("mongo filters: ", filters);
     let dbAbstraction = new DbAbstraction();
     let response = {};
     let page = 1, perPage = 5;
     try {
         do {
             response = await dbAbstraction.pagedFind(dsName, 'data', filters, {}, page, perPage);
-            //console.log("Response: ", response);
+            //logger.info("Response: ", response);
             page += 1;
 
             for (let i = 0; i < response.data.length; i++) {

@@ -16,14 +16,14 @@ var lock = async (key) => {
         let p = new Promise ((resolve, reject) => {
                                 f = () => {
                                     resolve();
-                                    //console.log("Lock obtained for: ", key)
+                                    //logger.info("Lock obtained for: ", key)
                                 };
                                 lockMap[key].waiting.push(f);
                             });
-        //console.log("Queuing for lock: ", key);
+        //logger.info("Queuing for lock: ", key);
         return p; 
     }
-    //console.log("Lock obtained for: ", key);
+    //logger.info("Lock obtained for: ", key);
     lockMap[key] = {locked: true, waiting: []};
     return 1;
 }
@@ -33,10 +33,10 @@ var unlock = async (key) => {
         if (lockMap[key].waiting.length) {
             let f = lockMap[key].waiting.shift();
             f(); // resolve the next in line
-            //console.log("Dequeuing next in line for:", key);
+            //logger.info("Dequeuing next in line for:", key);
         } else {
             delete lockMap[key];
-            //console.log("Last unlock done! : ", key);
+            //logger.info("Last unlock done! : ", key);
         }
     } else {
         logger.warn(`Spurious unlock! : ${key}`);
