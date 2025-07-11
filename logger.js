@@ -38,6 +38,7 @@ const customLogMethod = function (args, method) {
 
 const logger = pino({
     level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+    nestedKey: 'payload', // any object is logged under payload key
     hooks: {
         logMethod: customLogMethod
     },
@@ -50,13 +51,5 @@ const logger = pino({
     timestamp: () => `,"time":"${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}"`
 }, process.env.NODE_ENV === 'production' ? dest : process.stdout);
 
-
-logger.info("info");
-logger.fatal('this is fatal');
-logger.error('error');
-logger.warn('warn');
-logger.debug('debug');
-logger.trace('trace');
-logger.silent('silent');
 
 module.exports = logger;

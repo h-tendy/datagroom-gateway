@@ -71,7 +71,7 @@ async function doIt(fromUrl, toUrl) {
                 }
                 let ret = await toCol.insertOne(doc);
                 if (ret.result.ok !== 1) {
-                    logger.fatal(`InsertOne failed: ${ret.result}`);
+                    logger.warn(`InsertOne failed: ${ret.result}`);
                 }
             }
         }
