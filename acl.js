@@ -1,6 +1,7 @@
 const DbAbstraction = require('./dbAbstraction');
 const jwt = require('jsonwebtoken');
 const Utils = require('./utils');
+const logger = require('./logger');
 
 async function aclCheck(dsName, dsView, dsUser, token = null) {
     let dbAbstraction = new DbAbstraction();
@@ -15,7 +16,7 @@ async function aclCheck(dsName, dsView, dsUser, token = null) {
             await dbAbstraction.destroy();
             return true
         }
-        console.log("User is: ", dsUser);
+        logger.info(`User is: , ${dsUser} in aclCheck`);
         if (token) {
             try {
                 const decode = jwt.verify(token, Utils.jwtSecret)
@@ -24,16 +25,16 @@ async function aclCheck(dsName, dsView, dsUser, token = null) {
                     await dbAbstraction.destroy();
                     return true
                 } else {
-                    console.log(`User ${dsUser} does not have access`)
+                    logger.warn(`User ${dsUser} does not have access`);
                 }
             } catch (e) {
-                console.log("Error verifying token");
+                logger.error(e, "Error verifying token in aclcheck");
             }
         } else {
-            console.log("Got no token in acl check")
+            logger.warn("Got no token in acl check");
         }
     } catch (e) {
-        console.log("In aclCheck, exception: ", e);
+        logger.error(e, "Exception in aclCheck");
     }
     await dbAbstraction.destroy();
     return false;
