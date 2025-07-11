@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const multer = require('multer');
 const ExcelUtils = require('../excelUtils');
+const logger = require('../logger');
 
 var upload = multer({
     storage: multer.diskStorage({
@@ -13,7 +14,7 @@ var upload = multer({
 }).single('file');
 
 function fileFilter(r, f, cb) {
-    console.log("Received request for upload: ", f.mimetype)
+    logger.info(`Received request for upload: ${f.mimetype}`);
     let supportedMimeTypes = [
         'application/vnd.ms-excel',
         'application/vnd.ms-excel',
@@ -46,7 +47,7 @@ router.post('/', (req, res, next) => {
         else if (err) {
             return res.send(err);
         }
-        console.log("Upload complete. File: ", JSON.stringify(req.file, null, 4));
+        logger.info(req.file, "Upload complete for file");
         try {
             let excelUtils = await ExcelUtils.getExcelUtilsForFile(req.file.path);
             let sheetNames = excelUtils.getSheetNames();
@@ -62,7 +63,7 @@ router.post('/', (req, res, next) => {
 // Not used. 
 router.post('/findHeadersInSheet', async (req, res, next) => {
     let request = req.body;
-    console.log("In findHeadersInSheet: ", request);
+    logger.info(request, "Incoming request in findHeadersInSheet");
     try {
         let excelUtils = await ExcelUtils.getExcelUtilsForFile("uploads/" + request.fileName);
         let hdrsInSheet = excelUtils.findHeadersInSheet(request.sheetName);
@@ -74,20 +75,20 @@ router.post('/findHeadersInSheet', async (req, res, next) => {
 
 router.post('/loadHdrsFromRange', async (req, res, next) => {
     let request = req.body;
-    console.log("In loadHdrsFromRange: ", request);
+    logger.info(request, "Incoming request in loadHdrsFromRange");
     try {
         let excelUtils = await ExcelUtils.getExcelUtilsForFile("uploads/" + request.fileName);
         let loadStatus = await excelUtils.loadHdrsFromRange(request.sheetName, request.selectedRange);
         res.status(200).send(loadStatus);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in loadHdrsFromRange");
         res.status(415).send(e);
     }
 });
 
 router.post('/createDs', async (req, res, next) => {
     let request = req.body;
-    console.log("In createDs: ", request);
+    logger.info(request, "Incoming request in createDs");
     try {
         let excelUtils = await ExcelUtils.getExcelUtilsForFile("uploads/" + request.fileName);
         let loadStatus = await excelUtils.loadHdrsFromRange(request.sheetName, request.selectedRange);
@@ -99,7 +100,7 @@ router.post('/createDs', async (req, res, next) => {
 
         res.status(200).send(loadStatus);
     } catch (e) {
-        console.log("Got exception: ", e);
+        logger.error(e, "Exception in createDs");
         res.status(415).send(e);
     }
 });
