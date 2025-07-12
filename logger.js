@@ -37,7 +37,7 @@ const customLogMethod = function (args, method) {
 }
 
 const logger = pino({
-    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+    level: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
     nestedKey: 'payload', // any object is logged under payload key
     hooks: {
         logMethod: customLogMethod
@@ -49,7 +49,7 @@ const logger = pino({
     },
     base: null, // Doesn't log hostname and pid everytime.
     timestamp: () => `,"time":"${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}"`
-}, process.env.NODE_ENV === 'production' ? dest : process.stdout);
+}, process.env.NODE_ENV === 'development' ? process.stdout : dest);
 
 
 module.exports = logger;
