@@ -226,7 +226,6 @@ class ExcelUtils {
         aclSheet.getCell("A1").value = JSON.stringify(aclConfig, null, 4);
 
         await workbook.xlsx.writeFile(fileName);
-        await dbAbstraction.destroy();
     }
 
     async loadDataIntoDb (sheet, range, hdrs, keys, dsName, dsUser) {
@@ -344,7 +343,6 @@ class ExcelUtils {
         } catch (e) {
             logger.error(e, "Db metaData update error");
         }
-        await dbAbstraction.destroy();
         return { loadStatus: true, range, rangeIndices, hdrs }
     }
 
@@ -397,7 +395,6 @@ class ExcelUtils {
                 logger.error(e, "Db update error in bulkUpdateDataInDb");
             }
         }
-        await dbAbstraction.destroy();
         return { loadStatus: true, range, rangeIndices, hdrs }
     }
 

@@ -7,31 +7,106 @@ const MongoClient = require('mongodb').MongoClient;
 var ObjectId = require('mongodb').ObjectId;
 
 class DbAbstraction {
+
+    // Holds the singleton object of this class
+    static _instance = null;
+
     constructor () {
+        //Enforce singleton, if an instance exists, return it.
+        if (DbAbstraction._instance) {
+            return DbAbstraction._instance;
+        }
+        // If no instance exists, set the current instance as the singleton object
+        DbAbstraction._instance = this;
         this.url = process.env.DATABASE || 'mongodb://localhost:27017';
         this.client = null;
+        this.connectionPromise = null;
+        this.isConnected = false;
     }
+
+    resetConnectionState() {
+        this.isConnected = false;
+        this.client = null;
+        this.connectionPromise = null;
+    }
+
     async destroy () {
-        if (this.client) {
-            await this.client.close(true);
-            this.client = null;
+        if (this.isConnected) {
+            try {
+                await this.client.close(true);
+                logger.warn("MongoDB: Client is closing the connection");
+                this.resetConnectionState();
+                DbAbstraction._instance = null;
+            } catch(err) {
+                logger.error(err, "Exception while closing the client connection to MongoDB");
+            }
+        } else {
+            logger.info("MongoDB: No active connection to close");
         }
     }
+
     async connect () {
-        this.client = await MongoClient.connect(this.url, { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 5000 })
-            .catch(err => { logger.error(err, "Error while connecting to Mongodb"); this.client = null; });
+        if (this.isConnected && this.client && this.client.topology 
+            && this.client.topology.isConnected()) {
+            logger.debug('Already a client connection to DB. Reusing this');
+            return;
+        }
+
+        if (this.connectionPromise) {
+            logger.warn('MongoDB: Connection in progress, waiting for it to complete');
+            await this.connectionPromise;
+            return;
+        }
+
+        logger.info('MongoDB: Initialising new client connection');
+        try {
+            this.client = new MongoClient(this.url, {
+                maxPoolSize: 10, //Maintain upto 10 sockets
+                minPoolSize: 3, // Keep at least 3 connections open
+                useNewUrlParser: true, 
+                useUnifiedTopology: true, 
+                serverSelectionTimeoutMS: 5000, // Timeout after 5 seconds if server not found
+                socketTimeoutMS: 45000 //Close sockets after 45s of inactivity
+            });
+            
+            this.connectionPromise = this.client.connect();
+            
+            await this.connectionPromise;
+
+            this.isConnected = true;
+
+            logger.info("MongoDB: Succesfully connected");
+
+            this.client.on('connectionPoolCreated', () => logger.info('MongoDB: Connection pool created.'));
+            this.client.on('connectionPoolClosed', () => logger.info('MongoDB: Connection pool closed.'));
+            this.client.on('connectionCreated', () => logger.info('MongoDB: New connection created in pool.'));
+            this.client.on('connectionClosed', () => logger.info('MongoDB: Connection closed from pool.'));
+            this.client.on('connectionReady', () => logger.info('MongoDB: Connection ready for use.'));
+            this.client.on('error', (err) => logger.error(err, 'MongoDB: Client error:'));
+            this.client.on('timeout', () => logger.warn('MongoDB: Connection timeout!'));
+            this.client.on('close', () => {
+                logger.warn("MongoDB: Connection closed");
+                this.resetConnectionState();
+                DbAbstraction._instance = null;
+            });
+        } catch (err) {
+            logger.error(err, "MongoDB: Error while creating client connection");
+            this.resetConnectionState();
+            DbAbstraction._instance = null;
+        }
     }
+
     async createDb (dbName) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         this.client.db(dbName);
     }
     async deleteDb (dbName) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         return await db.dropDatabase();
     }
     async deleteTable (dbName, tableName) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         let ret = await collection.drop();
@@ -39,21 +114,21 @@ class DbAbstraction {
 
     }
     async createTable (dbName, tableName) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         db.collection(tableName);
     }
     // Only double-quotes need to be escaped while inserting data rows. 
     // And don't allow column names which start with underscore. Or at least don't allow _id
     async insertOne (dbName, tableName, doc) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         let ret = await collection.insertOne(doc);
         return ret.result;
     }
     async insertOneUniquely (dbName, tableName, selector, setObj) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         if (selector["_id"]) {
@@ -64,13 +139,13 @@ class DbAbstraction {
         return ret.result;
     }
     async update (dbName, tableName, selector, updateObj) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         return await collection.updateMany(selector, { $set: updateObj }, { upsert: true });
     }
     async updateOne (dbName, tableName, selector, updateObj, convertId = true) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         if (selector["_id"] && convertId) {
@@ -81,7 +156,7 @@ class DbAbstraction {
     }
 
     async unsetOne (dbName, tableName, selector, unsetObj, convertId = true) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         if (selector["_id"] && convertId) {
@@ -92,7 +167,7 @@ class DbAbstraction {
     }
 
     async updateOneKeyInTransaction (dbName, tableName, selector, updateObj) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         const session = this.client.startSession();
         let ret = {}; 
@@ -124,7 +199,7 @@ class DbAbstraction {
     }
 
     async removeOne (dbName, tableName, selector) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         if (selector["_id"]) {
@@ -135,7 +210,7 @@ class DbAbstraction {
     }
 
     async removeOneWithValidId (dbName, tableName, selector) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         let ret = await collection.deleteOne(selector);
@@ -143,7 +218,7 @@ class DbAbstraction {
     }
 
     async removeMany (dbName, tableName, selector, convertId = true) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         if (selector["_id"] && convertId) {
@@ -154,7 +229,7 @@ class DbAbstraction {
     }
 
     async removeFieldFromAll (dbName, tableName, field) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         let unsetObj = {};
@@ -164,7 +239,7 @@ class DbAbstraction {
     }
 
     async countDocuments (dbName, tableName, query, options) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
 
@@ -178,7 +253,7 @@ class DbAbstraction {
         return new ObjectId(id);
     }
     async find (dbName, tableName, query, options) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
 
@@ -190,7 +265,7 @@ class DbAbstraction {
     }
 
     async removeFromQuery(dbName, tableName, query, options) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let db = this.client.db(dbName);
         let collection = db.collection(tableName);
         let count = 0;
@@ -252,7 +327,7 @@ class DbAbstraction {
     }
 
     async listDatabases () {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let dbs = await this.client.db().admin().listDatabases();
         return dbs.databases;
     }
@@ -263,7 +338,7 @@ class DbAbstraction {
    * @returns {Promise<Array>}
    */
     async listFilteredDatabases(filter) {
-        if (!this.client) await this.connect();
+        if (!this.isConnected) await this.connect();
         let dbs = await this.client
             .db()
             .admin()
@@ -272,7 +347,7 @@ class DbAbstraction {
     }
 
     async copy (fromDsName, fromTable, toDsName, toTable, fn) {
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let fromDb = this.client.db(fromDsName);
         let toDb = this.client.db(toDsName);
         let fromCollection = fromDb.collection(fromTable);
@@ -293,7 +368,7 @@ class DbAbstraction {
 
     async hello () {
         logger.info("Hello from DbAbstraction!");
-        if (! this.client ) await this.connect();
+        if (! this.isConnected ) await this.connect();
         let dbs = await this.client.db().admin().listDatabases();        
         logger.info(dbs.databases, "Databases list");
         return;

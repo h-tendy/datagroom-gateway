@@ -93,7 +93,6 @@ async function editSingleAttribute(req) {
         /**Get record from db and parse it accordingly */
         let recs = await dbAbstraction.find(request.dsName, "data", { _id: dbAbstraction.getObjectId(request.selectorObj._id) }, {});
         let record = recs[0]
-        dbAbstraction.destroy()
         ret = utils.parseRecord(record, revContentMap, jiraAgileConfig.jiraFieldMapping)
         if (!ret.parseSuccess) {
             response.status = 'fail'
@@ -351,7 +350,6 @@ async function ifKeyBeingEdited(request) {
             }
         }
     }
-    await dbAbstraction.destroy()
     return keyBeingEdited
 }
 
@@ -392,7 +390,6 @@ async function writeToDb(request, keyBeingEdited) {
             }
         }
     }
-    await dbAbstraction.destroy();
     return response
 }
 
@@ -401,7 +398,6 @@ async function insertInEditLog(request, keyBeingEdited, status) {
     let editLog = getSingleEditLog(request, keyBeingEdited, status);
     let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
     logger.info(editLogResp, "Edit log response from DB");
-    await dbAbstraction.destroy()
 }
 
 function getSingleEditLog(req, isKey, status) {
@@ -526,7 +522,6 @@ async function getAllAssigneesForJiraAgile(dsName, jiraAgileConfig) {
     } catch (e) {
         logger.error(e, "Error in getAllAssigneesForJiraAgile");
     }
-    dbAbstraction.destroy();
     return Array.from(assignees);
 }
 
@@ -574,7 +569,6 @@ async function getIssuesForGivenTypes(type, dsName, jiraAgileConfig) {
     } catch (e) {
         logger.error(e, "Error in getIssuesForGivenTypes");
     }
-    dbAbstraction.destroy();
     return Array.from(issues);
 }
 

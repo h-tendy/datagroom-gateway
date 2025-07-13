@@ -80,7 +80,6 @@ async function refreshJiraQuery(dsName, jiraConfig) {
             logger.error(e, "Db update error refreshJiraQuery");
         }
     }
-    await dbAbstraction.destroy();
 }
 
 function doJiraMapping(rec, jiraConfig) {
@@ -273,8 +272,9 @@ async function markAsStale(dsName, jiraConfig) {
                 }
             }
         } while (page <= response.total_pages)
-    } catch (e) { }
-    await dbAbstraction.destroy();
+    } catch (e) {
+        logger.error(e, "Exception in markAsStale");
+    }
 }
 
 
@@ -427,7 +427,6 @@ async function getAllAssigneesForJira(dsName, jiraConfig) {
     } catch (e) {
         logger.error(e, "Error in getAllAssigneesForJiraAgile");
     }
-    dbAbstraction.destroy();
     return Array.from(assignees);
 }
 
@@ -777,7 +776,6 @@ async function updateJiraRecInDb(dsName, selectorObj, jiraRec, jiraConfig) {
         response.error = 'unable to update the jiraRec in db'
         logger.error(e, "Db update error refreshJiraQuery");
     }
-    await dbAbstraction.destroy();
     return response
 }
 

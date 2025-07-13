@@ -62,7 +62,6 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     perRowAccessConfig = perRowAccessConfig[0]
     let jiraProjectName = await dbAbstraction.find(req.params.dsName, "metaData", { _id: `jiraProjectName` }, {});
     jiraProjectName = (jiraProjectName && jiraProjectName.length == 1 && jiraProjectName[0].jiraProjectName) ? jiraProjectName[0].jiraProjectName : "";
-    await dbAbstraction.destroy();
     res.status(200).json({ columns: response[0].columns, columnAttrs: response[0].columnAttrs, keys: keys[0].keys, jiraConfig, dsDescription, filters, otherTableAttrs, aclConfig, jiraAgileConfig, jiraProjectName, perRowAccessConfig });
     return;
 });
@@ -106,7 +105,6 @@ async function pager (req, res, collectionName) {
     } catch (e) {
         logger.error(e, "Exception in pager: ");
     }
-    await dbAbstraction.destroy();
     res.status(200).json(response);
 }
 
@@ -155,7 +153,6 @@ router.get('/view/:dsName/:dsView/:dsUser/:id', async (req, res, next) => {
     } catch (e) {
         logger.error(e, 'Exception while getting the data from id');
     }
-    await dbAbstraction.destroy();
     res.status(200).json(response);
 });
 
@@ -227,8 +224,6 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
         response = {};
         response.count = count;
     }
-
-    await dbAbstraction.destroy();
     logger.info(response, "Response in deleteFromQuery");
     res.status(200).json(response);
 });
@@ -302,14 +297,12 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
                 response.error = resp.error
                 if (resp.record) response.record = resp.record
                 res.status(200).send(response);
-                await dbAbstraction.destroy();
                 return
             }
         } else {
             response.status = 'fail';
             response.error = 'Row not found!';
             res.status(200).send(response);
-            await dbAbstraction.destroy();
             return
         }
         let keys = await dbAbstraction.find(request.dsName, "metaData", { _id: `keys` }, {} );
@@ -367,7 +360,6 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
         logger.error(e, "Exception in editing singleAttribute");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 function isJiraAgileRec(rec) {
@@ -423,7 +415,6 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
         logger.error(e, "Exception in insertOneDoc");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 // XXX: Wonder who uses this api? It doesn't seem to be used from 
@@ -450,7 +441,6 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
             if (recs.length == 0) {
                 let response = { status: 'fail', error: 'Row not found!'}
                 res.status(200).send(response);
-                await dbAbstraction.destroy();
                 return    
             }
         }
@@ -483,7 +473,6 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
         logger.error(e, "Got exception: ");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 
@@ -562,7 +551,6 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
     pruned.sort((a, b) => a.name.localeCompare(b.name));
     logger.info(pruned, "Returning dsList");
     res.json({ dbList: pruned });
-    await dbAbstraction.destroy();
 });
 
 router.post("/dsList/:dsUser", async (req, res, next) => {
@@ -628,7 +616,6 @@ router.post("/dsList/:dsUser", async (req, res, next) => {
     // return the databases list
     pruned.sort((a, b) => a.name.localeCompare(b.name));
     res.json({ dbList: pruned });
-    await dbAbstraction.destroy();
 });
 
 router.post('/deleteDs', async (req, res, next) => {
@@ -654,7 +641,6 @@ router.post('/deleteDs', async (req, res, next) => {
         logger.error(e, "Exception in deleteDs");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 router.post('/view/addColumn', async (req, res, next) => {
@@ -888,8 +874,6 @@ router.post('/view/deleteColumn', async (req, res) => {
     } catch (e) {
         logger.error(e, "Error in deleteColumn");
         res.status(500).send(e);
-    } finally {
-        await dbAbstraction.destroy();
     }
 });
 router.post('/view/deleteOneDoc', async (req, res, next) => {
@@ -913,7 +897,6 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
             // @ts-ignore
             if (recs.length == 0) {
                 res.status(200).send({ status: 'fail', error: 'Row not found!'});
-                await dbAbstraction.destroy();
                 return;
             }
             deletedObj = recs[0];
@@ -934,7 +917,6 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
         logger.error(e, "Exception in deleteOneDoc");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 router.post('/view/deleteManyDocs', async (req, res, next) => {
@@ -975,7 +957,6 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
         logger.error(e, "Exception in deleteManyDocs");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 
@@ -1068,7 +1049,6 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         response.status = 'success';
         response.message = 'ok';
         res.status(200).send(response);
-        await dbAbstraction.destroy();
     } catch (e) {
         logger.error(e, "Exception in setViewDefinitions");
         res.status(415).send({status: 'fail', message: 'Server side exception'});
@@ -1111,7 +1091,6 @@ router.post('/view/refreshJira', async (req, res, next) => {
         logger.error(e, "Exception in refereshJira");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 router.post('/view/addFilter', async (req, res, next) => {
@@ -1157,7 +1136,6 @@ router.post('/view/addFilter', async (req, res, next) => {
         logger.error(e, "Exception in addFilter");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 
@@ -1203,7 +1181,6 @@ router.post('/view/editFilter', async (req, res, next) => {
         logger.error(e, "Exception in editFilter");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 router.post('/view/deleteFilter', async (req, res, next) => {
@@ -1248,7 +1225,6 @@ router.post('/view/deleteFilter', async (req, res, next) => {
         logger.error(e, "Exception in deleteFilter");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 
@@ -1553,7 +1529,6 @@ router.post('/doBulkEdit', async (req, res, next) => {
         logger.error(e, "Exception in bulkEdit");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 router.post('/createDsFromDs', async (req, res, next) => {
@@ -1619,7 +1594,6 @@ router.post('/createDsFromDs', async (req, res, next) => {
         logger.error(e, "Exception in createDsFromDs");
         res.status(415).send({ status: 'fail', message: 'Server side exception' });
     }
-    await dbAbstraction.destroy();
 });
 
 
@@ -1766,7 +1740,6 @@ router.post('/view/convertToJira', async (req, res, next) => {
         logger.error(e, "Exception in convertToJira");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 router.post('/view/addJiraRow', async (req, res, next) => {
@@ -1845,7 +1818,6 @@ router.post('/view/addJiraRow', async (req, res, next) => {
         logger.error(e, "Exception in addJiraRow");
         res.status(415).send(e);
     }
-    await dbAbstraction.destroy();
 });
 
 module.exports = router;
