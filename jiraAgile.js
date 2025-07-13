@@ -406,6 +406,7 @@ function getSingleEditLog(req, isKey, status) {
     //column, oldVal, newVal, user, selector, date
     let editDoc = {};
     editDoc.opr = "edit";
+    editDoc.editedRowId = selectorObj._id;
     delete selectorObj._id;
     editDoc.selector = JSON.stringify(selectorObj, null, 4);
     editDoc.column = req.column;
