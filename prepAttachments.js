@@ -29,12 +29,11 @@ async function refreshAttachmentsIntoDbForOne(dsName) {
             rec.size = stats.size;
             rec.time = stats.ctimeMs;
             let insertResp = await dbAbstraction.insertOne(dsName, "attachments", rec);
-            logger.info(`Attachment insert response: ${insertResp}`);
+            logger.info(insertResp, `Attachment insert response`);
         }
     } catch (e) { 
         logger.error(e, "Error in refreshAttachmentsIntoDbForOne");
     }
-    await dbAbstraction.destroy();
 }
 
 async function refreshAttachmentsIntoDb() {
@@ -50,7 +49,6 @@ async function refreshAttachmentsIntoDb() {
         } catch (e) {}
         await refreshAttachmentsIntoDbForOne(dbList[i].name);
     }
-    await dbAbstraction.destroy();
 }
 
 module.exports = {

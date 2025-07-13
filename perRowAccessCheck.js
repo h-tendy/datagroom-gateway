@@ -11,7 +11,6 @@ async function checkAccessForSpecificRow(dsName, dsView, dsUser, _id) {
     [qFilters] = await enforcePerRowAcessCtrl(dsName, dsView, dsUser, qFilters);
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(qFilters, null, null);
     let recs = await dbAbstraction.find(dsName, "data", filters, {});
-    await dbAbstraction.destroy();
     return recs;
 }
 
@@ -22,16 +21,13 @@ async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
         let perRowAccessConfig = await dbAbstraction.find(dsName, "metaData", { _id: `perRowAccessConfig` }, {} );
         perRowAccessConfig = perRowAccessConfig[0];
         logger.info(perRowAccessConfig, "EnforcePerRowAccessCtrl config");
-        if (!perRowAccessConfig) {
-            await dbAbstraction.destroy();            
+        if (!perRowAccessConfig) {         
             return [filters, onlyPerRowAccessCtrlQueried]
         }
         if (!perRowAccessConfig.enabled) {
-            await dbAbstraction.destroy();
             return [filters, onlyPerRowAccessCtrlQueried]
         }
         if (!perRowAccessConfig.column) {
-            await dbAbstraction.destroy();
             return [filters, onlyPerRowAccessCtrlQueried]
         }
         logger.info(`In enforcePerRowAccessCtrl, User is: ${dsUser}`);
@@ -56,7 +52,6 @@ async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
     } catch (e) {
         logger.error(e, "Exception in perRowAccessCheck");
     }
-    await dbAbstraction.destroy();
     return [filters, onlyPerRowAccessCtrlQueried];
 }
 
@@ -96,7 +91,6 @@ async function checkIfUserCanEditPerRowAccessConfig(dsName, dsView, dsUser, requ
             }
         }
     } catch (e) { ok = false; message = "Exception in checking edit permissions!" }
-    await dbAbstraction.destroy();
     return [ok, message];
 }
 
@@ -117,7 +111,6 @@ async function checkIfUserCanCopyDs (dsName, dsUser) {
             }
         }
     } catch (e) { ok = false; message = "Exception in checking copy permissions!" }
-    await dbAbstraction.destroy();
     return [ok, message];    
 }
 

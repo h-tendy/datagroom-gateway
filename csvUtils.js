@@ -35,7 +35,6 @@ class CsvUtils {
                 if (dbList[i].name === dsName) {
                     logger.warn(`${dsName} Dataset name conflict`);
                     reject ({ loadStatus: false, error: 'Dataset name conflict' });
-                    dbAbstraction.destroy();
                     return;
                 }
             }
@@ -88,7 +87,6 @@ class CsvUtils {
                         logger.error(e, "Db metaData update error");
                     }            
                     resolve ({ loadStatus: true, hdrs })
-                    await dbAbstraction.destroy();
                 });
 
         });   

@@ -8,12 +8,10 @@ async function aclCheck(dsName, dsView, dsUser, token = null) {
     try {
         let aclConfig = await dbAbstraction.find(dsName, "metaData", { _id: `aclConfig` }, {} );
         aclConfig = aclConfig[0];
-        if (!aclConfig) {
-            await dbAbstraction.destroy();            
+        if (!aclConfig) {     
             return true
         }
         if (!aclConfig.accessCtrl) {
-            await dbAbstraction.destroy();
             return true
         }
         logger.info(`User is: , ${dsUser} in aclCheck`);
@@ -22,7 +20,6 @@ async function aclCheck(dsName, dsView, dsUser, token = null) {
                 const decode = jwt.verify(token, Utils.jwtSecret)
                 dsUser = decode.user;
                 if (aclConfig.acl.includes(dsUser)) {
-                    await dbAbstraction.destroy();
                     return true
                 } else {
                     logger.warn(`User ${dsUser} does not have access`);
@@ -36,7 +33,6 @@ async function aclCheck(dsName, dsView, dsUser, token = null) {
     } catch (e) {
         logger.error(e, "Exception in aclCheck");
     }
-    await dbAbstraction.destroy();
     return false;
 }
 

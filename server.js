@@ -73,6 +73,31 @@ try {
 }
 httpServer.timeout = 60 * 60 * 1000;
 
+const dbConnectivityChecker = new DbConnectivityChecker(io);
+let dbAbstraction = new DbAbstraction();
+
+//Add some process event listeners
+process.on('SIGINT', async () => {
+    logger.info("SIGINT signal received, Shutting down gracefully");
+    const dbClient = new DbAbstraction();
+    await dbClient.destroy();
+    await dbConnectivityChecker.destroy();
+    process.exit(0);
+})
+process.on('SIGTERM', async () => {
+    logger.info("SIGTERM signal received, Shutting down gracefully");
+    const dbClient = new DbAbstraction();
+    await dbClient.destroy();
+    await dbConnectivityChecker.destroy();
+    process.exit(0);
+})
+process.on('unhandledRejection', (e) => {
+    logger.error(e, "Caught unhandledRejection");
+})
+process.on('uncaughtException', (e) => {
+    logger.error(e, "Caught uncaughtException");
+})
+
 app.use(bodyParser.urlencoded({'limit': '200mb', extended: true }));
 
 app.use(bodyParser.json({
@@ -471,13 +496,12 @@ function sessionCheck(req, res, next) {
     }
 };
 
-let dbAbstraction = new DbAbstraction();
 dbAbstraction.hello();
 
-const dbConnectivityChecker = new DbConnectivityChecker(io);
 dbConnectivityChecker.checkDbConnectivity(dbCheckInterval);
-//setTimeout(dbAbstraction.destroy, 5000);
 
 PrepAttachments.refreshAttachmentsIntoDb();
+
+console.log("Started DG server..... Find the logs in ./datagroom.log");
 
 //ExcelUtils.exportDataFromDbIntoXlsx('myDb2', 'default', 'jhanu', 'export.xlsx');
