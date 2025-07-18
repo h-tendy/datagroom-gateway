@@ -15,7 +15,7 @@ const Utils = require('./utils');
 const PrepAttachments = require('./prepAttachments');
 let fs = require('fs');
 const dotenv = require('dotenv')
-const Jira = require('./jira')
+const Jira = require('./jira/jira')
 const AclCheck = require('./acl');
 const logger = require('./logger');
 

@@ -1,10 +1,10 @@
 var JiraApi = require('jira-client');
-const DbAbstraction = require('./dbAbstraction');
-const JiraSettings = require('./jiraSettings');
-const utils = require('./utils')
+const DbAbstraction = require('../dbAbstraction');
+const JiraSettings = require('../jiraSettings');
+const utils = require('../utils')
 const fetch = require('node-fetch')
 const JIRA_AGILE = require('./jiraAgile')
-const logger = require('./logger')
+const logger = require('../logger')
 // Initialize
 
 let host = JiraSettings.host;

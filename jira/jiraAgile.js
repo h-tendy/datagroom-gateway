@@ -1,10 +1,10 @@
 // @ts-check
 var JiraApi = require('jira-client');
 const { async } = require('regenerator-runtime');
-const DbAbstraction = require('./dbAbstraction');
-const JiraSettings = require('./jiraSettings');
-const utils = require('./utils');
-const logger = require('./logger');
+const DbAbstraction = require('../dbAbstraction');
+const JiraSettings = require('../jiraSettings');
+const utils = require('../utils');
+const logger = require('../logger');
 // Initialize
 
 let host = JiraSettings.host;
