@@ -1,10 +1,11 @@
 var JiraApi = require('jira-client');
-const DbAbstraction = require('./dbAbstraction');
-const JiraSettings = require('./jiraSettings');
-const utils = require('./utils')
+const DbAbstraction = require('../dbAbstraction');
+const JiraSettings = require('../jiraSettings');
+const utils = require('../utils')
 const fetch = require('node-fetch')
 const JIRA_AGILE = require('./jiraAgile')
-const logger = require('./logger')
+const logger = require('../logger')
+const {jiraFields} = require('./jiraCommons');
 // Initialize
 
 let host = JiraSettings.host;
@@ -12,8 +13,6 @@ var jira = new JiraApi(JiraSettings.settings);
 
 let filteredProjectsMetaData = {}
 
-// Custom fields per installation
-let fields = ["summary", "assignee", "customfield_25901", "issuetype", "customfield_26397", "customfield_11504", "description", "priority", "reporter", "customfield_21091", "status", "customfield_25792", "customfield_25907", "customfield_25802", "created", "customfield_22013", "customfield_25582", "customfield_25588", "customfield_25791", "versions", "parent", "subtasks", "issuelinks", "updated", "votes", "customfield_25570", "labels", "customfield_12790", "customfield_11890", "customfield_11990", "jiraSummary", "fixVersions", "customfield_28097", "duedate", "customfield_25555", "customfield_25523", "customfield_25800", "customfield_25609", "customfield_28096", "customfield_25518", "customfield_25693", "customfield_28258", "customfield_28403", "customfield_28404", "customfield_25695", "resolution", "customfield_25503"];
 // Must have 'Work-id' and 'Description' fields in the data-set. 
 // The keys for this dataset must include 'Work-id' for now. 
 // 'Work-id' and 'Description' will get populated from Jira. 
@@ -37,7 +36,7 @@ async function refreshJiraQuery(dsName, jiraConfig) {
     do {
         logger.info("Fetching from: ", startAt);
         // Comment out 'fields' below for getting all fields for field exploration. 
-        results = await jira.searchJira(jql, { startAt, fields, expand: ["names"] });
+        results = await jira.searchJira(jql, { startAt, fields: jiraFields, expand: ["names"] });
         startAt += results.issues.length;
         names = results.names;
         for (let i = 0; i < results.issues.length; i++) {
@@ -175,7 +174,7 @@ function defaultJiraMapping(rec, jiraConfig) {
     let jiraUrl = "https://" + host;
     let jiraKeyMapping = { 'key': 'Work-id' }
     // No need for "Details" links to appear here. 
-    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'Sprint Name': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description', 'Agile Commit': 'Description', "duedate": 'Description', "targetRlsGx": 'Description', "Acceptance Criteria": 'Description', "Assignee Manager": 'Description', "Dev RCA Comments": 'Description', "Agile Team": 'Description', "Phase Bug Found": 'Description', "Phase Bug Introduced": 'Description', "Failure Category": 'Description', "Failure Subcategory": 'Description', "Improvement Suggestions": 'Description', "Root Cause or Defect Category": 'Description', "Resolution": 'Description', "Resolution Details": 'Description' };
+    let jiraContentMapping = { 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'Sprint Name': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description', 'Agile Commit': 'Description', "duedate": 'Description', "targetRlsGx": 'Description', "Acceptance Criteria": 'Description', "Assignee Manager": 'Description', "Dev RCA Comments": 'Description', "Agile Team": 'Description', "Phase Bug Found": 'Description', "Phase Bug Introduced": 'Description', "Failure Category": 'Description', "Failure Subcategory": 'Description', "Improvement Suggestions": 'Description', "Root Cause or Defect Category": 'Description', "Resolution": 'Description', "Resolution Details": 'Description', "Notes": 'Description' };
     let selectorObj = {}, fullRec = {};
     if (jiraConfig._id == "jiraAgileConfig") {
         selectorObj[jiraKeyMapping['key']] = `[JIRA_AGILE-${rec.key}](${jiraUrl + '/browse/' + rec.key})`;
@@ -205,7 +204,7 @@ async function markAsStale(dsName, jiraConfig) {
     let jiraFieldMapping;
     if (!jiraConfig.jiraFieldMapping || !Object.keys(jiraConfig.jiraFieldMapping).length) {
         // No need for "Details" links to appear here. 
-        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'Sprint Name': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description', 'Agile Commit': 'Description', "duedate": 'Description', "targetRlsGx": 'Description', "Acceptance Criteria": 'Description', "Assignee Manager": 'Description', "Dev RCA Comments": 'Description', "Agile Team": 'Description', "Phase Bug Found": 'Description', "Phase Bug Introduced": 'Description', "Failure Category": 'Description', "Failure Subcategory": 'Description', "Improvement Suggestions": 'Description', "Root Cause or Defect Category": 'Description', "Resolution": 'Description', "Resolution Details": 'Description' };
+        jiraFieldMapping = { 'key': 'Work-id', 'summary': 'Description', 'type': 'Description', 'assignee': 'Description', 'severity': 'Description', 'priority': 'Description', 'foundInRls': 'Description', 'reporter': 'Description', 'created': 'Description', 'rrtTargetRls': 'Description', 'targetRls': 'Description', 'status': 'Description', 'feature': 'Description', 'rzFeature': 'Description', 'versions': 'Description', 'parentKey': 'Description', 'parentSummary': 'Description', 'parent': 'Description', 'subtasks': 'Description', 'labels': 'Description', 'phaseBugFound': 'Description', 'phaseBugIntroduced': 'Description', 'epic': 'Description', 'description': 'Description', 'Story Points': 'Description', 'Sprint Name': 'Description', 'jiraSummary': 'Description', 'fixVersions': 'Description', 'Agile Commit': 'Description', "duedate": 'Description', "targetRlsGx": 'Description', "Acceptance Criteria": 'Description', "Assignee Manager": 'Description', "Dev RCA Comments": 'Description', "Agile Team": 'Description', "Phase Bug Found": 'Description', "Phase Bug Introduced": 'Description', "Failure Category": 'Description', "Failure Subcategory": 'Description', "Improvement Suggestions": 'Description', "Root Cause or Defect Category": 'Description', "Resolution": 'Description', "Resolution Details": 'Description', "Notes": 'Description' };
     } else {
         jiraFieldMapping = JSON.parse(JSON.stringify(jiraConfig.jiraFieldMapping));
     }

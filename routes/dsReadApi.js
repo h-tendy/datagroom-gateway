@@ -3,8 +3,9 @@ const router = require('express').Router();
 const DbAbstraction = require('../dbAbstraction');
 const ExcelUtils = require('../excelUtils');
 const fs = require('fs');
-const Jira = require('../jira');
-const JiraAgile = require('../jiraAgile')
+const Jira = require('../jira/jira');
+const JiraAgile = require('../jira/jiraAgile')
+const JiraFieldEdit = require('../jira/jiraFieldEdit');
 const JiraSettings = require('../jiraSettings');
 const Utils = require('../utils');
 const PrepAttachments = require('../prepAttachments');
@@ -293,7 +294,18 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
         if (recs.length == 1) {
             let isJiraAgileRow = isJiraAgileRec(recs[0])
             if (isJiraAgileRow) {
+                logger.info("Edit Jira Agile Row");
                 let resp = await JiraAgile.editSingleAttribute(req)
+                response.status = resp.status
+                response.error = resp.error
+                if (resp.record) response.record = resp.record
+                res.status(200).send(response);
+                return
+            }
+            let isJiraRow = isJiraRec(recs[0]);
+            if (isJiraRow) {
+                logger.info("Edit Jira Row");
+                let resp = await JiraFieldEdit.editSingleAttribute(req)
                 response.status = resp.status
                 response.error = resp.error
                 if (resp.record) response.record = resp.record
@@ -367,7 +379,7 @@ function isJiraAgileRec(rec) {
     let isJiraAgileRec = false
     let jiraUrl = "https://" + host;
     for (let [key, value] of Object.entries(rec)) {
-        let regex = new RegExp(`JIRA_AGILE.*${jiraUrl + '/browse/'}`)
+        let regex = new RegExp(`\\[(JIRA_AGILE).*${jiraUrl + '/browse/'}`)
         if (typeof value == "string") {
             if (regex.test(value)) {
                 isJiraAgileRec = true
@@ -375,6 +387,20 @@ function isJiraAgileRec(rec) {
         }
     }
     return isJiraAgileRec
+}
+
+function isJiraRec(rec) {
+    let isJiraRec = false
+    let jiraUrl = "https://" + host;
+    for (let [key, value] of Object.entries(rec)) {
+        let regex = new RegExp(`\\[(?!JIRA_AGILE).*${jiraUrl + '/browse/'}`)
+        if (typeof value == "string") {
+            if (regex.test(value)) {
+                isJiraRec = true
+            }
+        }
+    }
+    return isJiraRec
 }
 
 router.post('/view/insertOneDoc', async (req, res, next) => {
