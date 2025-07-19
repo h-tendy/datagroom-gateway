@@ -14,14 +14,14 @@ let editableFieldsAndTypeMapping = {
     "Story Points": 'number',
     "summary": 'string',
     "assignee": 'string',
-    "Sprint Name": 'string',
     "Acceptance Criteria": 'string',
+    "Notes": 'string',
 }
 
 let customFieldMapping = {
     "Story Points": "customfield_11890",
-    "Sprint Name": "customfield_11990",
     "Acceptance Criteria": "customfield_25523",
+    "Notes": "customfield_22792",
 }
 
 
@@ -35,10 +35,10 @@ let customFieldMapping = {
 async function editSingleAttribute(req) {
     let response = {}
     let request = req.body
-    let jiraAgileConfig = request.jiraAgileConfig
+    let jiraConfig = request.jiraConfig
     let dbAbstraction = new DbAbstraction();
 
-    let revContentMap = utils.getRevContentMap(jiraAgileConfig)
+    let revContentMap = utils.getRevContentMap(jiraConfig)
     let editedCol = request.column;
     if (!editedCol) {
         response.status = 'fail'
@@ -49,10 +49,10 @@ async function editSingleAttribute(req) {
     let keyBeingEdited = await ifKeyBeingEdited(request)
     /* If the column being edited is mapped to JIRA, then go in the if block and finally make the request to JIRA backend.
     Otherwise, skip this block and directly update the db. */
-    if (isJiraMappedColumnBeingEdited(editedCol, jiraAgileConfig)) {
+    if (isJiraMappedColumnBeingEdited(editedCol, jiraConfig)) {
         utils.sanitizeData(request.editObj)
         /**Get the incoming edited record parsed */
-        let ret = utils.parseRecord(request.editObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
+        let ret = utils.parseRecord(request.editObj, revContentMap, jiraConfig.jiraFieldMapping)
         if (!ret.parseSuccess) {
             response.status = 'fail'
             response.error = 'unable to parse the incoming edited record according to given mapping'
@@ -60,17 +60,17 @@ async function editSingleAttribute(req) {
             return response
         }
         let newUiRec = ret.rec
-        request.editObj = getRecord(newUiRec, jiraAgileConfig)
+        request.editObj = getRecord(newUiRec, jiraConfig)
 
         if (Object.keys(newUiRec).includes('key')) {
             response.status = 'fail'
-            response.error = `Key for the JIRA_AGILE row can't be edited`
+            response.error = `Key for the JIRA row can't be edited`
             await insertInEditLog(request, keyBeingEdited, response.status)
             return response
         }
 
         /**Get the old existing UI record parsed */
-        ret = utils.parseRecord(request.selectorObj, revContentMap, jiraAgileConfig.jiraFieldMapping)
+        ret = utils.parseRecord(request.selectorObj, revContentMap, jiraConfig.jiraFieldMapping)
         if (!ret.parseSuccess) {
             response.status = 'fail'
             response.error = 'unable to parse the current record according to given mapping'
@@ -91,7 +91,7 @@ async function editSingleAttribute(req) {
         /**Get record from db and parse it accordingly */
         let recs = await dbAbstraction.find(request.dsName, "data", { _id: dbAbstraction.getObjectId(request.selectorObj._id) }, {});
         let record = recs[0]
-        ret = utils.parseRecord(record, revContentMap, jiraAgileConfig.jiraFieldMapping)
+        ret = utils.parseRecord(record, revContentMap, jiraConfig.jiraFieldMapping)
         if (!ret.parseSuccess) {
             response.status = 'fail'
             response.error = 'unable to parse the dbrecord according to given mapping'
@@ -103,7 +103,7 @@ async function editSingleAttribute(req) {
         /**Get the latest record from JIRA if jira is enabled */
         let jiraIssueName = dbRec.key
         let latestJiraRec = null
-        if (jiraAgileConfig && jiraAgileConfig.jira) {
+        if (jiraConfig && jiraConfig.jira) {
             try {
                 let issue = await jira.findIssue(jiraIssueName)
                 latestJiraRec = utils.getRecFromJiraIssue(issue)
@@ -135,7 +135,7 @@ async function editSingleAttribute(req) {
 
         /**Compare the latest jira with that in db. If db is not updated send the message to the UI and cancel the edit operation */
         if (latestJiraRec) {
-            let ret = await getEditedFieldsObj(oldUiRec, newUiRec, jiraAgileConfig.boardId)
+            let ret = await getEditedFieldsObj(oldUiRec, newUiRec)
             if (ret.errorMsg != '') {
                 response.status = 'fail'
                 response.error = ret.errorMsg
@@ -356,10 +356,9 @@ function isRecordUpdated(oldRec, newRec) {
  * Also, it return any errorMsg in string that is to be processed by the caller of this function
  * @param {object} oldRec 
  * @param {object} newRec 
- * @param {string} boardId 
  * @returns {Promise<object>}
  */
-async function getEditedFieldsObj(oldRec, newRec, boardId) {
+async function getEditedFieldsObj(oldRec, newRec) {
     let editedJiraObj = {}
     let errorMsg = ''
     for (let newKey of Object.keys(newRec)) {
@@ -377,13 +376,6 @@ async function getEditedFieldsObj(oldRec, newRec, boardId) {
             if (jiraFields.includes(jiraKey)) {
                 if (jiraKey == "assignee") {
                     editedJiraObj[jiraKey] = { "name": newRec[newKey].trim() }
-                } else if (newKey == "Sprint Name") {
-                    let sprintId = await getSprintIdFromSprintName(newRec[newKey], boardId)
-                    if (!sprintId) {
-                        errorMsg = `Can't find the sprintId for the Sprint Name. Maybe you have to create one.`
-                    } else {
-                        editedJiraObj[jiraKey] = sprintId
-                    }
                 } else {
                     editedJiraObj[jiraKey] = newRec[newKey]
                 }
@@ -406,13 +398,6 @@ async function getEditedFieldsObj(oldRec, newRec, boardId) {
         } else {
             if (jiraKey == "assignee") {
                 editedJiraObj[jiraKey] = { "name": newRec[newKey].trim() }
-            } else if (newKey == "Sprint Name") {
-                let sprintId = await getSprintIdFromSprintName(newRec[newKey], boardId)
-                if (!sprintId) {
-                    errorMsg = `Can't find the sprintId for the Sprint Name. Maybe you have to create one.`
-                } else {
-                    editedJiraObj[jiraKey] = sprintId
-                }
             } else {
                 editedJiraObj[jiraKey] = newRec[newKey]
             }

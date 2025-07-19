@@ -141,6 +141,11 @@ function getRecFromJiraIssue(issue) {
   } else {
     rec["Resolution Details"] = "NotSet";
   }
+  if (issue.fields.customfield_22792) {
+    rec["Notes"] = issue.fields.customfield_22792;
+  } else {
+    rec["Notes"] = "";
+  }
   if (issue.fields.duedate)
     rec.duedate = issue.fields.duedate.split('T')[0];
   else
