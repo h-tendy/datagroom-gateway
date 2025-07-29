@@ -208,7 +208,7 @@ function getSingleEditLog(req, isKey, status) {
     let editObj = JSON.parse(JSON.stringify(req.editObj));
     //column, oldVal, newVal, user, selector, date
     let editDoc = {};
-    editDoc.opr = "edit";
+    editDoc.opr = "editJiraField";
     editDoc.editedRowId = selectorObj._id;
     delete selectorObj._id;
     editDoc.selector = JSON.stringify(selectorObj, null, 4);
