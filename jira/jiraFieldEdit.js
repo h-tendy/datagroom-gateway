@@ -35,15 +35,18 @@ let customFieldMapping = {
 async function editSingleAttribute(req) {
     let response = {}
     let request = req.body
+    logger.info(request, "[JIRAFIELDEDIT] Incoming request in editSingleAttribute")
     let jiraConfig = request.jiraConfig
     let dbAbstraction = new DbAbstraction();
 
     let revContentMap = utils.getRevContentMap(jiraConfig)
+    logger.info(revContentMap, "[JIRAFIELDEDIT] Reverse content mapping")
     let editedCol = request.column;
     if (!editedCol) {
         response.status = 'fail'
         response.error = 'unable to get edited column attribute'
-        await insertInEditLog(request, request.key, response.status)
+        logger.error("[JIRAFIELDEDIT] Unable to get edited column attribute");
+        await insertInEditLog(request, request.key, response)
         return response
     }
     let keyBeingEdited = await ifKeyBeingEdited(request)
@@ -51,30 +54,36 @@ async function editSingleAttribute(req) {
     Otherwise, skip this block and directly update the db. */
     if (isJiraMappedColumnBeingEdited(editedCol, jiraConfig)) {
         utils.sanitizeData(request.editObj)
+        logger.info(request.editObj, "[JIRAFIELDEDIT] Edit obj after sanitization");
         /**Get the incoming edited record parsed */
         let ret = utils.parseRecord(request.editObj, revContentMap, jiraConfig.jiraFieldMapping)
+        logger.info(ret, "[JIRAFIELDEDIT] Incoming edited parsed record")
         if (!ret.parseSuccess) {
             response.status = 'fail'
             response.error = 'unable to parse the incoming edited record according to given mapping'
-            await insertInEditLog(request, keyBeingEdited, response.status)
+            logger.error("[JIRAFIELDEDIT] Unable to parse the incoming edited record according to given mapping");
+            await insertInEditLog(request, keyBeingEdited, response)
             return response
         }
         let newUiRec = ret.rec
         request.editObj = getRecord(newUiRec, jiraConfig)
-
+        logger.info(request.editObj, "[JIRAFIELDEDIT] Edit obj after getRecord");
         if (Object.keys(newUiRec).includes('key')) {
             response.status = 'fail'
             response.error = `Key for the JIRA row can't be edited`
-            await insertInEditLog(request, keyBeingEdited, response.status)
+            logger.error("[JIRAFIELDEDIT] Key for the JIRA row can't be edited");
+            await insertInEditLog(request, keyBeingEdited, response)
             return response
         }
 
         /**Get the old existing UI record parsed */
         ret = utils.parseRecord(request.selectorObj, revContentMap, jiraConfig.jiraFieldMapping)
+        logger.info(ret, "[JIRAFIELDEDIT] Old existing UI parsed record")
         if (!ret.parseSuccess) {
             response.status = 'fail'
             response.error = 'unable to parse the current record according to given mapping'
-            await insertInEditLog(request, keyBeingEdited, response.status)
+            logger.error("[JIRAFIELDEDIT] unable to parse the current record according to given mapping");
+            await insertInEditLog(request, keyBeingEdited, response)
             return response
         }
         let oldUiRec = ret.rec
@@ -84,7 +93,8 @@ async function editSingleAttribute(req) {
         if (!isEditable) {
             response.status = 'fail'
             response.error = errorMsg
-            await insertInEditLog(request, keyBeingEdited, response.status)
+            logger.error(errorMsg);
+            await insertInEditLog(request, keyBeingEdited, response)
             return response
         }
 
@@ -92,10 +102,12 @@ async function editSingleAttribute(req) {
         let recs = await dbAbstraction.find(request.dsName, "data", { _id: dbAbstraction.getObjectId(request.selectorObj._id) }, {});
         let record = recs[0]
         ret = utils.parseRecord(record, revContentMap, jiraConfig.jiraFieldMapping)
+        logger.info(ret, "[JIRAFIELDEDIT] Db parsed record")
         if (!ret.parseSuccess) {
             response.status = 'fail'
             response.error = 'unable to parse the dbrecord according to given mapping'
-            await insertInEditLog(request, keyBeingEdited, response.status)
+            logger.error("[JIRAFIELDEDIT] unable to parse the dbrecord according to given mapping");
+            await insertInEditLog(request, keyBeingEdited, response)
             return response
         }
         let dbRec = ret.rec
@@ -107,10 +119,12 @@ async function editSingleAttribute(req) {
             try {
                 let issue = await jira.findIssue(jiraIssueName)
                 latestJiraRec = utils.getRecFromJiraIssue(issue)
+                logger.info(latestJiraRec, "[JIRAFIELDEDIT] Latest Jira record from JIRA");
             } catch (e) {
                 response.status = 'fail'
                 response.error = 'unable to fetch the record from JIRA to update'
-                await insertInEditLog(request, keyBeingEdited, response.status)
+                logger.error("[JIRAFIELDEDIT] unable to fetch the record from JIRA to update");
+                await insertInEditLog(request, keyBeingEdited, response)
                 return response
             }
         }
@@ -119,8 +133,9 @@ async function editSingleAttribute(req) {
             let isUpdated = isRecordUpdated(dbRec, latestJiraRec)
             if (!isUpdated) {
                 response.status = 'fail'
-                response.error = 'Stale JIRA entry found. Please refresh again.'
-                await insertInEditLog(request, keyBeingEdited, response.status)
+                response.error = 'Stale JIRA entry found in DB. Please hit Refresh JIRA again.'
+                logger.error("[JIRAFIELDEDIT] Stale JIRA entry found in DB. Please hit Refresh JIRA again.");
+                await insertInEditLog(request, keyBeingEdited, response)
                 return response
             }
         }
@@ -128,29 +143,33 @@ async function editSingleAttribute(req) {
         let isUpdated = isRecordUpdated(oldUiRec, dbRec)
         if (!isUpdated) {
             response.status = 'fail'
-            response.error = 'Stale JIRA entry found. Please refresh again.'
-            await insertInEditLog(request, keyBeingEdited, response.status)
+            response.error = 'Stale JIRA entry found in UI. Please refresh the whole page again.'
+            logger.error("[JIRAFIELDEDIT] Stale JIRA entry found in UI. Please refresh the whole page again.");
+            await insertInEditLog(request, keyBeingEdited, response)
             return response
         }
 
         /**Compare the latest jira with that in db. If db is not updated send the message to the UI and cancel the edit operation */
         if (latestJiraRec) {
             let ret = await getEditedFieldsObj(oldUiRec, newUiRec)
+            logger.info(ret, "[JIRAFIELDEDIT] Edited Fields Object for the JIRA")
             if (ret.errorMsg != '') {
                 response.status = 'fail'
                 response.error = ret.errorMsg
-                await insertInEditLog(request, keyBeingEdited, response.status)
+                logger.error(ret.errorMsg);
+                await insertInEditLog(request, keyBeingEdited, response)
                 return response
             }
             let editedObj = ret.editedJiraObj
             if (Object.keys(editedObj).length != 0) {
                 try {
                     let ret = await jira.updateIssue(jiraIssueName, { "fields": editedObj })
-                    logger.info(ret, "Record updated in JIRA");
+                    logger.info(ret, "[JIRAFIELDEDIT] Record updated in JIRA");
                 } catch (e) {
                     response.status = 'fail'
                     response.error = `unable to update the record to JIRA. Error: ${e.message}`
-                    await insertInEditLog(request, keyBeingEdited, response.status)
+                    logger.error(response.error);
+                    await insertInEditLog(request, keyBeingEdited, response)
                     return response
                 }
             } else {
@@ -158,6 +177,7 @@ async function editSingleAttribute(req) {
                  * In those cases we can do silent fail, the UI will know the old val and it will revert to it.
                  */
                 response.status = 'silentFail'
+                logger.error("[JIRAFIELDEDIT] Silent Fail during JIRA")
                 return response
             }
         }
@@ -168,12 +188,16 @@ async function editSingleAttribute(req) {
         response = JSON.parse(JSON.stringify(responseFromDb))
         response.record = request.editObj
     }
-    await insertInEditLog(request, keyBeingEdited, response.status)
+    await insertInEditLog(request, keyBeingEdited, response)
     return response
 }
 
-async function insertInEditLog(request, keyBeingEdited, status) {
+async function insertInEditLog(request, keyBeingEdited, response) {
     let dbAbstraction = new DbAbstraction();
+    let status = response.status;
+    if (response.error) {
+        status = `${status} (${response.error})`;
+    }
     let editLog = getSingleEditLog(request, keyBeingEdited, status);
     let editLogResp = await dbAbstraction.insertOne(request.dsName, "editlog", editLog);
     logger.info(editLogResp, "Edit log response from DB");
@@ -184,7 +208,7 @@ function getSingleEditLog(req, isKey, status) {
     let editObj = JSON.parse(JSON.stringify(req.editObj));
     //column, oldVal, newVal, user, selector, date
     let editDoc = {};
-    editDoc.opr = "edit";
+    editDoc.opr = "editJiraField";
     editDoc.editedRowId = selectorObj._id;
     delete selectorObj._id;
     editDoc.selector = JSON.stringify(selectorObj, null, 4);
