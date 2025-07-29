@@ -130,7 +130,7 @@ async function editSingleAttribute(req) {
         }
 
         if (latestJiraRec) {
-            let isUpdated = isRecordUpdated(dbRec, latestJiraRec)
+            let isUpdated = isRecordUpdated(dbRec, latestJiraRec, getKeysToCompare(editedCol, jiraConfig.jiraFieldMapping))
             if (!isUpdated) {
                 response.status = 'fail'
                 response.error = 'Stale JIRA entry found in DB. Please hit Refresh JIRA again.'
@@ -140,7 +140,7 @@ async function editSingleAttribute(req) {
             }
         }
 
-        let isUpdated = isRecordUpdated(oldUiRec, dbRec)
+        let isUpdated = isRecordUpdated(oldUiRec, dbRec, getKeysToCompare(editedCol, jiraConfig.jiraFieldMapping))
         if (!isUpdated) {
             response.status = 'fail'
             response.error = 'Stale JIRA entry found in UI. Please refresh the whole page again.'
@@ -236,6 +236,29 @@ async function ifKeyBeingEdited(request) {
         }
     }
     return keyBeingEdited
+}
+
+/**
+ * Given the edited column. This function gives the jira keys which may have been edited.
+ * For example, If a description column has 4 jira keys mapped then it will return the array of 4 keys.
+ * If a column is mapped for a single key, it will return that single key 
+ * @param {String} editedCol 
+ * @param {Object} jiraFieldMapping 
+ * @returns {Array<String>}
+ */
+function getKeysToCompare(editedCol, jiraFieldMapping) {
+    let keysToCompare = [];
+    if (!jiraFieldMapping) {
+        logger.info("[JIRAFIELDEDIT] Found no jiraFieldMapping");
+        return keysToCompare;
+    }
+    Object.entries(jiraFieldMapping).forEach(([key, value]) => {
+        if (value == editedCol) {
+            keysToCompare.push(key);
+        }
+    })
+    logger.info({editedCol, jiraFieldMapping, keysToCompare}, "[JIRAFIELDEDIT] Returning the keys to Compare for edit");
+    return keysToCompare;
 }
 
 /**
@@ -356,18 +379,24 @@ function isFieldEditable(oldUiParsedRec, newUiParsedRec) {
  * Returns true if the newRec is the same as oldRec and false otherwise.
  * Meaning the oldRec and the newRec should be of the same version, then it will return true signifying we have the updated record.
  * @param {object} oldRec 
- * @param {object} newRec 
+ * @param {object} newRec
+ * @param {Array<String>} keysToCompare
  * @returns {boolean}
  */
-function isRecordUpdated(oldRec, newRec) {
+function isRecordUpdated(oldRec, newRec, keysToCompare) {
     let isUpdated = true
-    for (let oldKeys of Object.keys(oldRec)) {
+    if (!keysToCompare) {
+        logger.warn("[JIRAFIELDEDIT] Can't find the keysToCompare. Returning as updated")
+        return isUpdated;
+    }
+    for (let oldKeys of keysToCompare) {
         if (!newRec[oldKeys]) continue
         if (newRec[oldKeys] == oldRec[oldKeys]) {
             continue
         } else if (typeof (newRec[oldKeys]) == 'string' && typeof (oldRec[oldKeys]) == 'string' && newRec[oldKeys].trim() == oldRec[oldKeys].trim()) {
             continue
         } else {
+            logger.info(`Record found as not updated because of the key ${oldKeys} and old value: ${oldRec[oldKeys]} and new value: ${newRec[oldKeys]}`);
             isUpdated = false
             break
         }
