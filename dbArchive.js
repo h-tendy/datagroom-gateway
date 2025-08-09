@@ -129,7 +129,7 @@ class DbArchiveProcessor {
 
         const sourceMetaDataCollections = await sourceDb.listCollections({ name: 'metaData' }).toArray();
         if (sourceMetaDataCollections.length > 0) {
-            console.log(`Copying 'metaData' collection from ${sourceDbName} to ${archiveDbName}.`);
+            logger.info(`Copying 'metaData' collection from ${sourceDbName} to ${archiveDbName}.`);
 
             const sourceMetaCollection = sourceDb.collection('metaData');
             const archiveMetaCollection = archiveDb.collection('metaData');
@@ -143,12 +143,12 @@ class DbArchiveProcessor {
             if (metaDataDocuments.length > 0) {
                 // Insert all documents into the archive metaData collection
                 await archiveMetaCollection.insertMany(metaDataDocuments);
-                console.log(`Successfully copied ${metaDataDocuments.length} documents to 'metaData' in ${archiveDbName}.`);
+                logger.info(`Successfully copied ${metaDataDocuments.length} documents to 'metaData' in ${archiveDbName}.`);
             } else {
-                console.log(`'metaData' collection in ${sourceDbName} is empty. Nothing to copy.`);
+                logger.info(`'metaData' collection in ${sourceDbName} is empty. Nothing to copy.`);
             }
         } else {
-            console.log(`'metaData' collection not found in ${sourceDbName}. Skipping copy.`);
+            logger.info(`'metaData' collection not found in ${sourceDbName}. Skipping copy.`);
         }
     }
 
@@ -186,7 +186,7 @@ class DbArchiveProcessor {
 
         // Delete the original documents from the source collection.
         const deleteResult = await sourceCollection.deleteMany(query);
-        console.log(`Successfully deleted ${deleteResult.deletedCount} documents from ${sourceDbName}.${collectionName}.`);
+        logger.info(`Successfully deleted ${deleteResult.deletedCount} documents from ${sourceDbName}.${collectionName}.`);
     }
 
     /**
