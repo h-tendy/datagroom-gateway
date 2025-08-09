@@ -56,6 +56,8 @@ router.post('/archive', async (req, res, next) => {
                 "archiveDataSetName": "abc_archive",
                 "cutOffDate": "17-11-2024"
             }
+            res.status(400).send(status);
+            return;
         }
         res.status(200).send(status);
     } catch (err) {
