@@ -15,8 +15,43 @@ const MongoFilters = require('./mongoFilters');
 // @ts-ignore
 const { ObjectId } = require('mongodb');
 const logger = require('../logger');
+const DbArchiveProcessor = require('../dbArchive')
 
 let host = JiraSettings.host;
+
+router.post('/archive', async (req, res, next) => {
+    let request = req.body;
+    logger.info(request, "Incoming request to archive dataset");
+    try {
+        const token = req.cookies.jwt;
+        let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
+        if (!allowed) {
+            res.status(403).json({ "Error": "access_denied" });
+            return
+        }
+        let dbArchiveProcessor = new DbArchiveProcessor();
+        let status = await dbArchiveProcessor.archiveData(request.sourceDataSetName, request.collectionName, request.archiveDataSetName, request.cutOffDate);
+        if (status.error) {
+            status.error = status.error.message;
+            status.exampleRequestSpecification = {
+                "sourceDataSetName": "<Dataset name whose documents to be archived>",
+                "collectionName": "The collection which needs to be archived. If not provided, defaults to `data`",
+                "archiveDataSetName": "<Dataset name where the archive docs should go>",
+                "cutOffDate": "Date in format dd-mm-yyyy"
+            }
+            status.exampleRequestBody = {
+                "sourceDataSetName": "abc",
+                "collectionName": "data",
+                "archiveDataSetName": "abc_archive",
+                "cutOffDate": "17-11-2024"
+            }
+        }
+        res.status(200).send(status);
+    } catch (err) {
+        logger.error(err, "Exception while archiving");
+        res.status(415).send(err);
+    }
+})
 
 router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;

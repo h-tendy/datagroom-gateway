@@ -95,75 +95,101 @@ class DbArchiveProcessor {
 
     /**
      * @param {string} sourceDbName
-     * @param {String[]} sourceCollectionNames
+     * @param {String} collectionName
      * @param {string} archiveDbName
-     * @param {number} ageInDays
+     * @param {string} date
+     * @returns {Promise<Object>}
      */
-    async archiveData(sourceDbName, sourceCollectionNames, archiveDbName, ageInDays) {
+    async archiveData(sourceDbName, collectionName, archiveDbName, date) {
         try {
-            // First copy the metaData collection from the source db to the archive db
-            await this.copyMetaDataCollToArchive(sourceDbName, archiveDbName);
-
-            // Then for each collection call the archive collection logic
-            for (const collectionName of sourceCollectionNames) {
-                logger.info(`Archiving ${archiveDbName}.${collectionName}`);
-                await this.archiveCollection(sourceDbName, collectionName, archiveDbName, ageInDays);
+            if (!sourceDbName || await this.ifDbExists(sourceDbName) == false) {
+                let error = new Error(`${sourceDbName} dataset doesn't exist`);
+                return {error}
             }
+            if (!archiveDbName || await this.ifDbExists(archiveDbName) == false) {
+                let error = new Error(`${archiveDbName} dataset doesn't exist. Please make one before proceeding`);
+                return {error}
+            }
+            if (!collectionName) {
+                collectionName = "data";
+            }
+            let cutOffDate = this.parseAndValidateDate(date);
+            if (cutOffDate.error) {
+                return {error: cutOffDate.error}
+            }
+            
+            logger.info(`Archiving ${archiveDbName}.${collectionName}`);
+            let status = await this.archiveCollection(sourceDbName, collectionName, archiveDbName, cutOffDate.date);
+            return {status}
         } catch (e) {
             logger.error(e, "MongoDbArchive: Error in archiving");
+            return {error: e};
         }
     }
 
     /**
-     * @param {String} sourceDbName
-     * @param {String} archiveDbName
+     * Validates a date string in "dd-mm-yyyy" format and returns a local Date object.
+     * @param {string} dateString The date string to validate.
+     * @returns {Object} The local Date object.
      */
-    async copyMetaDataCollToArchive(sourceDbName, archiveDbName) {
-        if (!this.isConnected) await this.connect();
-        const sourceDb = this.client.db(sourceDbName);
-        const archiveDb = this.client.db(archiveDbName);
+    parseAndValidateDate(dateString) {
+        // Regular expression to match dd-mm-yyyy format
+        const dateRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-(\d{4})/;
 
-        const sourceMetaDataCollections = await sourceDb.listCollections({ name: 'metaData' }).toArray();
-        if (sourceMetaDataCollections.length > 0) {
-            logger.info(`Copying 'metaData' collection from ${sourceDbName} to ${archiveDbName}.`);
-
-            const sourceMetaCollection = sourceDb.collection('metaData');
-            const archiveMetaCollection = archiveDb.collection('metaData');
-
-            // Clear out any old metaData in the archive before copying
-            await archiveMetaCollection.deleteMany({});
-
-            // Find all documents in the source metaData collection
-            const metaDataDocuments = await sourceMetaCollection.find({}).toArray();
-
-            if (metaDataDocuments.length > 0) {
-                // Insert all documents into the archive metaData collection
-                await archiveMetaCollection.insertMany(metaDataDocuments);
-                logger.info(`Successfully copied ${metaDataDocuments.length} documents to 'metaData' in ${archiveDbName}.`);
-            } else {
-                logger.info(`'metaData' collection in ${sourceDbName} is empty. Nothing to copy.`);
-            }
-        } else {
-            logger.info(`'metaData' collection not found in ${sourceDbName}. Skipping copy.`);
+        // Check if the format is correct
+        if (!dateRegex.test(dateString)) {
+            return { error: new Error('Invalid date format. Expected format is "dd-mm-yyyy".')} ;
         }
+
+        // Parse the day, month, and year from the string
+        const parts = dateString.split('-');
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+
+        // Construct a new Date object in the local timezone.
+        // Note: The month in a Date object is 0-indexed (0 = January).
+        const date = new Date(year, month - 1, day);
+
+        // Final validation: check if the constructed date values match the input values.
+        // This catches invalid dates like '31-02-2023', which would otherwise be parsed as '03-03-2023'.
+        if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+            return {error: new Error('Invalid date value. The date does not exist (e.g., February 30th).') };
+        }
+        return {date};
+    }
+
+    /**
+     * @param {string} dsName
+     */
+    async ifDbExists(dsName) {
+        if (!this.isConnected) await this.connect();
+        let dbs = await this.client.db().admin().listDatabases();
+        // Check if db already exists...
+        let dbList = dbs.databases;
+        for (let i = 0; i < dbList.length; i++) {
+            if (dbList[i].name === dsName) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
      * @param {String} sourceDbName
      * @param {String} collectionName
      * @param {String} archiveDbName
-     * @param {number} ageInDays
+     * @param {Date} cutOffDate
+     * @returns {Promise<Object>}
      */
-    async archiveCollection(sourceDbName, collectionName, archiveDbName, ageInDays) {
+    async archiveCollection(sourceDbName, collectionName, archiveDbName, cutOffDate) {
+        let status = "";
         if (!this.isConnected) await this.connect();
         const sourceDb = this.client.db(sourceDbName);
         const archiveDb = this.client.db(archiveDbName);
 
         const sourceCollection = sourceDb.collection(collectionName);
         const archiveCollection = archiveDb.collection(collectionName);
-
-        const cutOffDate = new Date();
-        cutOffDate.setDate(cutOffDate.getDate() - ageInDays);
 
         const cutOffObjectId = ObjectId.createFromTime(Math.floor(cutOffDate.getTime() / 1000));
         const query = { "_id": { $lt: cutOffObjectId } }
@@ -172,45 +198,26 @@ class DbArchiveProcessor {
         const documentsToArchive = await cursor.toArray();
 
         if (documentsToArchive.length === 0) {
-            logger.info(`No documents older than ${ageInDays} days in ${sourceDbName}.${collectionName} to archive.`);
-            return;
+            logger.info(`No documents older than ${cutOffDate} in ${sourceDbName}.${collectionName} to archive.`);
+            status = `No documents older than ${cutOffDate} in ${sourceDbName}.${collectionName} to archive.`;
+            return status;
         }
         logger.info(`Found ${documentsToArchive.length} documents to archive from ${sourceDbName}.${collectionName}.`);
         // Insert the documents into the archive collection.
-        const result = await archiveCollection.insertMany(documentsToArchive);
+        const result = await archiveCollection.insertMany(documentsToArchive, {ordered: false});
         logger.info(`Successfully archived ${result.insertedCount} documents to ${archiveDbName}.${collectionName}.`);
 
-        // Delete the original documents from the source collection.
-        const deleteResult = await sourceCollection.deleteMany(query);
-        logger.info(`Successfully deleted ${deleteResult.deletedCount} documents from ${sourceDbName}.${collectionName}.`);
-    }
-
-    /**
-     * @param {{ sourceDbName: String; sourceCollectionNames: Array<String>; archiveDbName: String; ageInDays: Number; frequencyInDays: Number; }} config
-     */
-    scheduleArchivalForConfig(config) {
-        const { sourceDbName, sourceCollectionNames, 
-            archiveDbName, ageInDays, frequencyInDays } = config;
-        const frequencyInMs = frequencyInDays * 24 * 60 * 60 * 1000;
-
-        // Run the archival task
-        this.archiveData(sourceDbName, sourceCollectionNames, archiveDbName, ageInDays)
-            .then(() => {
-                // After the task is complete, schedule the next run
-                logger.info(`Next archival for ${sourceDbName} scheduled in ${frequencyInDays} days.`);
-                setTimeout(() => this.scheduleArchivalForConfig(config), frequencyInMs);
-            })
-            .catch(err => {
-                // In case of an error, still schedule the next run to keep the process alive
-                logger.error(err, `Archival for ${sourceDbName} failed. Retrying in ${frequencyInDays} days.`);
-                setTimeout(() => this.scheduleArchivalForConfig(config), frequencyInMs);
-            });
-    }
-
-    scheduleArchival() {
-        for (const config of ARCHIVE_CONFIG_LIST) {
-            logger.info(`Scheduling archive for ${config.sourceDbName}`);
-            this.scheduleArchivalForConfig(config)
+        if (documentsToArchive.length === result.insertedCount) {
+            logger.info(`All documents successfully archived. Moving on to delete them from original dataset`);
+            // Delete the original documents from the source collection.
+            const deleteResult = await sourceCollection.deleteMany(query);
+            logger.info(`Successfully deleted ${deleteResult.deletedCount} documents from ${sourceDbName}.${collectionName}.`);
+            status = `Successfully archived ${deleteResult.deletedCount} documents to ${archiveDbName}.${collectionName}`;
+            return status;
+        } else {
+            status = `Successfully archived ${result.insertedCount} documents out of ${documentsToArchive.length} documents to ${archiveDbName}.${collectionName}.
+            Some documents we were unable to archive. Please check manually.`;
+            return status;
         }
     }
 }

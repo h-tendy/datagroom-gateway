@@ -515,8 +515,6 @@ dbConnectivityChecker.checkDbConnectivity(dbCheckInterval);
 
 PrepAttachments.refreshAttachmentsIntoDb();
 
-dbArchiveProcessor.scheduleArchival();
-
 console.log("Started DG server..... Find the logs in ./datagroom.log");
 
 //ExcelUtils.exportDataFromDbIntoXlsx('myDb2', 'default', 'jhanu', 'export.xlsx');
