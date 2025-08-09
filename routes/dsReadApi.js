@@ -27,9 +27,16 @@ router.post('/archive', async (req, res, next) => {
         if (!request.sourceDataSetName || !request.archiveDataSetName || !request.cutOffDate) {
             status.error = new Error("One or more required parameters is missing");
         } else {
-            let allowed = await AclCheck.aclCheck(request.sourceDataSetName, "default", req.params.dsUser, token);
-            if (!allowed) {
-                res.status(403).json({ "Error": "access_denied" });
+            let sourceDsAccessAllowed = await AclCheck.aclCheck(request.sourceDataSetName, "default", req.params.dsUser, token);
+            if (!sourceDsAccessAllowed) {
+                status.error = `${request.sourceDataSetName} dataset access denied`;
+                res.status(403).json(status);
+                return
+            }
+            let archiveDsAccessAllowed = await AclCheck.aclCheck(request.archiveDataSetName, "default", req.params.dsUser, token);
+            if (!archiveDsAccessAllowed) {
+                status.error = `${request.archiveDataSetName} dataset access denied`;
+                res.status(403).json(status);
                 return
             }
             let dbAbstraction = new DbAbstraction();
