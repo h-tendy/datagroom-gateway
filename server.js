@@ -84,6 +84,7 @@ process.on('SIGINT', async () => {
     const dbClient = new DbAbstraction();
     await dbClient.destroy();
     await dbConnectivityChecker.destroy();
+    await dbArchiveProcessor.destroy();
     process.exit(0);
 })
 process.on('SIGTERM', async () => {
@@ -91,6 +92,7 @@ process.on('SIGTERM', async () => {
     const dbClient = new DbAbstraction();
     await dbClient.destroy();
     await dbConnectivityChecker.destroy();
+    await dbArchiveProcessor.destroy();
     process.exit(0);
 })
 process.on('unhandledRejection', (e) => {

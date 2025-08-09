@@ -109,12 +109,8 @@ class DbArchiveProcessor {
                 logger.info(`Archiving ${archiveDbName}.${collectionName}`);
                 await this.archiveCollection(sourceDbName, collectionName, archiveDbName, ageInDays);
             }
-
         } catch (e) {
             logger.error(e, "MongoDbArchive: Error in archiving");
-        } finally {
-            this.destroy();
-            logger.info("MongoDbArchive: Destroyed the connection");
         }
     }
 
@@ -181,7 +177,7 @@ class DbArchiveProcessor {
         }
         logger.info(`Found ${documentsToArchive.length} documents to archive from ${sourceDbName}.${collectionName}.`);
         // Insert the documents into the archive collection.
-        const result = await archiveCollection.insertMany(documentsToArchive, { ordered: true });
+        const result = await archiveCollection.insertMany(documentsToArchive);
         logger.info(`Successfully archived ${result.insertedCount} documents to ${archiveDbName}.${collectionName}.`);
 
         // Delete the original documents from the source collection.
@@ -212,10 +208,10 @@ class DbArchiveProcessor {
     }
 
     scheduleArchival() {
-        ARCHIVE_CONFIG_LIST.forEach((config)  => {
+        for (const config of ARCHIVE_CONFIG_LIST) {
             logger.info(`Scheduling archive for ${config.sourceDbName}`);
             this.scheduleArchivalForConfig(config)
-        });
+        }
     }
 }
 
