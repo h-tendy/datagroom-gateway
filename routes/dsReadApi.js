@@ -405,7 +405,7 @@ function isJiraRec(rec) {
 
 router.post('/view/insertOneDoc', async (req, res, next) => {
     let request = req.body;
-    logger.info(request, "Incoming request in insertOneDoc");
+    logger.info("Incoming request in insertOneDoc");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -448,7 +448,7 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
 // the front end for sure. 
 router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     let request = req.body;
-    logger.info(request, "Incoming request in insertOrUpdateOneDoc");
+    logger.info("Incoming request in insertOrUpdateOneDoc");
     //res.status(200).send({status: 'success'});
     //return;
     const token = req.cookies.jwt;
