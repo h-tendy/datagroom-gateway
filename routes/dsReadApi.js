@@ -24,13 +24,18 @@ router.post('/archive', async (req, res, next) => {
     logger.info(request, "Incoming request to archive dataset");
     try {
         const token = req.cookies.jwt;
-        let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
-        if (!allowed) {
-            res.status(403).json({ "Error": "access_denied" });
-            return
+        let status = {};
+        if (!request.sourceDataSetName || !request.archiveDataSetName || !request.cutOffDate) {
+            status.error = new Error("One or more required parameters is missing");
+        } else {
+            let allowed = await AclCheck.aclCheck(request.sourceDataSetName, "default", req.params.dsUser, token);
+            if (!allowed) {
+                res.status(403).json({ "Error": "access_denied" });
+                return
+            }
+            let dbArchiveProcessor = new DbArchiveProcessor();
+            status = await dbArchiveProcessor.archiveData(request.sourceDataSetName, request.collectionName, request.archiveDataSetName, request.cutOffDate);
         }
-        let dbArchiveProcessor = new DbArchiveProcessor();
-        let status = await dbArchiveProcessor.archiveData(request.sourceDataSetName, request.collectionName, request.archiveDataSetName, request.cutOffDate);
         if (status.error) {
             status.error = status.error.message;
             status.exampleRequestSpecification = {
