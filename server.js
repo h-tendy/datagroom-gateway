@@ -228,6 +228,15 @@ const basicAuth = (req, res, next) => {
 // Attach the authentication middleware to all routes except /login
 app.use(/^(?!\/login).*$/, authenticate);
 
+app.use((req, res, next) => {
+    const startTime = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - startTime;
+        logger.info({method : req.method, url: req.originalUrl, durationInMs: duration}, "Time to prcoess request");
+    })
+    next();
+})
+
 const fileUpload = require('./routes/upload');
 app.use('/upload', fileUpload);
 const dsReadApi = require('./routes/dsReadApi');

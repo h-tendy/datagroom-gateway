@@ -5,6 +5,7 @@ const logger = require('./logger');
 
 const MongoClient = require('mongodb').MongoClient;
 var ObjectId = require('mongodb').ObjectId;
+const {parseAndValidateDate} = require('./utils');
 
 class DbAbstraction {
 
@@ -363,6 +364,102 @@ class DbAbstraction {
             if (ret.result.ok !== 1) {
                 logger.warn(`InsertOne failed: ${ret.result}`);
             }
+        }
+    }
+
+    /**
+     * @param {string} sourceDbName
+     * @param {String} collectionName
+     * @param {string} archiveDbName
+     * @param {string} date
+     * @returns {Promise<Object>}
+     */
+    async archiveData(sourceDbName, collectionName, archiveDbName, date) {
+        try {
+            if (!sourceDbName || await this.ifDbExists(sourceDbName) == false) {
+                let error = new Error(`${sourceDbName} dataset doesn't exist`);
+                return {error}
+            }
+            if (!archiveDbName || await this.ifDbExists(archiveDbName) == false) {
+                let error = new Error(`${archiveDbName} dataset doesn't exist. Please make one before proceeding`);
+                return {error}
+            }
+            if (!collectionName) {
+                collectionName = "data";
+            }
+            let cutOffDate = parseAndValidateDate(date);
+            if (cutOffDate.error) {
+                return {error: cutOffDate.error}
+            }
+            
+            logger.info(`Archiving ${archiveDbName}.${collectionName}`);
+            let status = await this.archiveCollection(sourceDbName, collectionName, archiveDbName, cutOffDate.date);
+            return {status}
+        } catch (e) {
+            logger.error(e, "MongoDbArchive: Error in archiving");
+            return {error: e};
+        }
+    }
+
+    /**
+     * @param {string} dsName
+     */
+    async ifDbExists(dsName) {
+        if (!this.isConnected) await this.connect();
+        let dbs = await this.client.db().admin().listDatabases();
+        // Check if db already exists...
+        let dbList = dbs.databases;
+        for (let i = 0; i < dbList.length; i++) {
+            if (dbList[i].name === dsName) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param {String} sourceDbName
+     * @param {String} collectionName
+     * @param {String} archiveDbName
+     * @param {Date} cutOffDate
+     * @returns {Promise<Object>}
+     */
+    async archiveCollection(sourceDbName, collectionName, archiveDbName, cutOffDate) {
+        let status = "";
+        if (!this.isConnected) await this.connect();
+        const sourceDb = this.client.db(sourceDbName);
+        const archiveDb = this.client.db(archiveDbName);
+
+        const sourceCollection = sourceDb.collection(collectionName);
+        const archiveCollection = archiveDb.collection(collectionName);
+
+        const cutOffObjectId = ObjectId.createFromTime(Math.floor(cutOffDate.getTime() / 1000));
+        const query = { "_id": { $lt: cutOffObjectId } }
+
+        const cursor = await sourceCollection.find(query).sort({ _id: 1 });
+        const documentsToArchive = await cursor.toArray();
+
+        if (documentsToArchive.length === 0) {
+            logger.info(`No documents older than ${cutOffDate} in ${sourceDbName}.${collectionName} to archive.`);
+            status = `No documents older than ${cutOffDate} in ${sourceDbName}.${collectionName} to archive.`;
+            return status;
+        }
+        logger.info(`Found ${documentsToArchive.length} documents to archive from ${sourceDbName}.${collectionName}.`);
+        // Insert the documents into the archive collection.
+        const result = await archiveCollection.insertMany(documentsToArchive, {ordered: false});
+        logger.info(`Successfully archived ${result.insertedCount} documents to ${archiveDbName}.${collectionName}.`);
+
+        if (documentsToArchive.length === result.insertedCount) {
+            logger.info(`All documents successfully archived. Moving on to delete them from original dataset`);
+            // Delete the original documents from the source collection.
+            const deleteResult = await sourceCollection.deleteMany(query);
+            logger.info(`Successfully deleted ${deleteResult.deletedCount} documents from ${sourceDbName}.${collectionName}.`);
+            status = `Successfully archived ${deleteResult.deletedCount} documents to ${archiveDbName}.${collectionName}`;
+            return status;
+        } else {
+            status = `Successfully archived ${result.insertedCount} documents out of ${documentsToArchive.length} documents to ${archiveDbName}.${collectionName}.
+            Some documents we were unable to archive. Please check manually.`;
+            return status;
         }
     }
 

@@ -212,3 +212,34 @@ async function drainRowstoDG(request)
   pushInProgress = false;
 }
 
+
+exports.archiveDataset = async (sourceDataSetName, archiveDataSetName, cutOffDate, collectionName = "data") => {
+  /* exmaple Request Body = {
+    "sourceDataSetName": "BMSCOPY",
+    "collectionName": "data",
+    "archiveDataSetName": "BMSCOPY_archive",
+    "cutOffDate": "10-08-2025"
+  } */
+  let request = {
+    sourceDataSetName,
+    archiveDataSetName,
+    collectionName,
+    cutOffDate
+  };
+  let data = new TextEncoder().encode(
+    JSON.stringify(request));
+  let options = {
+      hostname: DG_HOST,
+      port: DG_PORT,
+      path: '/ds/archive',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': data.length
+      }
+  }
+  console.log(`${Date()}: Doing a DG archive request: ${JSON.stringify(request, null, 4)}`);
+  let t = await exports.doRequest(options, data);
+  console.log(`${Date()}: Done DG update, response: ${JSON.stringify(t, null, 4)}`);
+}
+

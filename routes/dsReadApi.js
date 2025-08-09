@@ -18,6 +18,54 @@ const logger = require('../logger');
 
 let host = JiraSettings.host;
 
+router.post('/archive', async (req, res, next) => {
+    let request = req.body;
+    logger.info(request, "Incoming request to archive dataset");
+    try {
+        const token = req.cookies.jwt;
+        let status = {};
+        if (!request.sourceDataSetName || !request.archiveDataSetName || !request.cutOffDate) {
+            status.error = new Error("One or more required parameters is missing");
+        } else {
+            let sourceDsAccessAllowed = await AclCheck.aclCheck(request.sourceDataSetName, "default", req.params.dsUser, token);
+            if (!sourceDsAccessAllowed) {
+                status.error = `${request.sourceDataSetName} dataset access denied`;
+                res.status(403).json(status);
+                return
+            }
+            let archiveDsAccessAllowed = await AclCheck.aclCheck(request.archiveDataSetName, "default", req.params.dsUser, token);
+            if (!archiveDsAccessAllowed) {
+                status.error = `${request.archiveDataSetName} dataset access denied`;
+                res.status(403).json(status);
+                return
+            }
+            let dbAbstraction = new DbAbstraction();
+            status = await dbAbstraction.archiveData(request.sourceDataSetName, request.collectionName, request.archiveDataSetName, request.cutOffDate);
+        }
+        if (status.error) {
+            status.error = status.error.message;
+            status.exampleRequestSpecification = {
+                "sourceDataSetName": "<Dataset name whose documents to be archived>",
+                "collectionName": "The collection which needs to be archived. If not provided, defaults to `data`",
+                "archiveDataSetName": "<Dataset name where the archive docs should go>",
+                "cutOffDate": "Date in format dd-mm-yyyy"
+            }
+            status.exampleRequestBody = {
+                "sourceDataSetName": "abc",
+                "collectionName": "data",
+                "archiveDataSetName": "abc_archive",
+                "cutOffDate": "17-11-2024"
+            }
+            res.status(400).send(status);
+            return;
+        }
+        res.status(200).send(status);
+    } catch (err) {
+        logger.error(err, "Exception while archiving");
+        res.status(415).send(err);
+    }
+})
+
 router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
     //logger check
@@ -405,7 +453,7 @@ function isJiraRec(rec) {
 
 router.post('/view/insertOneDoc', async (req, res, next) => {
     let request = req.body;
-    logger.info(request, "Incoming request in insertOneDoc");
+    logger.info("Incoming request in insertOneDoc");
     const token = req.cookies.jwt;
     let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
@@ -448,7 +496,7 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
 // the front end for sure. 
 router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     let request = req.body;
-    logger.info(request, "Incoming request in insertOrUpdateOneDoc");
+    logger.info("Incoming request in insertOrUpdateOneDoc");
     //res.status(200).send({status: 'success'});
     //return;
     const token = req.cookies.jwt;
