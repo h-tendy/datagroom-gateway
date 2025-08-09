@@ -10,7 +10,6 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken')
 const DbAbstraction = require('./dbAbstraction');
 const DbConnectivityChecker = require('./dbConnectivityChecker');
-const DbArchiveProcessor = require('./dbArchive');
 const ExcelUtils = require('./excelUtils');
 const Utils = require('./utils');
 const PrepAttachments = require('./prepAttachments');
@@ -76,7 +75,6 @@ httpServer.timeout = 60 * 60 * 1000;
 
 const dbConnectivityChecker = new DbConnectivityChecker(io);
 let dbAbstraction = new DbAbstraction();
-const dbArchiveProcessor = new DbArchiveProcessor();
 
 //Add some process event listeners
 process.on('SIGINT', async () => {
@@ -84,7 +82,6 @@ process.on('SIGINT', async () => {
     const dbClient = new DbAbstraction();
     await dbClient.destroy();
     await dbConnectivityChecker.destroy();
-    await dbArchiveProcessor.destroy();
     process.exit(0);
 })
 process.on('SIGTERM', async () => {
@@ -92,7 +89,6 @@ process.on('SIGTERM', async () => {
     const dbClient = new DbAbstraction();
     await dbClient.destroy();
     await dbConnectivityChecker.destroy();
-    await dbArchiveProcessor.destroy();
     process.exit(0);
 })
 process.on('unhandledRejection', (e) => {

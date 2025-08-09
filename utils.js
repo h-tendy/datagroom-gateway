@@ -568,6 +568,38 @@ function parseRecord(dbRecord, revContentMap, jiraFieldMapping) {
   return { rec, parseSuccess }
 }
 
+/**
+ * Validates a date string in "dd-mm-yyyy" format and returns a local Date object.
+ * @param {string} dateString The date string to validate.
+ * @returns {Object} The local Date object.
+ */
+function parseAndValidateDate(dateString) {
+    // Regular expression to match dd-mm-yyyy format
+    const dateRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-(\d{4})/;
+
+    // Check if the format is correct
+    if (!dateRegex.test(dateString)) {
+        return { error: new Error('Invalid date format. Expected format is "dd-mm-yyyy".')} ;
+    }
+
+    // Parse the day, month, and year from the string
+    const parts = dateString.split('-');
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+
+    // Construct a new Date object in the local timezone.
+    // Note: The month in a Date object is 0-indexed (0 = January).
+    const date = new Date(year, month - 1, day);
+
+    // Final validation: check if the constructed date values match the input values.
+    // This catches invalid dates like '31-02-2023', which would otherwise be parsed as '03-03-2023'.
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return {error: new Error('Invalid date value. The date does not exist (e.g., February 30th).') };
+    }
+    return {date};
+}
+
 
 module.exports = {
     execCmdExecutor,
@@ -576,5 +608,6 @@ module.exports = {
   sanitizeData,
   getRevContentMap,
   parseRecord,
+  parseAndValidateDate,
   jwtSecret
 };

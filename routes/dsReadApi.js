@@ -15,7 +15,6 @@ const MongoFilters = require('./mongoFilters');
 // @ts-ignore
 const { ObjectId } = require('mongodb');
 const logger = require('../logger');
-const DbArchiveProcessor = require('../dbArchive')
 
 let host = JiraSettings.host;
 
@@ -33,8 +32,8 @@ router.post('/archive', async (req, res, next) => {
                 res.status(403).json({ "Error": "access_denied" });
                 return
             }
-            let dbArchiveProcessor = new DbArchiveProcessor();
-            status = await dbArchiveProcessor.archiveData(request.sourceDataSetName, request.collectionName, request.archiveDataSetName, request.cutOffDate);
+            let dbAbstraction = new DbAbstraction();
+            status = await dbAbstraction.archiveData(request.sourceDataSetName, request.collectionName, request.archiveDataSetName, request.cutOffDate);
         }
         if (status.error) {
             status.error = status.error.message;
