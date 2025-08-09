@@ -2,7 +2,6 @@ const logger = require('./logger');
 
 const MongoClient = require('mongodb').MongoClient;
 var ObjectId = require('mongodb').ObjectId;
-const ARCHIVE_CONFIG_LIST = require('./archiveConfig');
 
 class DbArchiveProcessor {
 
