@@ -62,7 +62,7 @@ class DbAbstraction {
         logger.info('MongoDB: Initialising new client connection');
         try {
             this.client = new MongoClient(this.url, {
-                maxPoolSize: 10, //Maintain upto 10 sockets
+                maxPoolSize: 30, //Maintain upto 10 sockets
                 minPoolSize: 3, // Keep at least 3 connections open
                 useNewUrlParser: true, 
                 useUnifiedTopology: true, 
