@@ -10,6 +10,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken')
 const DbAbstraction = require('./dbAbstraction');
 const DbConnectivityChecker = require('./dbConnectivityChecker');
+const DbArchiveProcessor = require('./dbArchive');
 const ExcelUtils = require('./excelUtils');
 const Utils = require('./utils');
 const PrepAttachments = require('./prepAttachments');
@@ -75,6 +76,7 @@ httpServer.timeout = 60 * 60 * 1000;
 
 const dbConnectivityChecker = new DbConnectivityChecker(io);
 let dbAbstraction = new DbAbstraction();
+const dbArchiveProcessor = new DbArchiveProcessor();
 
 //Add some process event listeners
 process.on('SIGINT', async () => {
@@ -501,6 +503,8 @@ dbAbstraction.hello();
 dbConnectivityChecker.checkDbConnectivity(dbCheckInterval);
 
 PrepAttachments.refreshAttachmentsIntoDb();
+
+dbArchiveProcessor.scheduleArchival();
 
 console.log("Started DG server..... Find the logs in ./datagroom.log");
 
