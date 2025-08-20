@@ -244,6 +244,8 @@ const { unlock, options } = require('./routes/upload');
 app.use('/ds', dsReadApi);
 const csvUpload = require('./routes/uploadCsv');
 app.use('/uploadCsv', csvUpload);
+const webhooks = require('./routes/webhook');
+app.use('/webhooks', webhooks);
 
 Utils.execCmdExecutor('mkdir attachments');
 const attachmentsDir = path.resolve(__dirname, './attachments');

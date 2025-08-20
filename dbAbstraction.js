@@ -119,6 +119,24 @@ class DbAbstraction {
         let db = this.client.db(dbName);
         db.collection(tableName);
     }
+
+    /**
+     * 
+     * @param {String} dbName 
+     * @returns {true} If the dbName exists in the db
+     * @returns {false} If the dbName doesn't exist in the db
+     * @throws {Error} In case of any unexpected error
+     */
+    async checkIfDbExists(dbName) {
+        try {
+            const dbList = await this.listDatabases();
+            return dbList.some(dbInfo => dbInfo.name === dbName);
+        } catch (err) {
+            console.log(`${Date()} Error in checkIfDbExists, Err: ${err}`);
+            throw err;
+        }
+    }
+
     // Only double-quotes need to be escaped while inserting data rows. 
     // And don't allow column names which start with underscore. Or at least don't allow _id
     async insertOne (dbName, tableName, doc) {
