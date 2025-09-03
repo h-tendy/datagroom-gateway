@@ -72,7 +72,7 @@ class DbAbstraction {
         logger.info('MongoDB: Initialising new client connection');
         try {
             this.client = new MongoClient(this.url, {
-                maxPoolSize: 30, //Maintain upto 30 sockets
+                maxPoolSize: 60, //Maintain upto 60 sockets
                 minPoolSize: 3, // Keep at least 3 connections open
                 useNewUrlParser: true, 
                 useUnifiedTopology: true, 
@@ -209,10 +209,11 @@ class DbAbstraction {
     }
 
     async updateOneKeyInTransaction (dbName, tableName, selector, updateObj) {
+        let session = null;
         try {
             if (! this.isConnected ) await this.connect();
             let db = this.client.db(dbName);
-            const session = this.client.startSession();
+            session = this.client.startSession();
             let ret = {}; 
             await session.withTransaction(async () => {
                 let collection = db.collection(tableName);
@@ -232,16 +233,15 @@ class DbAbstraction {
                     ret = await collection.updateOne(selector, { $set: updateObj }, {});
                 }
             }, {})
-
+            logger.info(`UpdateOneKeyInTransaction result: ${ret.result}`);
+            return ret.result;
         } catch (err) {
             logger.error(err, `updateOneKeyInTransaction error for ${dbName}.${tableName}`);
             this.handleDbErrors(err);
             throw err;
         } finally {
-            await session.endSession();
+            if (session) await session.endSession();
         }
-        logger.info(`UpdateOneKeyInTransaction result: ${ret.result}`);
-        return ret.result;
     }
 
     async removeOne (dbName, tableName, selector) {
