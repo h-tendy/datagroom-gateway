@@ -146,9 +146,9 @@ nohup ./startDg.sh &
 ```
 
 ### Files Generated
-- **nohupGateway.log**: Captures all output from the DataGroom server and the script itself, including crash/restart messages and system resource snapshots (from the `top` command) when the server restarts.
+- **nohupGateway.log**: Captures all output from the DataGroom server and the script itself, including crash/restart messages.
 - **datagroom.log**: The main application log file. On every crash/restart, this file is rotated and renamed to `datagroom.log.<PID>.<timestamp>`, preserving logs for each run.
-- **top snapshots (in nohupGateway.log)**: After every crash, the script logs 5 consecutive `top` command outputs (1 second apart) to help diagnose resource issues.
+- **top snapshots (in nohup.out)**: After every crash, the script logs 5 consecutive `top` command outputs (1 second apart) to help diagnose resource issues. (This can be very specific to the OS. Change the command accordingly, otherwise it may result in error messages.)
 
 ### Script Advantages
 - **Automatic Restart**: If the DataGroom server crashes, the script waits 10 seconds and restarts it automatically.
