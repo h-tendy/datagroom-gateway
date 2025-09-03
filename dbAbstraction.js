@@ -25,6 +25,16 @@ class DbAbstraction {
         this.isConnected = false;
     }
 
+    handleDbErrors(err) {
+        // Check for MongoDB connection errors and exit gracefully if needed
+        const isMongoServerSelectionError = err && (err.name === 'MongoServerSelectionError');
+        const isMongoNetworkError = err && (err.name === 'MongoNetworkError');
+        if (isMongoServerSelectionError || isMongoNetworkError) {
+            logger.error(err, 'Critical MongoDB connection error. Exiting process.');
+            process.exit(1);
+        }
+    }
+
     resetConnectionState() {
         this.isConnected = false;
         this.client = null;
@@ -131,6 +141,7 @@ class DbAbstraction {
             return ret.result;
         } catch (err) {
             logger.error(err, `insertOne error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
             throw err;
         }
     }
@@ -147,6 +158,7 @@ class DbAbstraction {
             return ret.result;
         } catch (err) {
             logger.error(err, `insertOneUniquely error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
             throw err;
         }
     }
@@ -158,6 +170,7 @@ class DbAbstraction {
             return await collection.updateMany(selector, { $set: updateObj }, { upsert: true });
         } catch (err) {
             logger.error(err, `update error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
             throw err;
         }
     }
@@ -173,6 +186,7 @@ class DbAbstraction {
             return ret.result;
         } catch (err) {
             logger.error(err, `updateOne error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
             throw err;
         }
     }
@@ -188,17 +202,18 @@ class DbAbstraction {
             let ret = await collection.updateOne(selector, { $unset: unsetObj }, {});
             return ret.result;
         } catch (err) {
-            logger.error(err, `unsetOne error for ${dbName}.${tableName}`);
-            throw err;
+                logger.error(err, `unsetOne error for ${dbName}.${tableName}`);
+                this.handleDbErrors(err);
+                throw err;
         }
     }
 
     async updateOneKeyInTransaction (dbName, tableName, selector, updateObj) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        const session = this.client.startSession();
-        let ret = {}; 
         try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            const session = this.client.startSession();
+            let ret = {}; 
             await session.withTransaction(async () => {
                 let collection = db.collection(tableName);
                 let query = JSON.parse(JSON.stringify(selector));
@@ -217,7 +232,11 @@ class DbAbstraction {
                     ret = await collection.updateOne(selector, { $set: updateObj }, {});
                 }
             }, {})
-    
+
+        } catch (err) {
+            logger.error(err, `updateOneKeyInTransaction error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
+            throw err;
         } finally {
             await session.endSession();
         }
@@ -237,6 +256,7 @@ class DbAbstraction {
             return ret.result;
         } catch (err) {
             logger.error(err, `removeOne error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
             throw err;
         }
     }
@@ -250,6 +270,7 @@ class DbAbstraction {
             return ret.result;
         } catch (err) {
             logger.error(err, `removeOneWithValidId error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
             throw err;
         }
     }
@@ -266,6 +287,7 @@ class DbAbstraction {
             return ret.result;
         } catch (err) {
             logger.error(err, `removeMany error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
             throw err;
         }
     }
@@ -281,34 +303,41 @@ class DbAbstraction {
             return ret.result;
         } catch (err) {
             logger.error(err, `removeFieldFromAll error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
             throw err;
         }
     }
 
     async countDocuments (dbName, tableName, query, options) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-
-        return new Promise ((resolve, reject) => {
-            collection.countDocuments(query, options, (err, data) => {
-                err ? reject (err) : resolve (data)
-            });            
-        })
+        try {
+            if (!this.isConnected) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            let count = await collection.countDocuments(query, options);
+            return count;
+        } catch (err) {
+            logger.error(err, `countDocuments error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
+            throw err;
+        }
     }
+
     getObjectId (id) {
         return new ObjectId(id);
     }
-    async find (dbName, tableName, query, options) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
 
-        return new Promise ((resolve, reject) => {
-            collection.find(query, options).toArray((err, data) => {
-                err ? reject (err) : resolve (data);
-            })
-        })
+    async find (dbName, tableName, query, options) {
+        try {
+            if (!this.isConnected) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            let data = await collection.find(query, options).toArray();
+            return data;
+        } catch (err) {
+            logger.error(err, `find error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
+            throw err;
+        }
     }
 
     async removeFromQuery(dbName, tableName, query, options) {
@@ -327,6 +356,7 @@ class DbAbstraction {
             return count;
         } catch (err) {
             logger.error(err, `removeFromQuery error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
             throw err;
         }
     }
@@ -379,6 +409,7 @@ class DbAbstraction {
             return results;
         } catch (err) {
             logger.error(err, `pagedFind error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
             throw err;
         }
     }
