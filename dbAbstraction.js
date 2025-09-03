@@ -62,7 +62,7 @@ class DbAbstraction {
         logger.info('MongoDB: Initialising new client connection');
         try {
             this.client = new MongoClient(this.url, {
-                maxPoolSize: 30, //Maintain upto 10 sockets
+                maxPoolSize: 30, //Maintain upto 30 sockets
                 minPoolSize: 3, // Keep at least 3 connections open
                 useNewUrlParser: true, 
                 useUnifiedTopology: true, 
@@ -94,6 +94,7 @@ class DbAbstraction {
             logger.error(err, "MongoDB: Error while creating client connection");
             this.resetConnectionState();
             DbAbstraction._instance = null;
+            throw err;
         }
     }
 
@@ -122,49 +123,74 @@ class DbAbstraction {
     // Only double-quotes need to be escaped while inserting data rows. 
     // And don't allow column names which start with underscore. Or at least don't allow _id
     async insertOne (dbName, tableName, doc) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-        let ret = await collection.insertOne(doc);
-        return ret.result;
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            let ret = await collection.insertOne(doc);
+            return ret.result;
+        } catch (err) {
+            logger.error(err, `insertOne error for ${dbName}.${tableName}`);
+            throw err;
+        }
     }
     async insertOneUniquely (dbName, tableName, selector, setObj) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-        if (selector["_id"]) {
-            logger.warn('insertOneUniquely error: Must not have _id');
-            return { result: { ok: 0 }, message: 'setObj must not have _id' }
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            if (selector["_id"]) {
+                logger.warn('insertOneUniquely error: Must not have _id');
+                return { result: { ok: 0 }, message: 'setObj must not have _id' }
+            }
+            let ret = await collection.updateOne(selector, { $setOnInsert: setObj }, { upsert: true });
+            return ret.result;
+        } catch (err) {
+            logger.error(err, `insertOneUniquely error for ${dbName}.${tableName}`);
+            throw err;
         }
-        let ret = await collection.updateOne(selector, { $setOnInsert: setObj }, { upsert: true });
-        return ret.result;
     }
     async update (dbName, tableName, selector, updateObj) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-        return await collection.updateMany(selector, { $set: updateObj }, { upsert: true });
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            return await collection.updateMany(selector, { $set: updateObj }, { upsert: true });
+        } catch (err) {
+            logger.error(err, `update error for ${dbName}.${tableName}`);
+            throw err;
+        }
     }
     async updateOne (dbName, tableName, selector, updateObj, convertId = true) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-        if (selector["_id"] && convertId) {
-            selector["_id"] = new ObjectId(selector["_id"]);
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            if (selector["_id"] && convertId) {
+                selector["_id"] = new ObjectId(selector["_id"]);
+            }
+            let ret = await collection.updateOne(selector, { $set: updateObj }, {});
+            return ret.result;
+        } catch (err) {
+            logger.error(err, `updateOne error for ${dbName}.${tableName}`);
+            throw err;
         }
-        let ret = await collection.updateOne(selector, { $set: updateObj }, {});
-        return ret.result;
     }
 
     async unsetOne (dbName, tableName, selector, unsetObj, convertId = true) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-        if (selector["_id"] && convertId) {
-            selector["_id"] = new ObjectId(selector["_id"]);
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            if (selector["_id"] && convertId) {
+                selector["_id"] = new ObjectId(selector["_id"]);
+            }
+            let ret = await collection.updateOne(selector, { $unset: unsetObj }, {});
+            return ret.result;
+        } catch (err) {
+            logger.error(err, `unsetOne error for ${dbName}.${tableName}`);
+            throw err;
         }
-        let ret = await collection.updateOne(selector, { $unset: unsetObj }, {});
-        return ret.result;
     }
 
     async updateOneKeyInTransaction (dbName, tableName, selector, updateObj) {
@@ -200,43 +226,63 @@ class DbAbstraction {
     }
 
     async removeOne (dbName, tableName, selector) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-        if (selector["_id"]) {
-            selector["_id"] = new ObjectId(selector["_id"]);
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            if (selector["_id"]) {
+                selector["_id"] = new ObjectId(selector["_id"]);
+            }
+            let ret = await collection.deleteOne(selector);
+            return ret.result;
+        } catch (err) {
+            logger.error(err, `removeOne error for ${dbName}.${tableName}`);
+            throw err;
         }
-        let ret = await collection.deleteOne(selector);
-        return ret.result;
     }
 
     async removeOneWithValidId (dbName, tableName, selector) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-        let ret = await collection.deleteOne(selector);
-        return ret.result;
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            let ret = await collection.deleteOne(selector);
+            return ret.result;
+        } catch (err) {
+            logger.error(err, `removeOneWithValidId error for ${dbName}.${tableName}`);
+            throw err;
+        }
     }
 
     async removeMany (dbName, tableName, selector, convertId = true) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-        if (selector["_id"] && convertId) {
-            selector["_id"] = new ObjectId(selector["_id"]);
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            if (selector["_id"] && convertId) {
+                selector["_id"] = new ObjectId(selector["_id"]);
+            }
+            let ret = await collection.deleteMany(selector);
+            return ret.result;
+        } catch (err) {
+            logger.error(err, `removeMany error for ${dbName}.${tableName}`);
+            throw err;
         }
-        let ret = await collection.deleteMany(selector);
-        return ret.result;
     }
 
     async removeFieldFromAll (dbName, tableName, field) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-        let unsetObj = {};
-        unsetObj[field] = 1;
-        let ret = await collection.updateMany({}, {$unset: unsetObj}, {});
-        return ret.result;
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            let unsetObj = {};
+            unsetObj[field] = 1;
+            let ret = await collection.updateMany({}, {$unset: unsetObj}, {});
+            return ret.result;
+        } catch (err) {
+            logger.error(err, `removeFieldFromAll error for ${dbName}.${tableName}`);
+            throw err;
+        }
     }
 
     async countDocuments (dbName, tableName, query, options) {
@@ -266,65 +312,75 @@ class DbAbstraction {
     }
 
     async removeFromQuery(dbName, tableName, query, options) {
-        if (! this.isConnected ) await this.connect();
-        let db = this.client.db(dbName);
-        let collection = db.collection(tableName);
-        let count = 0;
-        const cursor = collection.find(query, options);
-        for await (let doc of cursor) {
-            let selector = {};
-            selector._id = doc._id;
-            await collection.deleteOne(selector);
-            count++
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            let count = 0;
+            const cursor = collection.find(query, options);
+            for await (let doc of cursor) {
+                let selector = {};
+                selector._id = doc._id;
+                await collection.deleteOne(selector);
+                count++
+            }
+            return count;
+        } catch (err) {
+            logger.error(err, `removeFromQuery error for ${dbName}.${tableName}`);
+            throw err;
         }
-        return count;
     }
 
     async pagedFind (dbName, tableName, query, options, page, limit, fetchAllMatchingRecords = false, onlyPerRowAccessCtrlQueried = false) {
-        let skip = limit * (page - 1);
-        let findOptions = { ...options, limit, skip };
-        //logger.info(dbName, tableName, query, findOptions);
-        let data = await this.find (dbName, tableName, query, findOptions );
-        //logger.info(data);
-        let total = 0;
-        let totalPages = 1;
-        let moreMatchingDocs = false;
-        if (query && Object.keys(query).length && !fetchAllMatchingRecords && !onlyPerRowAccessCtrlQueried) {
-            // If there is incoming query, then countDocuments should have the limit and skip options filled. 
-            // Basically, look for limit + 1 matching document. If it is there, we can show correct pagination in UI.
-            let countLimit = limit + 1;
-            let countOptions = {...options, limit: countLimit, skip};
-            let nextMatchingCount = await this.countDocuments(dbName, tableName, query, countOptions);
-            // If there are documents more than the asked limit, it signifies there is a next page and more matching docs
-            if (nextMatchingCount > limit) {
-                totalPages = page + 1;
-                moreMatchingDocs = true;
-            } else {
-                // If there are no documents more than the limit. The asked page is the last page or there are no pages at all.
-                if (data.length) {
-                    // If the asked page has data then it is the last page
-                    totalPages = page;
+        try {
+            let skip = limit * (page - 1);
+            let findOptions = { ...options, limit, skip };
+            //logger.info(dbName, tableName, query, findOptions);
+            let data = await this.find (dbName, tableName, query, findOptions );
+            //logger.info(data);
+            let total = 0;
+            let totalPages = 1;
+            let moreMatchingDocs = false;
+            if (query && Object.keys(query).length && !fetchAllMatchingRecords && !onlyPerRowAccessCtrlQueried) {
+                // If there is incoming query, then countDocuments should have the limit and skip options filled. 
+                // Basically, look for limit + 1 matching document. If it is there, we can show correct pagination in UI.
+                let countLimit = limit + 1;
+                let countOptions = {...options, limit: countLimit, skip};
+                let nextMatchingCount = await this.countDocuments(dbName, tableName, query, countOptions);
+                // If there are documents more than the asked limit, it signifies there is a next page and more matching docs
+                if (nextMatchingCount > limit) {
+                    totalPages = page + 1;
+                    moreMatchingDocs = true;
                 } else {
-                    // If the asked page does not have data, then the previous page is total number of page.
-                    if (page - 1 >= 0) {
-                        totalPages = page - 1;
+                    // If there are no documents more than the limit. The asked page is the last page or there are no pages at all.
+                    if (data.length) {
+                        // If the asked page has data then it is the last page
+                        totalPages = page;
+                    } else {
+                        // If the asked page does not have data, then the previous page is total number of page.
+                        if (page - 1 >= 0) {
+                            totalPages = page - 1;
+                        }
                     }
                 }
+                //TODO: This total count is misleading in someways.
+                total = skip + nextMatchingCount;
+            } else {
+                //If there is no incoming query or fetchaAllMatchingRecords is true, get the whole document count
+                total = await this.countDocuments (dbName, tableName, query, options);
+                totalPages = Math.ceil(total / limit);
+                if (page < totalPages) {
+                    moreMatchingDocs = true;
+                }
             }
-            //TODO: This total count is misleading in someways.
-            total = skip + nextMatchingCount;
-        } else {
-            //If there is no incoming query or fetchaAllMatchingRecords is true, get the whole document count
-            total = await this.countDocuments (dbName, tableName, query, options);
-            totalPages = Math.ceil(total / limit);
-            if (page < totalPages) {
-                moreMatchingDocs = true;
-            }
+            //logger.info(total, totalPages);
+            let results = { page, per_page: limit, total, total_pages: totalPages, data, moreMatchingDocs }
+            //logger.info(results);
+            return results;
+        } catch (err) {
+            logger.error(err, `pagedFind error for ${dbName}.${tableName}`);
+            throw err;
         }
-        //logger.info(total, totalPages);
-        let results = { page, per_page: limit, total, total_pages: totalPages, data, moreMatchingDocs }
-        //logger.info(results);
-        return results;
     }
 
     async listDatabases () {
