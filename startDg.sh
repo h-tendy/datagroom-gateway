@@ -44,7 +44,7 @@ while true; do
         mv datagroom.log datagroom.log.$child_pid.$ts
         echo "$(date '+%Y-%m-%d %H:%M:%S') datagroom.log rotated to datagroom.log.$child_pid.$ts"
     fi
-    # Wait for 10 seconds before restarting the DG-gateway
-    echo "$(date '+%Y-%m-%d %H:%M:%S') Restarting in 10 seconds..."
-    sleep 10
+    # Wait for 30 seconds before restarting the DG-gateway
+    echo "$(date '+%Y-%m-%d %H:%M:%S') Restarting in 30 seconds..."
+    sleep 30
 done
