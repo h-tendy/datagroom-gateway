@@ -133,4 +133,29 @@ Bulk editing features are now available. Yet to be documented
 1. Edit-log
 ![](./img/2020-09-19-16-31-38.png)
 
+## Starting DataGroom stack (Production)
+
+The recommended way to start the DataGroom stack in a production environment is to use the `startDg.sh` script provided in the repository.
+
+### How to Start
+
+Run the following command from your project directory:
+
+```bash
+nohup ./startDg.sh &
+```
+
+### Files Generated
+- **nohupGateway.log**: Captures all output from the DataGroom server and the script itself, including crash/restart messages and system resource snapshots (from the `top` command) when the server restarts.
+- **datagroom.log**: The main application log file. On every crash/restart, this file is rotated and renamed to `datagroom.log.<PID>.<timestamp>`, preserving logs for each run.
+- **top snapshots (in nohupGateway.log)**: After every crash, the script logs 5 consecutive `top` command outputs (1 second apart) to help diagnose resource issues.
+
+### Script Advantages
+- **Automatic Restart**: If the DataGroom server crashes, the script waits 10 seconds and restarts it automatically.
+- **Log Backup**: Preserves old logs by renaming `datagroom.log` on every crash, preventing log loss.
+- **Resource Diagnostics**: Captures system resource usage (`top` output) at the time of failure for easier troubleshooting.
+- **Graceful Cleanup**: If the script is stopped, it ensures the server process is also terminated, preventing orphaned processes.
+
+This approach ensures high reliability and easier maintenance for production deployments.
+
 
