@@ -1,6 +1,7 @@
 const pino = require('pino');
 const path = require('path');
 const fs = require('fs');
+const requestContext = require('./contextManager');
 
 //Define relative path to the logfile
 const logFileName = 'datagroom.log';
@@ -36,6 +37,27 @@ const customLogMethod = function (args, method) {
     method.apply(this, finalArgs);
 }
 
+// Create a wrapper function that automatically adds requestId
+function createLoggerMethod(originalMethod) {
+    return function(logData, message) {
+        const requestId = requestContext.getRequestId();
+        if (requestId) {
+            // If logData is an object, add requestId to it
+            if (typeof logData === 'object' && logData !== null) {
+                logData = { requestId, ...logData };
+            } else if (typeof logData === 'string') {
+                // If logData is a string, treat it as message and create object
+                message = logData;
+                logData = { requestId };
+            } else {
+                // If logData is something else, create new object
+                logData = { requestId, data: logData };
+            }
+        }
+        return originalMethod.call(this, logData, message);
+    };
+}
+
 const logger = pino({
     level: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
     nestedKey: 'payload', // any object is logged under payload key
@@ -50,6 +72,12 @@ const logger = pino({
     base: null, // Doesn't log hostname and pid everytime.
     timestamp: () => `,"time":"${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}"`
 }, process.env.NODE_ENV === 'development' ? process.stdout : dest);
+
+logger.info = createLoggerMethod(logger.info.bind(logger));
+logger.error = createLoggerMethod(logger.error.bind(logger));
+logger.warn = createLoggerMethod(logger.warn.bind(logger));
+logger.debug = createLoggerMethod(logger.debug.bind(logger));
+logger.trace = createLoggerMethod(logger.trace.bind(logger));
 
 
 module.exports = logger;

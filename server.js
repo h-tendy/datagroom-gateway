@@ -19,6 +19,7 @@ const Jira = require('./jira/jira')
 const AclCheck = require('./acl');
 const logger = require('./logger');
 const { v4: uuidv4 } = require('uuid');
+const requestContext = require('./contextManager');
 
 dotenv.config({ path: './.env' })
 
@@ -93,10 +94,10 @@ process.on('SIGTERM', async () => {
     process.exit(0);
 })
 process.on('unhandledRejection', (e) => {
-    logger.error(e, "Caught unhandledRejection");
+    logger.error({message: e.message}, "Caught unhandledRejection");
 })
 process.on('uncaughtException', (e) => {
-    logger.error(e, "Caught uncaughtException");
+    logger.error({message: e.message}, "Caught uncaughtException");
 })
 
 app.use(bodyParser.urlencoded({'limit': '200mb', extended: true }));
@@ -135,9 +136,13 @@ app.use(session({
 Utils.execCmdExecutor('mkdir uploads');
 
 app.use((req, res, next) => {
-    req.requestId = uuidv4();
-    res.setHeader('X-Request-Id', req.requestId);
-    next();
+    const requestId = uuidv4();
+    req.requestId = requestId;
+    res.setHeader('X-Request-Id', requestId);
+
+    requestContext.run(requestId, () => {
+        next();
+    });
 });
 
 app.route('/login').post(loginAuthenticateForReact);
