@@ -183,7 +183,7 @@ const authenticate = async (req, res, next) => {
             req.user = decoded.user;
             next();
         } catch (err) {
-            logger.error({requestId: req.requestId, err}, "Error in authenticate middleware")
+            logger.error({ err}, "Error in authenticate middleware")
             res.cookie('originalUrl', req.originalUrl, { httpOnly: true, path: '/', secure: isSecure, });
             res.redirect('/login');
             return;
@@ -244,7 +244,7 @@ app.use((req, res, next) => {
     const startTime = Date.now();
     res.on('finish', () => {
         const duration = Date.now() - startTime;
-        logger.info({requestId: req.requestId, method : req.method, url: req.originalUrl, durationInMs: duration}, "Time to process request");
+        logger.info({method : req.method, url: req.originalUrl, durationInMs: duration}, "Time to process request");
     })
     next();
 })
