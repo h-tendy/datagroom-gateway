@@ -18,6 +18,8 @@ const dotenv = require('dotenv')
 const Jira = require('./jira/jira')
 const AclCheck = require('./acl');
 const logger = require('./logger');
+const { v4: uuidv4 } = require('uuid');
+const requestContext = require('./contextManager');
 
 dotenv.config({ path: './.env' })
 
@@ -92,10 +94,10 @@ process.on('SIGTERM', async () => {
     process.exit(0);
 })
 process.on('unhandledRejection', (e) => {
-    logger.error(e, "Caught unhandledRejection");
+    logger.error({message: e.message}, "Caught unhandledRejection");
 })
 process.on('uncaughtException', (e) => {
-    logger.error(e, "Caught uncaughtException");
+    logger.error({message: e.message}, "Caught uncaughtException");
 })
 
 app.use(bodyParser.urlencoded({'limit': '200mb', extended: true }));
@@ -132,6 +134,16 @@ app.use(session({
 }));
 
 Utils.execCmdExecutor('mkdir uploads');
+
+app.use((req, res, next) => {
+    const requestId = uuidv4();
+    req.requestId = requestId;
+    res.setHeader('X-Request-Id', requestId);
+
+    requestContext.run(requestId, () => {
+        next();
+    });
+});
 
 app.route('/login').post(loginAuthenticateForReact);
 app.route('/sessionCheck').get(sessionCheck);
@@ -171,7 +183,7 @@ const authenticate = async (req, res, next) => {
             req.user = decoded.user;
             next();
         } catch (err) {
-            logger.error(err, "Error in authenticate middleware")
+            logger.error({ err}, "Error in authenticate middleware")
             res.cookie('originalUrl', req.originalUrl, { httpOnly: true, path: '/', secure: isSecure, });
             res.redirect('/login');
             return;
@@ -232,7 +244,7 @@ app.use((req, res, next) => {
     const startTime = Date.now();
     res.on('finish', () => {
         const duration = Date.now() - startTime;
-        logger.info({method : req.method, url: req.originalUrl, durationInMs: duration}, "Time to prcoess request");
+        logger.info({method : req.method, url: req.originalUrl, durationInMs: duration}, "Time to process request");
     })
     next();
 })

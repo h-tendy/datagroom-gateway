@@ -88,11 +88,33 @@ class DbAbstraction {
 
             logger.info("MongoDB: Succesfully connected");
 
-            this.client.on('connectionPoolCreated', () => logger.info('MongoDB: Connection pool created.'));
-            this.client.on('connectionPoolClosed', () => logger.info('MongoDB: Connection pool closed.'));
-            this.client.on('connectionCreated', () => logger.info('MongoDB: New connection created in pool.'));
-            this.client.on('connectionClosed', () => logger.info('MongoDB: Connection closed from pool.'));
-            this.client.on('connectionReady', () => logger.info('MongoDB: Connection ready for use.'));
+            this.client.on('connectionPoolCreated', (event) => {
+                logger.info({poolId: event.address}, 'MongoDB: Connection pool created');
+            });
+            this.client.on('connectionPoolClosed', (event) => {
+                logger.info({poolId: event.address}, 'MongoDB: Connection pool closed');
+            });
+            this.client.on('connectionCreated', (event) => {
+                logger.info({connectionId: event.connectionId, poolId: event.address}, 'MongoDB: New connection created in pool');
+            });
+            this.client.on('connectionClosed', (event) => {
+                logger.info({connectionId: event.connectionId, poolId: event.address, reason: event.reason}, 'MongoDB: Connection closed from pool');
+            });
+            this.client.on('connectionReady', (event) => {
+                logger.info({connectionId: event.connectionId, poolId: event.address}, 'MongoDB: Connection ready for use');
+            });
+            this.client.on('connectionCheckOutStarted', (event) => {
+                logger.debug({poolId: event.address}, 'MongoDB: Connection checkout started');
+            });
+            this.client.on('connectionCheckedOut', (event) => {
+                logger.debug({connectionId: event.connectionId, poolId: event.address}, 'MongoDB: Connection checked out from pool');
+            });
+            this.client.on('connectionCheckOutFailed', (event) => {
+                logger.warn({poolId: event.address, reason: event.reason}, 'MongoDB: Connection checkout failed');
+            });
+            this.client.on('connectionCheckedIn', (event) => {
+                logger.debug({connectionId: event.connectionId, poolId: event.address}, 'MongoDB: Connection checked back into pool');
+            });
             this.client.on('error', (err) => logger.error(err, 'MongoDB: Client error:'));
             this.client.on('timeout', () => logger.warn('MongoDB: Connection timeout!'));
             this.client.on('close', () => {
@@ -130,7 +152,7 @@ class DbAbstraction {
         let db = this.client.db(dbName);
         db.collection(tableName);
     }
-    // Only double-quotes need to be escaped while inserting data rows. 
+    // Only double-quotes need to be escaped while inserting data rows.
     // And don't allow column names which start with underscore. Or at least don't allow _id
     async insertOne (dbName, tableName, doc) {
         try {
@@ -202,9 +224,9 @@ class DbAbstraction {
             let ret = await collection.updateOne(selector, { $unset: unsetObj }, {});
             return ret.result;
         } catch (err) {
-                logger.error(err, `unsetOne error for ${dbName}.${tableName}`);
-                this.handleDbErrors(err);
-                throw err;
+            logger.error(err, `unsetOne error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
+            throw err;
         }
     }
 
