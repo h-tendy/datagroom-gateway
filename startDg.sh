@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Function to capture 'top' output 5 times at 1-second intervals and log it
 log_top_snapshots() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') Capturing 'top' output snapshots (5x, 1s interval)" 
@@ -13,7 +15,6 @@ log_top_snapshots() {
     done
     echo "$(date '+%Y-%m-%d %H:%M:%S') 'top' snapshots complete."
 }
-#!/bin/bash
 
 # Cleanup function which stops the DG-gateway if the script is killed.
 cleanup() {
