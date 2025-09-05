@@ -9,6 +9,7 @@
     "test:coverage": "jest --coverage",
     "test:db": "jest tests/dbAbstraction.test.js",
     "test:mongofilters": "jest tests/mongoFilters.test.js",
+    "test:api": "jest tests/dsReadApi.test.js",
     "test:verbose": "jest --verbose",
     "start": "node server.js"
   },

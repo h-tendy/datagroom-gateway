@@ -11,5 +11,12 @@ module.exports = {
     ],
     coverageDirectory: 'coverage',
     coverageReporters: ['text', 'lcov', 'html'],
-    verbose: true
+    verbose: false,
+    // Add these options to handle async operations
+    forceExit: true,
+    // detectOpenHandles: true,
+    // Clear mocks after each test
+    clearMocks: true,
+    resetMocks: true,
+    restoreMocks: true
 };
