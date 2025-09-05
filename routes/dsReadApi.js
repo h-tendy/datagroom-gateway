@@ -61,8 +61,8 @@ router.post('/archive', async (req, res, next) => {
         }
         res.status(200).send(status);
     } catch (err) {
-        logger.error(err, "Exception while archiving");
-        res.status(415).send(err);
+        logger.error({err : err.message, stack: err.stack}, "Exception while archiving");
+        res.status(415).send({err: err.message});
     }
 })
 

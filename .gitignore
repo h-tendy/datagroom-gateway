@@ -3,3 +3,4 @@ uploads
 nohup.out
 attachments
 .env
+coverage
