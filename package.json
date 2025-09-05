@@ -8,6 +8,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:db": "jest tests/dbAbstraction.test.js",
+    "test:mongofilters": "jest tests/mongoFilters.test.js",
     "test:verbose": "jest --verbose",
     "start": "node server.js"
   },
