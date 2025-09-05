@@ -30,5 +30,10 @@
     "pino": "^6.14.0",
     "regenerator-runtime": "^0.13.5",
     "socket.io": "^2.3.0"
+  },
+  "devDependencies": {
+    "jest": "^26.6.3",
+    "mongodb-memory-server": "^6.9.6",
+    "supertest": "^6.1.6"
   }
 }
