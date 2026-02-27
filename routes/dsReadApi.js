@@ -497,9 +497,9 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
         let dbResponse = await dbAbstraction.insertOneUniquely(request.dsName, "data", request.selectorObj, request.doc);
         logger.info(dbResponse, 'DB response after insertOneUniquely');
         let response = {};
-        if (dbResponse.ok == 1 && dbResponse.upserted && dbResponse.upserted.length == 1) {
+        if (dbResponse.ok == 1 && dbResponse.upsertedId) {
             response.status = 'success';
-            response._id = dbResponse.upserted[0]._id;
+            response._id = dbResponse.upsertedId;
         } else {
             response.status = 'fail';
             // Assumes that selector definitely has the '_id' field. 
@@ -1900,9 +1900,9 @@ router.post('/view/addJiraRow', async (req, res, next) => {
         let dbAbstraction = new DbAbstraction();
         let dbResponse = await dbAbstraction.insertOneUniquely(request.dsName, "data", selectorObj, fullRec);
         logger.info(dbResponse, 'insertOneUniquely db response in addJiraRow');
-        if (dbResponse.ok == 1 && dbResponse.upserted && dbResponse.upserted.length == 1) {
+        if (dbResponse.ok == 1 && dbResponse.upsertedId) {
             response.status = 'success';
-            response._id = dbResponse.upserted[0]._id;
+            response._id = dbResponse.upsertedId;
             response.record = fullRec
             response.key = jiraResponse.key
         } else {
