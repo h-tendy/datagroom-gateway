@@ -15,6 +15,7 @@ const MongoFilters = require('./mongoFilters');
 // @ts-ignore
 const { ObjectId } = require('mongodb');
 const logger = require('../logger');
+const UserPrefs = require('../userPrefs');
 
 let host = JiraSettings.host;
 
@@ -637,7 +638,8 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
     let dbAbstraction = new DbAbstraction();
     let dbList = await dbAbstraction.listDatabases();
     let pruned = [];
-    let sysDbs = ['admin', 'config', 'local'];
+    // _dg_metaData is an internal metadata/preferences DB, not a user dataset
+    let sysDbs = ['admin', 'config', 'local', '_dg_metaData'];
     for (let i = 0; i < dbList.length; i++) {
         let j = sysDbs.indexOf(dbList[i].name);
         if (j > -1)
@@ -654,6 +656,19 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
         let perms = await dbAbstraction.find(pruned[i].name, 'metaData', { _id: "perms" });
         pruned[i].perms = perms[0];
     }
+
+    // Enrich each entry with pinned flag. Gracefully degrade if prefs DB is unavailable.
+    let pinnedSet = new Set();
+    try {
+        const pinnedDs = await UserPrefs.getPinnedDs(req.params.dsUser);
+        pinnedDs.forEach(name => pinnedSet.add(name));
+    } catch (e) {
+        logger.warn(e, "Failed to load pinned datasets for user, continuing without pins");
+    }
+    for (let i = 0; i < pruned.length; i++) {
+        pruned[i].pinned = pinnedSet.has(pruned[i].name);
+    }
+
     pruned.sort((a, b) => a.name.localeCompare(b.name));
     logger.info(pruned, "Returning dsList");
     res.json({ dbList: pruned });
@@ -1923,6 +1938,51 @@ router.post('/view/addJiraRow', async (req, res, next) => {
     } catch (e) {
         logger.error(e, "Exception in addJiraRow");
         res.status(415).send(e);
+    }
+});
+
+/**
+ * POST /ds/pinDs
+ * Pin or unpin a dataset for a user.
+ * Body: { dsName: string, dsUser: string, pin: boolean }
+ * Returns: { ok: true, pinnedDs: string[] }
+ */
+router.post('/pinDs', async (req, res) => {
+    try {
+        const { dsName, dsUser, pin } = req.body || {};
+
+        if (!dsName || !dsUser) {
+            return res.status(400).json({ error: 'dsName and dsUser are required' });
+        }
+
+        // Verify the JWT user matches the requested dsUser
+        if (!req.user || req.user !== dsUser) {
+            logger.warn({ jwtUser: req.user, dsUser }, 'pinDs: JWT user mismatch');
+            return res.status(403).json({ error: 'Forbidden: user mismatch' });
+        }
+
+        let current = [];
+        try {
+            current = await UserPrefs.getPinnedDs(dsUser);
+        } catch (e) {
+            logger.warn(e, 'pinDs: could not read existing pins, starting fresh');
+        }
+
+        let updated;
+        if (pin) {
+            // Add dsName if not already present
+            updated = current.includes(dsName) ? current : [...current, dsName];
+        } else {
+            // Remove dsName
+            updated = current.filter(name => name !== dsName);
+        }
+
+        await UserPrefs.setPinnedDs(dsUser, updated);
+        logger.info({ dsUser, dsName, pin, updated }, 'pinDs: updated pins');
+        return res.status(200).json({ ok: true, pinnedDs: updated });
+    } catch (e) {
+        logger.error(e, 'Exception in pinDs');
+        return res.status(500).json({ error: 'Failed to update pin' });
     }
 });
 
