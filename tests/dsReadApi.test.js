@@ -8,12 +8,14 @@ jest.mock('../acl');
 jest.mock('../logger');
 jest.mock('../utils');
 jest.mock('../routes/mongoFilters');
+jest.mock('../userPrefs');
 
 const DbAbstraction = require('../dbAbstraction');
 const AclCheck = require('../acl');
 const logger = require('../logger');
 const Utils = require('../utils');
 const MongoFilters = require('../routes/mongoFilters');
+const UserPrefs = require('../userPrefs');
 const dsReadApiRouter = require('../routes/dsReadApi');
 
 describe('dsReadApi - /archive route', function() {
@@ -547,6 +549,291 @@ describe('dsReadApi - /archive route', function() {
 
             expect(response.status).toBe(400);
             expect(response.body.error).toBe('One or more required parameters is missing');
+        });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// POST /ds/pinDs  +  GET /ds/dsList graceful degradation
+// ---------------------------------------------------------------------------
+describe('dsReadApi - /pinDs and dsList pinned flag', function () {
+    let app;
+    let mockDbAbstraction;
+    // Controls what req.user is set to in the injected middleware
+    let mockReqUser;
+
+    beforeEach(function () {
+        app = express();
+        app.use(express.json());
+        app.use(cookieParser());
+
+        // Inject req.user before the router (simulates JWT auth middleware)
+        app.use((req, _res, next) => {
+            req.user = mockReqUser;
+            next();
+        });
+
+        app.use('/ds', dsReadApiRouter);
+
+        jest.clearAllMocks();
+
+        logger.info = jest.fn();
+        logger.warn = jest.fn();
+        logger.error = jest.fn();
+
+        mockDbAbstraction = {
+            listDatabases: jest.fn(),
+            find: jest.fn(),
+        };
+        DbAbstraction.mockImplementation(() => mockDbAbstraction);
+
+        // Default UserPrefs mocks — override per test as needed
+        UserPrefs.getPinnedDs = jest.fn().mockResolvedValue([]);
+        UserPrefs.setPinnedDs = jest.fn().mockResolvedValue(undefined);
+
+        mockReqUser = null;
+    });
+
+    afterEach(function () {
+        jest.clearAllTimers();
+        jest.resetAllMocks();
+    });
+
+    // -----------------------------------------------------------------------
+    // POST /ds/pinDs
+    // -----------------------------------------------------------------------
+    describe('POST /ds/pinDs', function () {
+
+        test('pin: adds dataset to pinned list and returns updated list', async function () {
+            mockReqUser = 'alice';
+            UserPrefs.getPinnedDs.mockResolvedValue(['ds-existing']);
+            UserPrefs.setPinnedDs.mockResolvedValue(undefined);
+
+            const response = await request(app)
+                .post('/ds/pinDs')
+                .set('Cookie', ['jwt=valid-token'])
+                .send({ dsName: 'ds-new', dsUser: 'alice', pin: true });
+
+            expect(response.status).toBe(200);
+            expect(response.body.ok).toBe(true);
+            expect(response.body.pinnedDs).toEqual(['ds-existing', 'ds-new']);
+
+            expect(UserPrefs.getPinnedDs).toHaveBeenCalledWith('alice');
+            expect(UserPrefs.setPinnedDs).toHaveBeenCalledWith('alice', ['ds-existing', 'ds-new']);
+        });
+
+        test('pin: does not duplicate if dataset already pinned', async function () {
+            mockReqUser = 'alice';
+            UserPrefs.getPinnedDs.mockResolvedValue(['ds-existing']);
+
+            const response = await request(app)
+                .post('/ds/pinDs')
+                .set('Cookie', ['jwt=valid-token'])
+                .send({ dsName: 'ds-existing', dsUser: 'alice', pin: true });
+
+            expect(response.status).toBe(200);
+            expect(response.body.pinnedDs).toEqual(['ds-existing']);
+            // setPinnedDs still called but list unchanged
+            expect(UserPrefs.setPinnedDs).toHaveBeenCalledWith('alice', ['ds-existing']);
+        });
+
+        test('unpin: removes dataset from pinned list', async function () {
+            mockReqUser = 'alice';
+            UserPrefs.getPinnedDs.mockResolvedValue(['ds-a', 'ds-b', 'ds-c']);
+
+            const response = await request(app)
+                .post('/ds/pinDs')
+                .set('Cookie', ['jwt=valid-token'])
+                .send({ dsName: 'ds-b', dsUser: 'alice', pin: false });
+
+            expect(response.status).toBe(200);
+            expect(response.body.ok).toBe(true);
+            expect(response.body.pinnedDs).toEqual(['ds-a', 'ds-c']);
+
+            expect(UserPrefs.setPinnedDs).toHaveBeenCalledWith('alice', ['ds-a', 'ds-c']);
+        });
+
+        test('unpin: returns empty list when last pin removed', async function () {
+            mockReqUser = 'alice';
+            UserPrefs.getPinnedDs.mockResolvedValue(['ds-only']);
+
+            const response = await request(app)
+                .post('/ds/pinDs')
+                .set('Cookie', ['jwt=valid-token'])
+                .send({ dsName: 'ds-only', dsUser: 'alice', pin: false });
+
+            expect(response.status).toBe(200);
+            expect(response.body.pinnedDs).toEqual([]);
+        });
+
+        test('returns 400 when dsName is missing', async function () {
+            mockReqUser = 'alice';
+
+            const response = await request(app)
+                .post('/ds/pinDs')
+                .set('Cookie', ['jwt=valid-token'])
+                .send({ dsUser: 'alice', pin: true }); // no dsName
+
+            expect(response.status).toBe(400);
+            expect(response.body.error).toBe('dsName and dsUser are required');
+            expect(UserPrefs.getPinnedDs).not.toHaveBeenCalled();
+            expect(UserPrefs.setPinnedDs).not.toHaveBeenCalled();
+        });
+
+        test('returns 400 when dsUser is missing', async function () {
+            mockReqUser = 'alice';
+
+            const response = await request(app)
+                .post('/ds/pinDs')
+                .set('Cookie', ['jwt=valid-token'])
+                .send({ dsName: 'ds-a', pin: true }); // no dsUser
+
+            expect(response.status).toBe(400);
+            expect(response.body.error).toBe('dsName and dsUser are required');
+        });
+
+        test('returns 403 when JWT user does not match dsUser', async function () {
+            mockReqUser = 'alice'; // JWT identity
+
+            const response = await request(app)
+                .post('/ds/pinDs')
+                .set('Cookie', ['jwt=valid-token'])
+                .send({ dsName: 'ds-a', dsUser: 'bob', pin: true }); // different user
+
+            expect(response.status).toBe(403);
+            expect(response.body.error).toBe('Forbidden: user mismatch');
+            expect(UserPrefs.getPinnedDs).not.toHaveBeenCalled();
+            expect(UserPrefs.setPinnedDs).not.toHaveBeenCalled();
+        });
+
+        test('returns 403 when req.user is absent (unauthenticated)', async function () {
+            mockReqUser = null; // no authenticated user
+
+            const response = await request(app)
+                .post('/ds/pinDs')
+                .set('Cookie', ['jwt=valid-token'])
+                .send({ dsName: 'ds-a', dsUser: 'alice', pin: true });
+
+            expect(response.status).toBe(403);
+            expect(response.body.error).toBe('Forbidden: user mismatch');
+        });
+
+        test('returns 500 when setPinnedDs throws (DB failure)', async function () {
+            mockReqUser = 'alice';
+            UserPrefs.getPinnedDs.mockResolvedValue([]);
+            UserPrefs.setPinnedDs.mockRejectedValue(new Error('MongoDB write error'));
+
+            const response = await request(app)
+                .post('/ds/pinDs')
+                .set('Cookie', ['jwt=valid-token'])
+                .send({ dsName: 'ds-a', dsUser: 'alice', pin: true });
+
+            expect(response.status).toBe(500);
+            expect(response.body.error).toBe('Failed to update pin');
+            expect(logger.error).toHaveBeenCalled();
+        });
+
+        test('continues with empty list when getPinnedDs throws, then persists update', async function () {
+            mockReqUser = 'alice';
+            // Read fails — should not abort the request
+            UserPrefs.getPinnedDs.mockRejectedValue(new Error('Read error'));
+            UserPrefs.setPinnedDs.mockResolvedValue(undefined);
+
+            const response = await request(app)
+                .post('/ds/pinDs')
+                .set('Cookie', ['jwt=valid-token'])
+                .send({ dsName: 'ds-a', dsUser: 'alice', pin: true });
+
+            // Falls back to empty list, pins ds-a, succeeds
+            expect(response.status).toBe(200);
+            expect(response.body.pinnedDs).toEqual(['ds-a']);
+            expect(logger.warn).toHaveBeenCalled();
+            expect(UserPrefs.setPinnedDs).toHaveBeenCalledWith('alice', ['ds-a']);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // GET /ds/dsList/:dsUser — pinned flag + graceful degradation
+    // -----------------------------------------------------------------------
+    describe('GET /ds/dsList/:dsUser - pinned flag', function () {
+
+        const mockDbs = [
+            { name: 'admin', sizeOnDisk: 0 },
+            { name: '_dg_user_prefs', sizeOnDisk: 0 },
+            { name: 'dataset-alpha', sizeOnDisk: 10240 },
+            { name: 'dataset-beta', sizeOnDisk: 20480 },
+        ];
+
+        function setupDbMocks() {
+            mockDbAbstraction.listDatabases.mockResolvedValue(mockDbs);
+            // find() is called twice per dataset: aclConfig then perms
+            mockDbAbstraction.find.mockImplementation((_db, _coll, selector) => {
+                if (selector._id === 'aclConfig') return Promise.resolve([]);     // no ACL
+                if (selector._id === 'perms')    return Promise.resolve([{ _id: 'perms', owner: 'alice' }]);
+                return Promise.resolve([]);
+            });
+        }
+
+        test('returns pinned:true for datasets in user pin list', async function () {
+            setupDbMocks();
+            UserPrefs.getPinnedDs.mockResolvedValue(['dataset-alpha']);
+
+            const response = await request(app)
+                .get('/ds/dsList/alice')
+                .set('Cookie', ['jwt=valid-token']);
+
+            expect(response.status).toBe(200);
+            const list = response.body.dbList;
+            const alpha = list.find(d => d.name === 'dataset-alpha');
+            const beta  = list.find(d => d.name === 'dataset-beta');
+
+            expect(alpha.pinned).toBe(true);
+            expect(beta.pinned).toBe(false);
+        });
+
+        test('all pinned:false when user has no pins', async function () {
+            setupDbMocks();
+            UserPrefs.getPinnedDs.mockResolvedValue([]);
+
+            const response = await request(app)
+                .get('/ds/dsList/alice')
+                .set('Cookie', ['jwt=valid-token']);
+
+            expect(response.status).toBe(200);
+            response.body.dbList.forEach(d => expect(d.pinned).toBe(false));
+        });
+
+        test('graceful degradation: all pinned:false when getPinnedDs throws', async function () {
+            setupDbMocks();
+            UserPrefs.getPinnedDs.mockRejectedValue(new Error('Prefs DB unavailable'));
+
+            const response = await request(app)
+                .get('/ds/dsList/alice')
+                .set('Cookie', ['jwt=valid-token']);
+
+            // Should still return 200 with the full list
+            expect(response.status).toBe(200);
+            expect(response.body.dbList).toHaveLength(2); // alpha and beta only (admin + _dg_user_prefs filtered)
+            response.body.dbList.forEach(d => expect(d.pinned).toBe(false));
+
+            // Warning should have been logged, not an error
+            expect(logger.warn).toHaveBeenCalled();
+        });
+
+        test('_dg_user_prefs and admin DBs are excluded from the list', async function () {
+            setupDbMocks();
+            UserPrefs.getPinnedDs.mockResolvedValue([]);
+
+            const response = await request(app)
+                .get('/ds/dsList/alice')
+                .set('Cookie', ['jwt=valid-token']);
+
+            expect(response.status).toBe(200);
+            const names = response.body.dbList.map(d => d.name);
+            expect(names).not.toContain('admin');
+            expect(names).not.toContain('_dg_user_prefs');
+            expect(names).toContain('dataset-alpha');
+            expect(names).toContain('dataset-beta');
         });
     });
 });
