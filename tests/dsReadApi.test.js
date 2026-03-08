@@ -759,7 +759,7 @@ describe('dsReadApi - /pinDs and dsList pinned flag', function () {
 
         const mockDbs = [
             { name: 'admin', sizeOnDisk: 0 },
-            { name: '_dg_user_prefs', sizeOnDisk: 0 },
+            { name: '_dg_metaData', sizeOnDisk: 0 },
             { name: 'dataset-alpha', sizeOnDisk: 10240 },
             { name: 'dataset-beta', sizeOnDisk: 20480 },
         ];
@@ -813,14 +813,14 @@ describe('dsReadApi - /pinDs and dsList pinned flag', function () {
 
             // Should still return 200 with the full list
             expect(response.status).toBe(200);
-            expect(response.body.dbList).toHaveLength(2); // alpha and beta only (admin + _dg_user_prefs filtered)
+            expect(response.body.dbList).toHaveLength(2); // alpha and beta only (admin + _dg_metaData filtered)
             response.body.dbList.forEach(d => expect(d.pinned).toBe(false));
 
             // Warning should have been logged, not an error
             expect(logger.warn).toHaveBeenCalled();
         });
 
-        test('_dg_user_prefs and admin DBs are excluded from the list', async function () {
+        test('_dg_metaData and admin DBs are excluded from the list', async function () {
             setupDbMocks();
             UserPrefs.getPinnedDs.mockResolvedValue([]);
 
@@ -831,7 +831,7 @@ describe('dsReadApi - /pinDs and dsList pinned flag', function () {
             expect(response.status).toBe(200);
             const names = response.body.dbList.map(d => d.name);
             expect(names).not.toContain('admin');
-            expect(names).not.toContain('_dg_user_prefs');
+            expect(names).not.toContain('_dg_metaData');
             expect(names).toContain('dataset-alpha');
             expect(names).toContain('dataset-beta');
         });

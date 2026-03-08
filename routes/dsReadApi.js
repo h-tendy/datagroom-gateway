@@ -638,8 +638,8 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
     let dbAbstraction = new DbAbstraction();
     let dbList = await dbAbstraction.listDatabases();
     let pruned = [];
-    // _dg_user_prefs is an internal preferences DB, not a user dataset
-    let sysDbs = ['admin', 'config', 'local', '_dg_user_prefs'];
+    // _dg_metaData is an internal metadata/preferences DB, not a user dataset
+    let sysDbs = ['admin', 'config', 'local', '_dg_metaData'];
     for (let i = 0; i < dbList.length; i++) {
         let j = sysDbs.indexOf(dbList[i].name);
         if (j > -1)
