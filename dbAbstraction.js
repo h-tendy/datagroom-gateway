@@ -248,6 +248,36 @@ class DbAbstraction {
         }
     }
 
+    async replaceOne (dbName, tableName, selector, replaceObj, convertId = true) {
+        try {
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            if (selector["_id"] && convertId) {
+                selector["_id"] = new ObjectId(selector["_id"]);
+            }
+            // replaceOne completely replaces the document (except _id), removing any fields not in replaceObj
+            logger.info(`[replaceOne] About to replace in ${dbName}.${tableName}`);
+            logger.info(`[replaceOne] Selector:`, selector);
+            logger.info(`[replaceOne] ReplaceObj:`, replaceObj);
+            logger.info(`[replaceOne] ReplaceObj keys:`, Object.keys(replaceObj));
+            
+            let ret = await collection.replaceOne(selector, replaceObj, { upsert: true });
+            
+            logger.info(`[replaceOne] Result:`, { acknowledged: ret.acknowledged, matchedCount: ret.matchedCount, modifiedCount: ret.modifiedCount, upsertedId: ret.upsertedId });
+            
+            // Verify what was actually saved
+            let verifyDoc = await collection.findOne(selector);
+            logger.info(`[replaceOne] Verified document in DB after replace:`, verifyDoc);
+            
+            return { ok: ret.acknowledged ? 1 : 0, nModified: ret.modifiedCount, matchedCount: ret.matchedCount, modifiedCount: ret.modifiedCount, upsertedId: ret.upsertedId };
+        } catch (err) {
+            logger.error(err, `replaceOne error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
+            throw err;
+        }
+    }
+
     async updateOneKeyInTransaction (dbName, tableName, selector, updateObj) {
         let session = null;
         try {

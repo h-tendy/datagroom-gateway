@@ -147,6 +147,105 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     return;
 });
 
+router.get('/view/otherTableAttrs/:dsName/:dsView/:dsUser', async (req, res, next) => {
+    logger.info(req.params, "Params in otherTableAttrs GET");
+    const token = req.cookies.jwt;
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
+    if (!allowed) {
+        res.status(403).json({ "Error": "access_denied" });
+        return;
+    }
+    let dbAbstraction = new DbAbstraction();
+    try {
+        let otherTableAttrs = await dbAbstraction.find(req.params.dsName, "metaData", { _id: "otherTableAttrs" }, {});
+        
+        if (!otherTableAttrs || otherTableAttrs.length === 0) {
+            res.status(200).json({});
+            return;
+        }
+        
+        // Extract only the allowed attributes
+        let attrs = otherTableAttrs[0];
+        let result = {};
+        
+        if (attrs.fixedHeight !== undefined && attrs.fixedHeight !== null) {
+            result.fixedHeight = attrs.fixedHeight;
+        }
+        if (attrs.rowMaxHeight !== undefined && attrs.rowMaxHeight !== null) {
+            result.rowMaxHeight = attrs.rowMaxHeight;
+        }
+        if (attrs.rowHeight !== undefined && attrs.rowHeight !== null) {
+            result.rowHeight = attrs.rowHeight;
+        }
+        
+        res.status(200).json(result);
+    } catch (e) {
+        logger.error(e, "Exception in otherTableAttrs GET");
+        res.status(500).json({ "Error": "Internal server error" });
+    }
+});
+
+router.post('/view/otherTableAttrs/set', async (req, res, next) => {
+    let request = req.body;
+    logger.info(request, "Incoming request in otherTableAttrs SET");
+    const token = req.cookies.jwt;
+    
+    // Validate required parameters
+    if (!request.dsName || !request.dsView || !request.dsUser) {
+        res.status(400).json({ status: 'fail', message: "Missing required parameters: dsName, dsView, or dsUser" });
+        return;
+    }
+    
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
+    if (!allowed) {
+        res.status(403).json({ status: 'fail', message: "Permission denied" });
+        return;
+    }
+    
+    let dbAbstraction = new DbAbstraction();
+    try {
+        let attrs = request.otherTableAttrs || {};
+        let cleanAttrs = {};
+        
+        // Validate and build clean object with only allowed attributes
+        if (attrs.fixedHeight !== undefined && attrs.fixedHeight !== null) {
+            cleanAttrs.fixedHeight = attrs.fixedHeight;
+        }
+        
+        if (attrs.rowMaxHeight !== undefined && attrs.rowMaxHeight !== null) {
+            // Validate it's an integer
+            if (!Number.isInteger(attrs.rowMaxHeight)) {
+                res.status(400).json({ status: 'fail', message: "rowMaxHeight must be an integer" });
+                return;
+            }
+            cleanAttrs.rowMaxHeight = attrs.rowMaxHeight;
+        }
+        
+        if (attrs.rowHeight !== undefined && attrs.rowHeight !== null) {
+            // Validate it's an integer
+            if (!Number.isInteger(attrs.rowHeight)) {
+                res.status(400).json({ status: 'fail', message: "rowHeight must be an integer" });
+                return;
+            }
+            cleanAttrs.rowHeight = attrs.rowHeight;
+        }
+        
+        // If all attributes are missing, delete the document
+        if (Object.keys(cleanAttrs).length === 0) {
+            await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "otherTableAttrs" });
+        } else {
+            // Use replaceOne to completely replace the document with only the attributes provided
+            // This ensures unchecked attributes are removed from the database
+            await dbAbstraction.replaceOne(request.dsName, "metaData", { _id: "otherTableAttrs" }, cleanAttrs, false);
+        }
+        
+        res.status(200).json({ status: 'success', message: 'ok' });
+    } catch (e) {
+        logger.error(e, "Exception in otherTableAttrs SET");
+        res.status(500).json({ status: 'fail', message: 'Server side exception' });
+    }
+});
+
 async function pager (req, res, collectionName) {
     let request = req.body;
     let query;
