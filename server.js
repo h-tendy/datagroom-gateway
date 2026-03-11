@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const passport = require('passport');
 const path = require('path');
 const compression = require('compression');
+const crypto = require('crypto');
 const LdapStrategy = require('passport-ldapauth').Strategy;
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
@@ -23,7 +24,9 @@ const requestContext = require('./contextManager');
 
 dotenv.config({ path: './.env' })
 
-const reactuiDir = path.resolve(__dirname, '../datagroom-ui/build');
+// Use datagroom-ui-2026 when DATAGROOM_UI_BUILD=2026
+const uiBuildDir = process.env.DATAGROOM_UI_BUILD === '2026' ? 'datagroom-ui-2026' : 'datagroom-ui';
+const reactuiDir = path.resolve(__dirname, `../${uiBuildDir}/build`);
 const config = {
     express: {
         port: process.env.PORT || 8887,
@@ -149,7 +152,73 @@ app.route('/login').post(loginAuthenticateForReact);
 app.route('/sessionCheck').get(sessionCheck);
 app.route('/logout').get(logout);
 
-// Define a middleware function to authenticate request
+// ========================================
+// PAT VERIFICATION FUNCTION
+// ========================================
+/**
+ * Verify a Personal Access Token.
+ * dg_pats is optional metadata: only present when a user has created PATs for that dataset (backward compatible).
+ * @param {string} token - Full token string (dgpat_abc123def456_...)
+ * @returns {object|null} {user_id, token_id, scopes, dataset_name} or null if invalid
+ */
+async function verifyPAT(token) {
+    try {
+        const tokenHash = crypto.createHash('sha256')
+            .update(token)
+            .digest('hex');
+        logger.info(`Verifying PAT with hash: ${tokenHash.substring(0, 10)}...`);
+        const dbAbstraction = new DbAbstraction();
+        const dbs = await dbAbstraction.listDatabases();
+        const sysDbs = ['admin', 'config', 'local'];
+        const databases = (dbs || []).map(d => d.name).filter(name => !sysDbs.includes(name));
+        for (const dbName of databases) {
+            try {
+                const patsDoc = await dbAbstraction.find(
+                    dbName,
+                    "metaData",
+                    { _id: "dg_pats" },
+                    {}
+                );
+                if (!patsDoc || patsDoc.length === 0) continue;
+                const users = patsDoc[0].users || {};
+                for (const [userId, userData] of Object.entries(users)) {
+                    const tokens = userData.tokens || [];
+                    for (const tokenData of tokens) {
+                        if (tokenData.token_hash === tokenHash) {
+                            if (tokenData.expires_at) {
+                                const expiryDate = new Date(tokenData.expires_at);
+                                if (expiryDate < new Date()) {
+                                    logger.warn(`Token expired for user ${userId} (expired: ${expiryDate})`);
+                                    return null;
+                                }
+                            }
+                            logger.info(`Successfully verified PAT for user ${userId}`);
+                            return {
+                                user_id: userId,
+                                token_id: tokenData.token_id,
+                                scopes: tokenData.scopes || ['mcp_access'],
+                                dataset_name: dbName
+                            };
+                        }
+                    }
+                }
+            } catch (e) {
+                logger.error(e, `Error checking PATs in dataset ${dbName}`);
+            }
+        }
+        logger.warn('PAT not found in any dataset');
+        return null;
+    } catch (e) {
+        logger.error(e, "Error in verifyPAT");
+        return null;
+    }
+}
+
+// ========================================
+// AUTHENTICATE MIDDLEWARE
+// Supports: JWT cookies, PAT Bearer tokens (dgpat_*), Basic Auth
+// Bearer JWT is not handled here; UI sends JWT via cookie, which is checked below.
+// ========================================
 const authenticate = async (req, res, next) => {
     /**
      * If the URL starts with /attachments/,
@@ -173,6 +242,28 @@ const authenticate = async (req, res, next) => {
             }
         }
     }
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        // Only treat as PAT when token looks like one (dgpat_xxx_yyy)
+        if (token.startsWith('dgpat_')) {
+            const patData = await verifyPAT(token);
+            if (patData) {
+                req.user = patData.user_id;
+                req.authMethod = 'pat';
+                req.patScopes = patData.scopes;
+                req.patDataset = patData.dataset_name;
+                logger.info(`PAT auth successful for user: ${req.user}`);
+                next();
+                return;
+            }
+            logger.warn('PAT authentication failed');
+            res.status(401).json({ error: 'Invalid or expired access token' });
+            return;
+        }
+    }
+
     const token = req.cookies.jwt;
     if (!token) {
         // If jwt token is not available kick in the basic authentication
@@ -181,10 +272,11 @@ const authenticate = async (req, res, next) => {
         try {
             const decoded = jwt.verify(token, Utils.jwtSecret);
             req.user = decoded.user;
+            req.authMethod = 'jwt';
             next();
         } catch (err) {
-            logger.error({ err}, "Error in authenticate middleware")
-            res.cookie('originalUrl', req.originalUrl, { httpOnly: true, path: '/', secure: isSecure, });
+            logger.error({ err }, "Error in authenticate middleware");
+            res.cookie('originalUrl', req.originalUrl, { httpOnly: true, path: '/', secure: isSecure });
             res.redirect('/login');
             return;
         }
@@ -254,6 +346,8 @@ app.use('/upload', fileUpload);
 const dsReadApi = require('./routes/dsReadApi');
 const { unlock, options } = require('./routes/upload');
 app.use('/ds', dsReadApi);
+const patRoutes = require('./routes/patApi');
+app.use('/api/pats', patRoutes);
 const csvUpload = require('./routes/uploadCsv');
 app.use('/uploadCsv', csvUpload);
 
