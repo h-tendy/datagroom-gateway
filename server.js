@@ -24,9 +24,10 @@ const requestContext = require('./contextManager');
 
 dotenv.config({ path: './.env' })
 
+const reactuiDir = path.resolve(__dirname, '../datagroom-ui/build');
 // Use datagroom-ui-2026 when DATAGROOM_UI_BUILD=2026
-const uiBuildDir = process.env.DATAGROOM_UI_BUILD === '2026' ? 'datagroom-ui-2026' : 'datagroom-ui';
-const reactuiDir = path.resolve(__dirname, `../${uiBuildDir}/build`);
+// const uiBuildDir = process.env.DATAGROOM_UI_BUILD === '2026' ? 'datagroom-ui-2026' : 'datagroom-ui';
+// const reactuiDir = path.resolve(__dirname, `../${uiBuildDir}/build`);
 const config = {
     express: {
         port: process.env.PORT || 8887,
