@@ -15,6 +15,7 @@ const MongoFilters = require('./mongoFilters');
 // @ts-ignore
 const { ObjectId } = require('mongodb');
 const logger = require('../logger');
+const UserPrefs = require('../userPrefs');
 
 let host = JiraSettings.host;
 
@@ -101,6 +102,7 @@ router.post('/archive', async (req, res, next) => {
 
 router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
+    //logger check
     logger.info(req.params, `Params In columns`);
     logger.info(req.query, `Query In columns`);
     const token = req.cookies.jwt;
@@ -149,6 +151,109 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     return;
 });
 
+router.get('/view/otherTableAttrs/:dsName/:dsView/:dsUser', async (req, res, next) => {
+    logger.info(req.params, "Params in otherTableAttrs GET");
+    const token = req.cookies.jwt;
+    const authMethod = req.authMethod || 'jwt';
+    const effectiveUser = req.user;
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, effectiveUser, token, authMethod);
+    if (!allowed) {
+        res.status(403).json({ "Error": "access_denied" });
+        return;
+    }
+    let dbAbstraction = new DbAbstraction();
+    try {
+        let otherTableAttrs = await dbAbstraction.find(req.params.dsName, "metaData", { _id: "otherTableAttrs" }, {});
+        
+        if (!otherTableAttrs || otherTableAttrs.length === 0) {
+            res.status(200).json({});
+            return;
+        }
+        
+        // Extract only the allowed attributes
+        let attrs = otherTableAttrs[0];
+        let result = {};
+        
+        if (attrs.fixedHeight !== undefined && attrs.fixedHeight !== null) {
+            result.fixedHeight = attrs.fixedHeight;
+        }
+        if (attrs.rowMaxHeight !== undefined && attrs.rowMaxHeight !== null) {
+            result.rowMaxHeight = attrs.rowMaxHeight;
+        }
+        if (attrs.rowHeight !== undefined && attrs.rowHeight !== null) {
+            result.rowHeight = attrs.rowHeight;
+        }
+        
+        res.status(200).json(result);
+    } catch (e) {
+        logger.error(e, "Exception in otherTableAttrs GET");
+        res.status(500).json({ "Error": "Internal server error" });
+    }
+});
+
+router.post('/view/otherTableAttrs/set', async (req, res, next) => {
+    let request = req.body;
+    logger.info(request, "Incoming request in otherTableAttrs SET");
+    const token = req.cookies.jwt;
+    const authMethod = req.authMethod || 'jwt';
+    const effectiveUser = req.user;
+    
+    // Validate required parameters
+    if (!request.dsName || !request.dsView || !request.dsUser) {
+        res.status(400).json({ status: 'fail', message: "Missing required parameters: dsName, dsView, or dsUser" });
+        return;
+    }
+    
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    if (!allowed) {
+        res.status(403).json({ status: 'fail', message: "Permission denied" });
+        return;
+    }
+    
+    let dbAbstraction = new DbAbstraction();
+    try {
+        let attrs = request.otherTableAttrs || {};
+        let cleanAttrs = {};
+        
+        // Validate and build clean object with only allowed attributes
+        if (attrs.fixedHeight !== undefined && attrs.fixedHeight !== null) {
+            cleanAttrs.fixedHeight = attrs.fixedHeight;
+        }
+        
+        if (attrs.rowMaxHeight !== undefined && attrs.rowMaxHeight !== null) {
+            // Validate it's an integer
+            if (!Number.isInteger(attrs.rowMaxHeight)) {
+                res.status(400).json({ status: 'fail', message: "rowMaxHeight must be an integer" });
+                return;
+            }
+            cleanAttrs.rowMaxHeight = attrs.rowMaxHeight;
+        }
+        
+        if (attrs.rowHeight !== undefined && attrs.rowHeight !== null) {
+            // Validate it's an integer
+            if (!Number.isInteger(attrs.rowHeight)) {
+                res.status(400).json({ status: 'fail', message: "rowHeight must be an integer" });
+                return;
+            }
+            cleanAttrs.rowHeight = attrs.rowHeight;
+        }
+        
+        // If all attributes are missing, delete the document
+        if (Object.keys(cleanAttrs).length === 0) {
+            await dbAbstraction.removeOneWithValidId(request.dsName, "metaData", { _id: "otherTableAttrs" });
+        } else {
+            // Use replaceOne to completely replace the document with only the attributes provided
+            // This ensures unchecked attributes are removed from the database
+            await dbAbstraction.replaceOne(request.dsName, "metaData", { _id: "otherTableAttrs" }, cleanAttrs, false);
+        }
+        
+        res.status(200).json({ status: 'success', message: 'ok' });
+    } catch (e) {
+        logger.error(e, "Exception in otherTableAttrs SET");
+        res.status(500).json({ status: 'fail', message: 'Server side exception' });
+    }
+});
+
 async function pager (req, res, collectionName) {
     let request = req.body;
     let query;
@@ -156,6 +261,7 @@ async function pager (req, res, collectionName) {
         query = req.query;
     else
         query = request;
+    //logger.info("In pager, req:", req);
     logger.info(req.params, "In pager, req.params");
     logger.info(query, "In pager, query");
     logger.info(`In pager, collectionName: ${collectionName}`);
@@ -650,7 +756,8 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
     let dbAbstraction = new DbAbstraction();
     let dbList = await dbAbstraction.listDatabases();
     let pruned = [];
-    let sysDbs = ['admin', 'config', 'local'];
+    // _dg_metaData is an internal metadata/preferences DB, not a user dataset
+    let sysDbs = ['admin', 'config', 'local', '_dg_metaData'];
     for (let i = 0; i < dbList.length; i++) {
         try {
             let j = sysDbs.indexOf(dbList[i].name);
@@ -680,6 +787,19 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
             pruned[i].perms = {};
         }
     }
+
+    // Enrich each entry with pinned flag. Gracefully degrade if prefs DB is unavailable.
+    let pinnedSet = new Set();
+    try {
+        const pinnedDs = await UserPrefs.getPinnedDs(effectiveUser);
+        pinnedDs.forEach(name => pinnedSet.add(name));
+    } catch (e) {
+        logger.warn(e, "Failed to load pinned datasets for user, continuing without pins");
+    }
+    for (let i = 0; i < pruned.length; i++) {
+        pruned[i].pinned = pinnedSet.has(pruned[i].name);
+    }
+
     pruned.sort((a, b) => a.name.localeCompare(b.name));
     logger.info(pruned, "Returning dsList");
     res.json({ dbList: pruned });
@@ -708,6 +828,10 @@ router.post("/dsList/:dsUser", async (req, res, next) => {
             .json({ Error: "bad filter given. Filter should be like A-G, 1-5" });
         return;
     }
+    /* The filter provided to dbAbstraction method should always be in uppercase. 
+      Since, if the user provides something like "A-n", it will also match "S" and "s". Reason being
+      the ascii char value of "S" comes within "A-n" range and the listFilteredDatabases ignores case while matching.
+      */
     startChar = startChar.toUpperCase();
     endChar = endChar.toUpperCase();
     let filter = `${startChar}-${endChar}`;
@@ -1982,6 +2106,51 @@ router.post('/view/addJiraRow', async (req, res, next) => {
     } catch (e) {
         logger.error(e, "Exception in addJiraRow");
         res.status(415).send(e);
+    }
+});
+
+/**
+ * POST /ds/pinDs
+ * Pin or unpin a dataset for a user.
+ * Body: { dsName: string, dsUser: string, pin: boolean }
+ * Returns: { ok: true, pinnedDs: string[] }
+ */
+router.post('/pinDs', async (req, res) => {
+    try {
+        const { dsName, dsUser, pin } = req.body || {};
+
+        if (!dsName || !dsUser) {
+            return res.status(400).json({ error: 'dsName and dsUser are required' });
+        }
+
+        // Verify the JWT user matches the requested dsUser
+        if (!req.user || req.user !== dsUser) {
+            logger.warn({ jwtUser: req.user, dsUser }, 'pinDs: JWT user mismatch');
+            return res.status(403).json({ error: 'Forbidden: user mismatch' });
+        }
+
+        let current = [];
+        try {
+            current = await UserPrefs.getPinnedDs(dsUser);
+        } catch (e) {
+            logger.warn(e, 'pinDs: could not read existing pins, starting fresh');
+        }
+
+        let updated;
+        if (pin) {
+            // Add dsName if not already present
+            updated = current.includes(dsName) ? current : [...current, dsName];
+        } else {
+            // Remove dsName
+            updated = current.filter(name => name !== dsName);
+        }
+
+        await UserPrefs.setPinnedDs(dsUser, updated);
+        logger.info({ dsUser, dsName, pin, updated }, 'pinDs: updated pins');
+        return res.status(200).json({ ok: true, pinnedDs: updated });
+    } catch (e) {
+        logger.error(e, 'Exception in pinDs');
+        return res.status(500).json({ error: 'Failed to update pin' });
     }
 });
 
