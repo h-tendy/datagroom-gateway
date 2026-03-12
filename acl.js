@@ -3,27 +3,37 @@ const jwt = require('jsonwebtoken');
 const Utils = require('./utils');
 const logger = require('./logger');
 
-async function aclCheck(dsName, dsView, dsUser, token = null) {
+async function aclCheck(dsName, dsView, dsUser, token = null, authMethod = 'jwt') {
     let dbAbstraction = new DbAbstraction();
     try {
-        let aclConfig = await dbAbstraction.find(dsName, "metaData", { _id: `aclConfig` }, {} );
+        let aclConfig = await dbAbstraction.find(dsName, "metaData", { _id: "aclConfig" }, {});
         aclConfig = aclConfig[0];
-        if (!aclConfig) {     
-            return true
+        if (!aclConfig) {
+            return true;
         }
         if (!aclConfig.accessCtrl) {
-            return true
+            return true;
         }
-        logger.info(`User is: , ${dsUser} in aclCheck`);
+        logger.info(`ACL check for user: ${dsUser}, authMethod: ${authMethod}, dataset: ${dsName}`);
+
+        if (authMethod === 'pat' && dsUser) {
+            if (aclConfig.acl && aclConfig.acl.includes(dsUser)) {
+                logger.info(`User ${dsUser} granted access via PAT (dataset: ${dsName})`);
+                return true;
+            }
+            logger.warn(`User ${dsUser} denied access via PAT (dataset: ${dsName})`);
+            return false;
+        }
+
         if (token) {
             try {
-                const decode = jwt.verify(token, Utils.jwtSecret)
+                const decode = jwt.verify(token, Utils.jwtSecret);
                 dsUser = decode.user;
-                if (aclConfig.acl.includes(dsUser)) {
-                    return true
-                } else {
-                    logger.warn(`User ${dsUser} does not have access`);
+                if (aclConfig.acl && aclConfig.acl.includes(dsUser)) {
+                    logger.info(`User ${dsUser} granted access via JWT (dataset: ${dsName})`);
+                    return true;
                 }
+                logger.warn(`User ${dsUser} denied access via JWT (dataset: ${dsName})`);
             } catch (e) {
                 logger.error(e, "Error verifying token in aclcheck");
             }
