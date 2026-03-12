@@ -7,6 +7,9 @@ const logger = require('../logger');
 
 const sysDbs = ['admin', 'config', 'local'];
 
+// Maximum number of active PATs allowed per user. Increase this value to allow more tokens.
+const MAX_PATS_PER_USER = 2;
+
 /**
  * Get list of dataset names the user has ACL access to
  */
@@ -56,6 +59,25 @@ router.post('/generate', async (req, res) => {
         if (allowedDatasets.length === 0) {
             return res.status(400).json({
                 error: 'You have no dataset access. Add yourself to at least one dataset ACL before creating a token.'
+            });
+        }
+
+        // Check existing token count for this user before generating a new one
+        const seen = new Set();
+        for (const datasetName of allowedDatasets) {
+            try {
+                const patsDoc = await dbAbstraction.find(datasetName, 'metaData', { _id: 'dg_pats' }, {});
+                if (patsDoc && patsDoc.length > 0 && patsDoc[0].users && patsDoc[0].users[userId]) {
+                    const tokens = patsDoc[0].users[userId].tokens || [];
+                    tokens.forEach(t => seen.add(t.token_id));
+                }
+            } catch (e) {
+                logger.error(e, `Error checking existing PATs in dataset ${datasetName}`);
+            }
+        }
+        if (seen.size >= MAX_PATS_PER_USER) {
+            return res.status(400).json({
+                error: `You have reached the maximum of ${MAX_PATS_PER_USER} personal access token(s). Please revoke an existing token before creating a new one.`
             });
         }
 
