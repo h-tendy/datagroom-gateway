@@ -86,6 +86,23 @@ router.post('/loadHdrsFromRange', async (req, res, next) => {
     }
 });
 
+router.post('/autoDetectRange', async (req, res, next) => {
+    let request = req.body;
+    logger.info(request, "Incoming request in autoDetectRange");
+    try {
+        let excelUtils = await ExcelUtils.getExcelUtilsForFile("uploads/" + request.fileName);
+        let result = await excelUtils.autoDetectRange(request.sheetName);
+        if (result.status) {
+            res.status(200).send(result);
+        } else {
+            res.status(400).send(result);
+        }
+    } catch (e) {
+        logger.error(e, "Exception in autoDetectRange");
+        res.status(415).send({ status: false, error: e.message || 'Exception in autoDetectRange' });
+    }
+});
+
 router.post('/createDs', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in createDs");

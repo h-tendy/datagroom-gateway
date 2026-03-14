@@ -117,6 +117,99 @@ class ExcelUtils {
         return ret;
     }
 
+    // Convert column index (1-based) to Excel column letter (A, B, ..., Z, AA, AB, ...)
+    translateIdToColumn (id) {
+        let code = '';
+        while (id) {
+            let r = (id - 1) % 26;
+            code = `${String.fromCharCode(65 + r)}${code}`;
+            id = Math.trunc((id - r) / 26);
+        }
+        return code;
+    }
+
+    // Auto-detect the used range in a sheet
+    async autoDetectRange (sheet) {
+        await this.init();
+        if (!this.workBook[sheet]) {
+            return { status: false, error: 'Sheet not found' };
+        }
+
+        let rows = this.workBook[sheet].rows;
+        if (!rows || rows.length === 0) {
+            return { status: false, error: 'Sheet is empty' };
+        }
+
+        // Find the first row with data (header row, typically row 1)
+        let firstRow = null; // Use null to distinguish "not set" from "row 0"
+        let lastRow = null;
+        let firstCol = null;
+        let lastCol = 0;
+
+        // Scan rows to find the actual data range
+        for (let i = 0; i < rows.length; i++) {
+            let row = rows[i];
+            let hasData = false;
+            let rowFirstCol = null;
+            let rowLastCol = 0;
+
+            // Scan columns in this row
+            for (let j = 1; j <= this.workBook[sheet].columns.length; j++) {
+                let cellValue = row[j];
+                // Check if cell has meaningful data (not empty, null, undefined, or empty string)
+                if (cellValue !== null && cellValue !== undefined && cellValue !== '') {
+                    hasData = true;
+                    if (rowFirstCol === null) {
+                        rowFirstCol = j;
+                    }
+                    rowLastCol = j;
+                }
+            }
+
+            if (hasData) {
+                if (firstRow === null) {
+                    firstRow = i;
+                    firstCol = rowFirstCol;
+                }
+                lastRow = i;
+                if (rowFirstCol !== null && (firstCol === null || rowFirstCol < firstCol)) {
+                    firstCol = rowFirstCol;
+                }
+                if (rowLastCol > lastCol) {
+                    lastCol = rowLastCol;
+                }
+            }
+        }
+
+        // If no data found, return error
+        if (firstRow === null || lastRow === null || firstCol === null) {
+            return { status: false, error: 'No data found in sheet' };
+        }
+
+        // Convert to 1-based row numbers for Excel (firstRow is 0-based, so add 1)
+        let fromRow = firstRow + 1;
+        let toRow = lastRow + 1;
+        let fromCol = firstCol || 1;
+        let toCol = lastCol || 1;
+
+        // Convert column indices to Excel column letters
+        let fromColLetter = this.translateIdToColumn(fromCol);
+        let toColLetter = this.translateIdToColumn(toCol);
+
+        // Build range string (e.g., "A1:Z100")
+        let range = `${fromColLetter}${fromRow}:${toColLetter}${toRow}`;
+
+        logger.info(`Auto-detected range for sheet ${sheet}: ${range}`);
+        return { 
+            status: true, 
+            range: range,
+            fromRow: fromRow,
+            toRow: toRow,
+            fromCol: fromCol,
+            toCol: toCol
+        };
+    }
+
     async loadHdrsFromRange (sheet, range) {
         await this.init();
         if (!this.workBook[sheet])
