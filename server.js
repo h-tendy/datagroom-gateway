@@ -20,6 +20,9 @@ const AclCheck = require('./acl');
 const logger = require('./logger');
 const { v4: uuidv4 } = require('uuid');
 const requestContext = require('./contextManager');
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+const swaggerOptions = require('./swaggerConfig');
 
 dotenv.config({ path: './.env' })
 
@@ -135,6 +138,9 @@ app.use(session({
 
 Utils.execCmdExecutor('mkdir uploads');
 
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
+
 app.use((req, res, next) => {
     const requestId = uuidv4();
     req.requestId = requestId;
@@ -145,8 +151,55 @@ app.use((req, res, next) => {
     });
 });
 
+/**
+ * @swagger
+ * /login:
+ *   post:
+ *     summary: Authenticate user and obtain a JWT cookie
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, password]
+ *             properties:
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login result (ok=true along with user object token on success, error string on failure)
+ */
 app.route('/login').post(loginAuthenticateForReact);
+
+/**
+ * @swagger
+ * /sessionCheck:
+ *   get:
+ *     summary: Verify the current JWT session is still valid
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Session is valid
+ *       401:
+ *         description: Token missing or invalid
+ */
 app.route('/sessionCheck').get(sessionCheck);
+
+/**
+ * @swagger
+ * /logout:
+ *   get:
+ *     summary: Clear the JWT cookie and log out
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ */
 app.route('/logout').get(logout);
 
 // Define a middleware function to authenticate request
