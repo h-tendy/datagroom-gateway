@@ -31,6 +31,30 @@ function fileFilter(r, f, cb) {
 }
 
 
+/**
+ * @swagger
+ * /upload:
+ *   post:
+ *     summary: Upload an Excel file and return its sheet names
+ *     tags: [Upload]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Excel file (.xls, .xlsx)
+ *     responses:
+ *       200:
+ *         description: Array of sheet names in the uploaded workbook
+ *       415:
+ *         description: Unsupported file type or processing error
+ */
 router.post('/', (req, res, next) => {
     upload(req, res, async function(err) {
         // req.file contains information of uploaded file
@@ -60,7 +84,28 @@ router.post('/', (req, res, next) => {
     });    
 });
 
-// Not used. 
+/**
+ * TODO: Not exposed as it is not used
+ * /upload/findHeadersInSheet:
+ *   post:
+ *     summary: Find column headers in a specific sheet of the uploaded workbook
+ *     tags: [Upload]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fileName, sheetName]
+ *             properties:
+ *               fileName: { type: string }
+ *               sheetName: { type: string }
+ *     responses:
+ *       200:
+ *         description: Detected header information
+ *       415:
+ *         description: Processing error
+ */
 router.post('/findHeadersInSheet', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in findHeadersInSheet");
@@ -73,6 +118,29 @@ router.post('/findHeadersInSheet', async (req, res, next) => {
     }
 });
 
+/**
+ * TODO: Not exposed as it is internally used. Need a better mechanism to expose this.
+ * /upload/loadHdrsFromRange:
+ *   post:
+ *     summary: Load column headers from a specific cell range in a sheet
+ *     tags: [Upload]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fileName, sheetName, selectedRange]
+ *             properties:
+ *               fileName: { type: string }
+ *               sheetName: { type: string }
+ *               selectedRange: { type: string, description: Cell range like "A1:G100" }
+ *     responses:
+ *       200:
+ *         description: Headers loaded from range
+ *       415:
+ *         description: Processing error
+ */
 router.post('/loadHdrsFromRange', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in loadHdrsFromRange");
@@ -86,6 +154,35 @@ router.post('/loadHdrsFromRange', async (req, res, next) => {
     }
 });
 
+/**
+ * TODO: Not exposed as it is internally used. Need a better mechanism to expose this.
+ * /upload/createDs:
+ *   post:
+ *     summary: Create a new dataset from an uploaded Excel sheet
+ *     tags: [Upload]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fileName, sheetName, selectedRange, selectedKeys, dsName, dsUser]
+ *             properties:
+ *               fileName: { type: string }
+ *               sheetName: { type: string }
+ *               selectedRange: { type: string, description: Cell range like "A1:G100" }
+ *               selectedKeys:
+ *                 type: array
+ *                 items: { type: string }
+ *                 description: Column names to use as unique keys
+ *               dsName: { type: string, description: Name for the new dataset }
+ *               dsUser: { type: string }
+ *     responses:
+ *       200:
+ *         description: Dataset creation result
+ *       415:
+ *         description: Processing error
+ */
 router.post('/createDs', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in createDs");
