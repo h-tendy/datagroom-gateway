@@ -19,6 +19,45 @@ const UserPrefs = require('../userPrefs');
 
 let host = JiraSettings.host;
 
+/**
+ * @swagger
+ * /ds/archive:
+ *   post:
+ *     summary: Archive dataset rows matching filters into another dataset
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [sourceDataSetName, archiveDataSetName, filters]
+ *             properties:
+ *               sourceDataSetName:
+ *                 type: string
+ *                 description: Source dataset name from which to archive
+ *               archiveDataSetName:
+ *                 type: string
+ *                 description: Archive dataset name to which to archive
+ *               collectionName:
+ *                 type: string
+ *                 description: Collection to archive (defaults to "data" collection in the source dataset)
+ *               filters:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     field: { type: string, description: Column to filter on }
+ *                     type: { type: string, enum: ['like', 'gt', 'lt', 'eq', "="] }
+ *                     value: { type: string, description: Value to filter on (it can be a valid regex too.) }
+ *     responses:
+ *       200:
+ *         description: Archive result
+ *       400:
+ *         description: Missing or invalid parameters
+ *       403:
+ *         description: Access denied
+ */
 router.post('/archive', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request to archive dataset");
@@ -98,6 +137,36 @@ router.post('/archive', async (req, res, next) => {
     }
 })
 
+/**
+ * @swagger
+ * /ds/view/columns/{dsName}/{dsView}/{dsUser}:
+ *   get:
+ *     summary: Get column definitions, keys, Jira config, filters, and ACL for a dataset view
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsName
+ *         required: true
+ *         schema: { type: string }
+ *         description: Dataset name
+ *       - in: path
+ *         name: dsView
+ *         required: true
+ *         schema: 
+ *           type: string
+ *           default: default
+ *         description: View name
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *     responses:
+ *       200:
+ *         description: Column metadata and configuration
+ *       403:
+ *         description: Access denied
+ */
 router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
     //logger check
@@ -147,6 +216,36 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     return;
 });
 
+/**
+ * @swagger
+ * /ds/view/otherTableAttrs/{dsName}/{dsView}/{dsUser}:
+ *   get:
+ *     summary: Get table display attributes (fixedHeight, rowMaxHeight, rowHeight)
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsName
+ *         required: true
+ *         schema: { type: string }
+ *         description: Dataset name
+ *       - in: path
+ *         name: dsView
+ *         required: true
+ *         schema: 
+ *           type: string
+ *           default: default
+ *         description: View name
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *     responses:
+ *       200:
+ *         description: Table display attributes
+ *       403:
+ *         description: Access denied
+ */
 router.get('/view/otherTableAttrs/:dsName/:dsView/:dsUser', async (req, res, next) => {
     logger.info(req.params, "Params in otherTableAttrs GET");
     const token = req.cookies.jwt;
@@ -185,6 +284,37 @@ router.get('/view/otherTableAttrs/:dsName/:dsView/:dsUser', async (req, res, nex
     }
 });
 
+/**
+ * @swagger
+ * /ds/view/otherTableAttrs/set:
+ *   post:
+ *     summary: Set table display attributes (fixedHeight, rowMaxHeight, rowHeight)
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsView: { type: string, default: default, description: View name }
+ *               dsUser: { type: string, description: Username }
+ *               otherTableAttrs:
+ *                 type: object
+ *                 properties:
+ *                   fixedHeight: { type: boolean }
+ *                   rowMaxHeight: { type: integer }
+ *                   rowHeight: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Success
+ *       400:
+ *         description: Missing or invalid parameters
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/otherTableAttrs/set', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in otherTableAttrs SET");
@@ -288,19 +418,224 @@ async function pager (req, res, collectionName) {
     res.status(200).json(response);
 }
 
+/**
+ * @swagger
+ * /ds/view/attachments/{dsName}/{dsView}/{dsUser}:
+ *   get:
+ *     summary: Get paginated attachment records for a dataset
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsName
+ *         required: true
+ *         schema: { type: string }
+ *         description: Dataset name
+ *       - in: path
+ *         name: dsView
+ *         required: true
+ *         schema: 
+ *           type: string
+ *           default: default
+ *         description: View name
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *       - in: query
+ *         name: filters
+ *         schema: { type: array, items: { type: object, properties: { field: { type: string, description: Column to filter on }, type: { type: string, enum: ['like', 'gt', 'lt', 'eq', "="] }, value: { type: string, description: Value to filter on (it can be a valid regex too.) } } } }
+ *       - in: query
+ *         name: sorters
+ *         schema: { type: array, items: { type: object, properties: { field: { type: string, description: Column to sort on }, dir: { type: string, enum: ['asc', 'desc'] } } } }
+ *       - in: query
+ *         name: page
+ *         required: true
+ *         schema: { type: integer }
+ *         description: Which page number to fetch
+ *       - in: query
+ *         name: per_page
+ *         required: true
+ *         schema: { type: integer }
+ *         description: Number of records per page
+ *       - in: query
+ *         name: chronology
+ *         schema: { type: string, enum: ['asc', 'desc'] }
+ *         default: desc
+ *         description: desc for latest record. asc for oldest record. (Overriden by sorter chronology)
+ *       - in: query
+ *         name: fetchAllMatchingRecords
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         default: false
+ *         description: Whether to fetch all matching records (overrides page and per_page)
+ *     responses:
+ *       200:
+ *         description: Paginated attachments
+ *       403:
+ *         description: Access denied
+ */
 router.get('/view/attachments/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "attachments");
 });
 
 
+/**
+ * @swagger
+ * /ds/view/editLog/{dsName}/{dsView}/{dsUser}:
+ *   get:
+ *     summary: Get paginated edit log for a dataset
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsName
+ *         required: true
+ *         schema: { type: string }
+ *         description: Dataset name
+ *       - in: path
+ *         name: dsView
+ *         required: true
+ *         schema: 
+ *           type: string
+ *           default: default
+ *         description: View name
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *       - in: query
+ *         name: filters
+ *         schema: { type: array, items: { type: object, properties: { field: { type: string, description: Column to filter on }, type: { type: string, enum: ['like', 'gt', 'lt', 'eq', "="] }, value: { type: string, description: Value to filter on (it can be a valid regex too.) } } } }
+ *       - in: query
+ *         name: sorters
+ *         schema: { type: array, items: { type: object, properties: { field: { type: string, description: Column to sort on }, dir: { type: string, enum: ['asc', 'desc'] } } } }
+ *       - in: query
+ *         name: page
+ *         required: true
+ *         schema: { type: integer }
+ *         description: Which page number to fetch
+ *       - in: query
+ *         name: per_page
+ *         required: true
+ *         schema: { type: integer }
+ *         description: Number of records per page
+ *       - in: query
+ *         name: chronology
+ *         schema: { type: string, enum: ['asc', 'desc'] }
+ *         default: desc
+ *         description: desc for latest record. asc for oldest record. (Overriden by sorter chronology)
+ *       - in: query
+ *         name: fetchAllMatchingRecords
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         default: false
+ *         description: Whether to fetch all matching records (overrides page and per_page)
+ *     responses:
+ *       200:
+ *         description: Paginated edit log
+ *       403:
+ *         description: Access denied
+ */
 router.get('/view/editLog/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "editlog");
 });
 
+/**
+ * @swagger
+ * /ds/view/{dsName}/{dsView}/{dsUser}:
+ *   get:
+ *     summary: Get paginated dataset rows
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsName
+ *         required: true
+ *         schema: { type: string }
+ *         description: Dataset name
+ *       - in: path
+ *         name: dsView
+ *         required: true
+ *         schema: 
+ *           type: string
+ *           default: default
+ *         description: View name
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *       - in: query
+ *         name: filters
+ *         schema: { type: array, items: { type: object, properties: { field: { type: string, description: Column to filter on }, type: { type: string, enum: ['like', 'gt', 'lt', 'eq', "="] }, value: { type: string, description: Value to filter on (it can be a valid regex too.) } } } }
+ *       - in: query
+ *         name: sorters
+ *         schema: { type: array, items: { type: object, properties: { field: { type: string, description: Column to sort on }, dir: { type: string, enum: ['asc', 'desc'] } } } }
+ *       - in: query
+ *         name: page
+ *         required: true
+ *         schema: { type: integer }
+ *         description: Which page number to fetch
+ *       - in: query
+ *         name: per_page
+ *         required: true
+ *         schema: { type: integer }
+ *         description: Number of records per page
+ *       - in: query
+ *         name: chronology
+ *         schema: { type: string, enum: ['asc', 'desc'] }
+ *         default: desc
+ *         description: desc for latest record. asc for oldest record. (Overriden by sorter chronology)
+ *       - in: query
+ *         name: fetchAllMatchingRecords
+ *         schema: { type: string, enum: ['true', 'false'] }
+ *         default: false
+ *         description: Whether to fetch all matching records (overrides page and per_page)
+ *     responses:
+ *       200:
+ *         description: Paginated dataset rows
+ *       403:
+ *         description: Access denied
+ */
 router.get('/view/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "data");
 });
 
+/**
+ * @swagger
+ * /ds/view/{dsName}/{dsView}/{dsUser}/{id}:
+ *   get:
+ *     summary: Get a single document by its MongoDB ObjectId
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsName
+ *         required: true
+ *         schema: { type: string }
+ *         description: Dataset name
+ *       - in: path
+ *         name: dsView
+ *         required: true
+ *         schema: 
+ *           type: string
+ *           default: default
+ *         description: View name
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: MongoDB ObjectId
+ *     responses:
+ *       200:
+ *         description: Single document
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: Invalid request
+ */
 router.get('/view/:dsName/:dsView/:dsUser/:id', async (req, res, next) => {
     let dsName = req.params.dsName;
     let dsView = req.params.dsView;
@@ -342,11 +677,44 @@ router.post('/viewViaPost/:dsName', async (req, res, next) => {
     await pager(req, res, "data");
 });
 
-// Use this for ACL enabled dataset via APIs. 
+/**
+ * @swagger
+ * /ds/viewViaPost/{dsName}/{dsView}/{dsUser}:
+ *   post:
+ *     summary: Get paginated dataset rows via POST (ACL-enabled)
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsName
+ *         required: true
+ *         schema: { type: string }
+ *         description: Dataset name
+ *       - in: path
+ *         name: dsView
+ *         required: true
+ *         schema: 
+ *           type: string
+ *           default: default
+ *         description: View name
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/PaginationQuery'
+ *     responses:
+ *       200:
+ *         description: Paginated dataset rows
+ *       403:
+ *         description: Access denied
+ */
 router.post('/viewViaPost/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "data");
 });
-
 
 // To ensure no conflicts. Retaining this for backward compatibility for APIs. 
 // This will only work when there is no ACL for the dataset. 
@@ -354,7 +722,41 @@ router.post('/viewViaPost/editLog/:dsName', async (req, res, next) => {
     await pager(req, res, "editlog");
 });
 
-// Use this for ACL enabled dataset via APIs. 
+/**
+ * @swagger
+ * /ds/viewViaPost/editLog/{dsName}/{dsView}/{dsUser}:
+ *   post:
+ *     summary: Get paginated edit log via POST (ACL-enabled)
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsName
+ *         required: true
+ *         schema: { type: string }
+ *         description: Dataset name
+ *       - in: path
+ *         name: dsView
+ *         required: true
+ *         schema:
+ *           type: string
+ *           default: default
+ *         description: View name
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/PaginationQuery'
+ *     responses:
+ *       200:
+ *         description: Paginated edit log
+ *       403:
+ *         description: Access denied
+ */
 router.post('/viewViaPost/editLog/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "editlog");
 });
@@ -365,11 +767,44 @@ router.post('/viewViaPost/attachments/:dsName', async (req, res, next) => {
     await pager(req, res, "attachments");
 });
 
-// Use this for ACL enabled dataset via APIs. 
+/**
+ * @swagger
+ * /ds/viewViaPost/attachments/{dsName}/{dsView}/{dsUser}:
+ *   post:
+ *     summary: Get paginated attachments via POST (ACL-enabled)
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsName
+ *         required: true
+ *         schema: { type: string }
+ *         description: Dataset name
+ *       - in: path
+ *         name: dsView
+ *         required: true
+ *         schema: { type: string, default: default }
+ *         description: View name
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/PaginationQuery'
+ *     responses:
+ *       200:
+ *         description: Paginated attachments
+ *       403:
+ *         description: Access denied
+ */
 router.post('/viewViaPost/attachments/:dsName/:dsView/:dsUser', async (req, res, next) => {
     await pager(req, res, "attachments");
 });
 
+// TODO: Add swagger later
 router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) => {
     let request = req.body;
     let query = req.query;
@@ -455,6 +890,38 @@ function getDeleteLog (req, _doc, status) {
     return deleteDoc;
 }
 
+/**
+ * @swagger
+ * /ds/view/editSingleAttribute:
+ *   post:
+ *     summary: Edit a single cell/attribute of a document (supports Jira field sync)
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, selectorObj, editObj, column]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsView: { type: string, default: default, description: View name }
+ *               dsUser: { type: string, description: Username }
+ *               selectorObj:
+ *                 type: object
+ *                 description: Object identifying the document (must contain _id)
+ *               editObj:
+ *                 type: object
+ *                 description: Object with the field to update (must contain the column to update)
+ *               column:
+ *                 type: string
+ *                 description: Name of the column being edited (must be a valid column name)
+ *     responses:
+ *       200:
+ *         description: Edit result with status
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/editSingleAttribute', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming Request in editSingleAttribute");
@@ -582,6 +1049,35 @@ function isJiraRec(rec) {
     return isJiraRec
 }
 
+/**
+ * @swagger
+ * /ds/view/insertOneDoc:
+ *   post:
+ *     summary: Insert a new document into the dataset (fails if key conflict)
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, selectorObj, doc]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsView: { type: string, default: default, description: View name }
+ *               dsUser: { type: string, description: Username }
+ *               selectorObj:
+ *                 type: object
+ *                 description: Key selector for uniqueness check (Generally same as doc in case of inserting new doc)
+ *               doc:
+ *                 type: object
+ *                 description: Full document to insert
+ *     responses:
+ *       200:
+ *         description: Insert result with status and _id
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/insertOneDoc', async (req, res, next) => {
     let request = req.body;
     logger.info("Incoming request in insertOneDoc");
@@ -623,8 +1119,35 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
     }
 });
 
-// XXX: Wonder who uses this api? It doesn't seem to be used from 
-// the front end for sure. 
+/**
+ * @swagger
+ * /ds/view/insertOrUpdateOneDoc:
+ *   post:
+ *     summary: Upsert a document — insert if not exists, update if exists
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, selectorObj, doc]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsView: { type: string, default: default, description: View name }
+ *               dsUser: { type: string, description: Username }
+ *               selectorObj:
+ *                 type: object
+ *                 description: Key selector for matching the document to upsert, it may contain _id too
+ *               doc:
+ *                 type: object
+ *                 description: Full document to upsert
+ *     responses:
+ *       200:
+ *         description: Upsert result with status and optionally _id if upsert failed
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     let request = req.body;
     logger.info("Incoming request in insertOrUpdateOneDoc");
@@ -682,6 +1205,57 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
 });
 
 
+/**
+ * @swagger
+ * /ds/downloadXlsx/{dsName}/{dsView}/{dsUser}:
+ *   post:
+ *     summary: Export filtered dataset rows to an Excel file (base64-encoded)
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsName
+ *         required: true
+ *         schema: { type: string }
+ *         description: Dataset name
+ *       - in: path
+ *         name: dsView
+ *         required: true
+ *         schema: { type: string, default: default }
+ *         description: View name
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               query:
+ *                 type: array
+ *                 description: Array of filter objects
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     field:
+ *                       type: string
+ *                       description: Name of column to filter
+ *                     type:
+ *                       type: string
+ *                       description: Type of filter (e.g., eq, lt, gt, etc.)
+ *                       enum: [like, eq, lt, gt, = ]
+ *                     value:
+ *                       type: string
+ *                       description: Value to match against the field (can be a valid regex too.)
+ *     responses:
+ *       200:
+ *         description: Base64-encoded Excel file
+ *       403:
+ *         description: Access denied
+ */
 router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
     // In this API, the request.query has filters directly. So, you have to use it accordingly.
     let request = req.body;
@@ -729,6 +1303,22 @@ router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
 });
 
 
+/**
+ * @swagger
+ * /ds/dsList/{dsUser}:
+ *   get:
+ *     summary: List all datasets accessible by the user
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *         description: Username
+ *     responses:
+ *       200:
+ *         description: Array of datasets with metadata
+ */
 router.get('/dsList/:dsUser', async (req, res, next) => {
     let request = req.body;
     logger.info(req.params, "Params in dsList");
@@ -773,6 +1363,35 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
     res.json({ dbList: pruned });
 });
 
+/**
+ * @swagger
+ * /ds/dsList/{dsUser}:
+ *   post:
+ *     summary: List datasets filtered by name range (e.g. "A-G")
+ *     tags: [Datasets]
+ *     parameters:
+ *       - in: path
+ *         name: dsUser
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsFilter]
+ *             properties:
+ *               dsFilter:
+ *                 type: string
+ *                 description: Range filter like "A-G" or "1-5"
+ *                 example: A-G
+ *     responses:
+ *       200:
+ *         description: Filtered array of datasets
+ *       403:
+ *         description: Bad or missing filter
+ */
 router.post("/dsList/:dsUser", async (req, res, next) => {
     let request = req.body;
     if (!request.dsFilter) {
@@ -838,6 +1457,29 @@ router.post("/dsList/:dsUser", async (req, res, next) => {
     res.json({ dbList: pruned });
 });
 
+/**
+ * //TODO: Not added swagger api here because there is some security holes. 
+ * /ds/deleteDs:
+ *   post:
+ *     summary: Permanently delete a dataset and its attachments
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsView: { type: string, default: default, description: View name }
+ *               dsUser: { type: string, description: Username }
+ *     responses:
+ *       200:
+ *         description: Dataset deleted
+ *       403:
+ *         description: Access denied
+ */
 router.post('/deleteDs', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteDs");
@@ -863,6 +1505,34 @@ router.post('/deleteDs', async (req, res, next) => {
     }
 });
 
+/**
+ * @swagger
+ * /ds/view/addColumn:
+ *   post:
+ *     summary: Add a new column relative to an existing reference column
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, columnName, position, referenceColumn]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsView: { type: string, default: default, description: View name }
+ *               dsUser: { type: string, description: Username }
+ *               columnName: { type: string, description: Name of the new column }
+ *               position: { type: string, enum: [left, right], description: Position relative to referenceColumn }
+ *               referenceColumn: { type: string, description: Existing column to place relative to }
+ *     responses:
+ *       200:
+ *         description: Column added successfully
+ *       400:
+ *         description: Missing parameters or column already exists
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/addColumn', async (req, res, next) => {
     try {
         logger.info(req.body, "Incoming request in addColumn");
@@ -993,7 +1663,32 @@ router.post('/view/addColumn', async (req, res, next) => {
     }
 });
 
-// deletion of column api
+/**
+ * @swagger
+ * /ds/view/deleteColumn:
+ *   post:
+ *     summary: Delete a column from the dataset (metadata, filters, Jira config, and data)
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, columnName]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsView: { type: string, default: default, description: View name }
+ *               dsUser: { type: string, description: Username }
+ *               columnName: { type: string, description: Column to delete }
+ *     responses:
+ *       200:
+ *         description: Column deleted with operation log
+ *       400:
+ *         description: Cannot delete a key column
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/deleteColumn', async (req, res) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteColumn");
@@ -1096,6 +1791,32 @@ router.post('/view/deleteColumn', async (req, res) => {
         res.status(500).send(e);
     }
 });
+/**
+ * TODO: Not added swagger api here because there is some security holes. If the empty selector obj is passed, it deletes any single row
+ * /ds/view/deleteOneDoc:
+ *   post:
+ *     summary: Delete a single document by selector
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, selectorObj]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsView: { type: string, default: default, description: View name }
+ *               dsUser: { type: string, description: Username }
+ *               selectorObj:
+ *                 type: object
+ *                 description: Object with _id of the document to delete
+ *     responses:
+ *       200:
+ *         description: Delete result
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/deleteOneDoc', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteOneDoc");
@@ -1139,6 +1860,33 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
     }
 });
 
+/**
+ * TODO: Some security holes.
+ * /ds/view/deleteManyDocs:
+ *   post:
+ *     summary: Delete multiple documents by their ObjectId array
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, objects]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               objects:
+ *                 type: array
+ *                 items: { type: string }
+ *                 description: Array of MongoDB ObjectId strings
+ *     responses:
+ *       200:
+ *         description: Delete result
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/deleteManyDocs', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteManyDocs");
@@ -1180,6 +1928,37 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
 });
 
 
+/**
+ * TODO: Not exposed this, it makes sense only to be used from the edit-view.
+ * /ds/view/setViewDefinitions:
+ *   post:
+ *     summary: Update view definitions, Jira config, ACL, per-row access, and description
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, viewDefs]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               viewDefs: { type: array, description: Column attribute definitions }
+ *               jiraConfig: { type: object }
+ *               jiraAgileConfig: { type: object }
+ *               dsDescription: { type: object }
+ *               otherTableAttrs: { type: object }
+ *               aclConfig: { type: object }
+ *               perRowAccessConfig: { type: object }
+ *               jiraProjectName: { type: string }
+ *     responses:
+ *       200:
+ *         description: View definitions updated
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/setViewDefinitions', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in setViewDefinitions");
@@ -1275,6 +2054,29 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
     }
 });
   
+/**
+ * @swagger
+ * /ds/view/refreshJira:
+ *   post:
+ *     summary: Re-fetch Jira data for the dataset using its stored JQL config
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsView: { type: string, default: default, description: View name }
+ *               dsUser: { type: string, description: Username }
+ *     responses:
+ *       200:
+ *         description: Refresh result
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/refreshJira', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in refreshJira");
@@ -1313,6 +2115,32 @@ router.post('/view/refreshJira', async (req, res, next) => {
     }
 });
 
+/**
+ * TODO: Not exposed this yet due to complex hdrFilters etc that is sent from UI currently
+ * /ds/view/addFilter:
+ *   post:
+ *     summary: Add a named filter to the dataset
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, filter]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               filter:
+ *                 type: object
+ *                 description: Filter definition including name, hdrFilters, hdrSorters, filterColumnAttrs
+ *     responses:
+ *       200:
+ *         description: Filter add result
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/addFilter', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in addFilter");
@@ -1359,6 +2187,32 @@ router.post('/view/addFilter', async (req, res, next) => {
 });
 
 
+/**
+ * TODO: Not exposed this yet due to complex hdrFilters etc that is sent from UI currently
+ * /ds/view/editFilter:
+ *   post:
+ *     summary: Update an existing named filter
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, filter]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               filter:
+ *                 type: object
+ *                 description: Updated filter definition
+ *     responses:
+ *       200:
+ *         description: Filter edit result
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/editFilter', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in editFilter");
@@ -1403,6 +2257,33 @@ router.post('/view/editFilter', async (req, res, next) => {
     }
 });
 
+/**
+ * TODO: Not exposed this since addFilter is not exposed yet. It can be exposed when the addFilter is exposed.
+ * /ds/view/deleteFilter:
+ *   post:
+ *     summary: Delete a named filter from the dataset
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, filter]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               filter:
+ *                 type: object
+ *                 properties:
+ *                   name: { type: string, description: Name of the filter to delete }
+ *     responses:
+ *       200:
+ *         description: Filter delete result
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/deleteFilter', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteFilter");
@@ -1451,6 +2332,36 @@ router.post('/view/deleteFilter', async (req, res, next) => {
 // Dataset editing utilities triggered by bulk-editing. 
 
 
+/**
+ * TODO: Not exposed yet.
+ * /ds/doBulkEdit:
+ *   post:
+ *     summary: Bulk-edit dataset from a previously uploaded Excel file
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, fileName, sheetName, selectedRange, selectedKeys]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               fileName: { type: string, description: Name of the uploaded Excel file }
+ *               sheetName: { type: string }
+ *               selectedRange: { type: string, description: Cell range like "A1:G100" }
+ *               selectedKeys: { type: array, items: { type: string } }
+ *               doIt: { type: boolean, description: False for dry-run preview }
+ *               setColsFrmSheet: { type: boolean, description: Sync columns to match sheet }
+ *               setRowsFrmSheet: { type: boolean, description: Purge existing rows first }
+ *     responses:
+ *       200:
+ *         description: Bulk edit result with operation log
+ *       403:
+ *         description: Access denied
+ */
 router.post('/doBulkEdit', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in doBulkEdit");
@@ -1751,6 +2662,30 @@ router.post('/doBulkEdit', async (req, res, next) => {
     }
 });
 
+/**
+ * @swagger
+ * /ds/createDsFromDs:
+ *   post:
+ *     summary: Copy a dataset (metadata and optionally data + attachments)
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fromDsName, toDsName, dsUser]
+ *             properties:
+ *               fromDsName: { type: string, description: Source dataset name }
+ *               toDsName: { type: string, description: Target dataset name }
+ *               dsUser: { type: string }
+ *               retainData: { type: boolean, description: If true, copies data and attachments }
+ *     responses:
+ *       200:
+ *         description: Copy result
+ *       403:
+ *         description: Access denied
+ */
 router.post('/createDsFromDs', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in createDsFromDs");
@@ -1829,6 +2764,31 @@ router.post('/createDsFromDs', async (req, res, next) => {
 //     Jira.createJiraIssue(request)
 // })
 
+/**
+ * TODO: Not exposed as this is not working currently.
+ * /ds/getProjectsMetadata:
+ *   post:
+ *     summary: Get Jira projects metadata for the dataset
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               jiraConfig: { type: object }
+ *               jiraAgileConfig: { type: object }
+ *     responses:
+ *       200:
+ *         description: Jira projects metadata
+ *       403:
+ *         description: Access denied
+ */
 router.post('/getProjectsMetadata', async (req, res, next) => {
     let request = req.body
     logger.info(request, 'Incoming request in getProjectsMetadata')
@@ -1846,6 +2806,32 @@ router.post('/getProjectsMetadata', async (req, res, next) => {
     }
 })
 
+/**
+ * TODO: Not exposed this as currently not working
+ * /ds/getProjectsMetaDataForProject:
+ *   post:
+ *     summary: Get Jira metadata for a specific project
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, jiraProjectName]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               jiraProjectName: { type: string }
+ *               jiraConfig: { type: object }
+ *               jiraAgileConfig: { type: object }
+ *     responses:
+ *       200:
+ *         description: Jira project metadata
+ *       403:
+ *         description: Access denied
+ */
 router.post('/getProjectsMetaDataForProject', async (req, res, next) => {
     let request = req.body
     logger.info(request, 'Incoming request in getProjectsMetaDataForProject')
@@ -1868,6 +2854,29 @@ router.post('/getProjectsMetaDataForProject', async (req, res, next) => {
     }
 })
 
+/**
+ * TODO: Not exposed, as not working currently
+ * /ds/getDefaultTypeFieldsAndValues:
+ *   post:
+ *     summary: Get default Jira issue type field values
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *     responses:
+ *       200:
+ *         description: Default Jira type fields and values
+ *       403:
+ *         description: Access denied
+ */
 router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
     let request = req.body
     logger.info(request, 'Incoming request in getDefaultTypeFieldsAndValues');
@@ -1885,6 +2894,30 @@ router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
     }
 })
 
+/**
+ * TODO: Not exposed, as not working currently
+ * /ds/getDefaultTypeFieldsAndValuesForProject:
+ *   post:
+ *     summary: Get default Jira issue type field values for a specific project
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, jiraProjectName]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               jiraProjectName: { type: string }
+ *     responses:
+ *       200:
+ *         description: Default Jira type fields for the project
+ *       403:
+ *         description: Access denied
+ */
 router.post('/getDefaultTypeFieldsAndValuesForProject', async (req, res, next) => {
     let request = req.body
     logger.info(request, 'Incoming request in getDefaultTypeFieldsAndValuesForProject');
@@ -1907,6 +2940,37 @@ router.post('/getDefaultTypeFieldsAndValuesForProject', async (req, res, next) =
     }
 })
 
+/**
+ * TODO: Not exposed yet, as not working currently.
+ * /ds/view/convertToJira:
+ *   post:
+ *     summary: Convert an existing dataset row into a Jira issue
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, selectorObj, jiraFormData]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               selectorObj:
+ *                 type: object
+ *                 description: Object with _id of the row to convert
+ *               jiraFormData:
+ *                 type: object
+ *                 description: Jira issue creation form data
+ *               jiraConfig: { type: object }
+ *               jiraAgileConfig: { type: object }
+ *     responses:
+ *       200:
+ *         description: Jira conversion result with issue key
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/convertToJira', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in convertToJira");
@@ -1962,6 +3026,40 @@ router.post('/view/convertToJira', async (req, res, next) => {
     }
 });
 
+/**
+ * TODO: Not exposed yet, as not working currently.
+ * /ds/view/addJiraRow:
+ *   post:
+ *     summary: Create a new Jira issue and add it as a row in the dataset
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, jiraFormData]
+ *             properties:
+ *               dsName: { type: string }
+ *               dsView: { type: string }
+ *               dsUser: { type: string }
+ *               jiraFormData:
+ *                 type: object
+ *                 description: Jira issue creation form data
+ *               parentKey:
+ *                 type: string
+ *                 description: Parent Jira issue key (for sub-tasks)
+ *               parentSelectorObj:
+ *                 type: object
+ *                 description: Selector for parent row in DB
+ *               jiraConfig: { type: object }
+ *               jiraAgileConfig: { type: object }
+ *     responses:
+ *       200:
+ *         description: Jira row creation result with issue key and record
+ *       403:
+ *         description: Access denied
+ */
 router.post('/view/addJiraRow', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in addJiraRow");
@@ -2041,10 +3139,38 @@ router.post('/view/addJiraRow', async (req, res, next) => {
 });
 
 /**
- * POST /ds/pinDs
- * Pin or unpin a dataset for a user.
- * Body: { dsName: string, dsUser: string, pin: boolean }
- * Returns: { ok: true, pinnedDs: string[] }
+ * @swagger
+ * /ds/pinDs:
+ *   post:
+ *     summary: Pin or unpin a dataset for a user
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsUser, pin]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsUser: { type: string, description: Username }
+ *               pin: { type: boolean, description: True to pin, false to unpin }
+ *     responses:
+ *       200:
+ *         description: Updated pinned dataset list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *                 pinnedDs:
+ *                   type: array
+ *                   items: { type: string }
+ *       400:
+ *         description: Missing dsName or dsUser
+ *       403:
+ *         description: User mismatch
  */
 router.post('/pinDs', async (req, res) => {
     try {
