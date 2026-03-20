@@ -139,7 +139,6 @@ app.use(session({
 Utils.execCmdExecutor('mkdir uploads');
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use((req, res, next) => {
     const requestId = uuidv4();
@@ -301,6 +300,8 @@ app.use((req, res, next) => {
     })
     next();
 })
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const fileUpload = require('./routes/upload');
 app.use('/upload', fileUpload);
