@@ -25,6 +25,30 @@ function fileFilter(r, f, cb) {
 }
 
 
+/**
+ * @swagger
+ * /uploadCsv:
+ *   post:
+ *     summary: Upload a CSV file and return its column headers
+ *     tags: [Upload CSV]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: CSV file
+ *     responses:
+ *       200:
+ *         description: Array of column headers from the CSV
+ *       415:
+ *         description: Unsupported file type or processing error
+ */
 router.post('/', (req, res, next) => {
     upload(req, res, async function(err) {
         // req.file contains information of uploaded file
@@ -54,6 +78,33 @@ router.post('/', (req, res, next) => {
 });
 
 
+/**
+ * TODO: Not exposed as it is internally used. Need a better mechanism to expose this.
+ * /uploadCsv/createDs:
+ *   post:
+ *     summary: Create a new dataset from an uploaded CSV file
+ *     tags: [Upload CSV]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fileName, selectedKeys, dsName, dsUser]
+ *             properties:
+ *               fileName: { type: string, description: Name of the uploaded CSV file }
+ *               selectedKeys:
+ *                 type: array
+ *                 items: { type: string }
+ *                 description: Column names to use as unique keys
+ *               dsName: { type: string, description: Name for the new dataset }
+ *               dsUser: { type: string }
+ *     responses:
+ *       200:
+ *         description: Dataset creation result
+ *       415:
+ *         description: Processing error
+ */
 router.post('/createDs', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in createDs");

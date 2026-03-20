@@ -30,6 +30,38 @@ function fileFilter(r, f, cb) {
 }
 
 
+/**
+ * @swagger
+ * /uploadAttachments:
+ *   post:
+ *     summary: Upload an attachment file for a dataset
+ *     tags: [Attachments]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file, dsName]
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Attachment file (any type)
+ *               dsName:
+ *                 type: string
+ *                 description: Dataset name to associate the attachment with
+ *     responses:
+ *       200:
+ *         description: Upload result with the attachment file path
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string }
+ *                 filename: { type: string }
+ */
 router.post('/', (req, res, next) => {
     upload(req, res, async function(err) {
         // req.file contains information of uploaded file
@@ -57,6 +89,28 @@ router.post('/', (req, res, next) => {
     });    
 });
 
+/**
+ * TODO: Not working. Need to add relative path handling to make it work
+ * /uploadAttachments/deleteAttachment:
+ *   post:
+ *     summary: Delete an attachment file
+ *     tags: [Attachments]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, _id]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               _id: { type: string, description: File path of the attachment to delete }
+ *     responses:
+ *       200:
+ *         description: Attachment deleted
+ *       415:
+ *         description: Error deleting attachment
+ */
 router.post('/deleteAttachment', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteAttachment");
