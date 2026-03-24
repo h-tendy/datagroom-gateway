@@ -10,6 +10,17 @@ const JiraSettings = require('./jiraSettings');
 let host = JiraSettings.host;
 
 /**
+ * Returns the list of non-system database names from the provided db list.
+ * Excludes internal MongoDB system databases and the Datagroom metadata database.
+ * @param {Array} dbs - Array of database objects with a `name` property
+ * @returns {string[]} Filtered array of database name strings
+ */
+function getDbsExcludingSysDbs(dbs) {
+    const sysDbs = ['admin', 'config', 'local', '_dg_metaData'];
+    return (dbs || []).map(d => d.name).filter(name => !sysDbs.includes(name));
+}
+
+/**
  * Look ma, it's cp -R.
  * @param {string} src  The path to the thing to copy.
  * @param {string} dest The path to the new copy.
@@ -609,5 +620,6 @@ module.exports = {
   getRevContentMap,
   parseRecord,
   parseAndValidateDate,
+  getDbsExcludingSysDbs,
   jwtSecret
 };

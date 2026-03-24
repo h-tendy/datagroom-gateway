@@ -4,18 +4,21 @@ const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const DbAbstraction = require('../dbAbstraction');
 const logger = require('../logger');
+const Utils = require('../utils');
 
-const sysDbs = ['admin', 'config', 'local'];
+const PAT_DB = '_dg_metaData';
+const PAT_COLLECTION = 'accessTokens';
 
 // Maximum number of active PATs allowed per user. Increase this value to allow more tokens.
-const MAX_PATS_PER_USER = 2;
+const MAX_PATS_PER_USER = 1;
 
 /**
- * Get list of dataset names the user has ACL access to
+ * Get list of dataset names the user has ACL access to.
+ * Used only to validate the user has at least one accessible dataset before issuing a token.
  */
 async function getDatasetsForUser(dbAbstraction, userId) {
     const dbs = await dbAbstraction.listDatabases();
-    const names = (dbs || []).map(d => d.name).filter(n => !sysDbs.includes(n));
+    const names = Utils.getDbsExcludingSysDbs(dbs);
     const allowed = [];
     for (const dbName of names) {
         try {
@@ -34,8 +37,21 @@ async function getDatasetsForUser(dbAbstraction, userId) {
 }
 
 /**
+ * Read the accessTokens document for a user from _dg_metaData.
+ * Returns null if no document exists yet.
+ * @param {DbAbstraction} dbAbstraction
+ * @param {string} userId
+ * @returns {Promise<object|null>}
+ */
+async function getUserTokenDoc(dbAbstraction, userId) {
+    const docs = await dbAbstraction.find(PAT_DB, PAT_COLLECTION, { _id: userId }, {});
+    return docs && docs.length > 0 ? docs[0] : null;
+}
+
+/**
  * Generate a new Personal Access Token.
  * Token grants access to ALL datasets under the user's ACL (no dataset selection).
+ * Stored once in _dg_metaData.accessTokens keyed by userId.
  *
  * @route POST /api/pats/generate
  * @body {string} name - User-friendly token name
@@ -44,7 +60,6 @@ async function getDatasetsForUser(dbAbstraction, userId) {
  */
 router.post('/generate', async (req, res) => {
     try {
-        // Only name and expiresInDays are used. datasetName is NOT required; token grants access to all datasets under user's ACL.
         const { name, expiresInDays } = req.body;
         const userId = req.user;
 
@@ -62,20 +77,9 @@ router.post('/generate', async (req, res) => {
             });
         }
 
-        // Check existing token count for this user before generating a new one
-        const seen = new Set();
-        for (const datasetName of allowedDatasets) {
-            try {
-                const patsDoc = await dbAbstraction.find(datasetName, 'metaData', { _id: 'dg_pats' }, {});
-                if (patsDoc && patsDoc.length > 0 && patsDoc[0].users && patsDoc[0].users[userId]) {
-                    const tokens = patsDoc[0].users[userId].tokens || [];
-                    tokens.forEach(t => seen.add(t.token_id));
-                }
-            } catch (e) {
-                logger.error(e, `Error checking existing PATs in dataset ${datasetName}`);
-            }
-        }
-        if (seen.size >= MAX_PATS_PER_USER) {
+        const userDoc = await getUserTokenDoc(dbAbstraction, userId);
+        const existingTokens = (userDoc && userDoc.tokens) || [];
+        if (existingTokens.length >= MAX_PATS_PER_USER) {
             return res.status(400).json({
                 error: `You have reached the maximum of ${MAX_PATS_PER_USER} personal access token(s). Please revoke an existing token before creating a new one.`
             });
@@ -88,7 +92,7 @@ router.post('/generate', async (req, res) => {
             .update(fullToken)
             .digest('hex');
 
-        logger.info(`Generated token hash: ${tokenHash.substring(0, 10)}... for user ${userId} (all datasets)`);
+        logger.info(`Generated token hash: ${tokenHash.substring(0, 10)}... for user ${userId}`);
 
         let expiresAt = null;
         if (expiresInDays && expiresInDays > 0) {
@@ -100,40 +104,28 @@ router.post('/generate', async (req, res) => {
             token_id: uuidv4(),
             name: name.trim(),
             token_hash: tokenHash,
-            scopes: ['mcp_access'],
+            scopes: ['dg_access'],
             created_at: new Date(),
             expires_at: expiresAt
         };
 
-        for (const datasetName of allowedDatasets) {
-            let patsDoc = await dbAbstraction.find(
-                datasetName,
-                'metaData',
-                { _id: 'dg_pats' },
-                {}
+        const updatedTokens = [...existingTokens, tokenData];
+
+        if (!userDoc) {
+            await dbAbstraction.insertOne(PAT_DB, PAT_COLLECTION, {
+                _id: userId,
+                tokens: updatedTokens
+            });
+        } else {
+            await dbAbstraction.update(
+                PAT_DB,
+                PAT_COLLECTION,
+                { _id: userId },
+                { tokens: updatedTokens }
             );
-            if (!patsDoc || patsDoc.length === 0) {
-                await dbAbstraction.insertOne(datasetName, 'metaData', {
-                    _id: 'dg_pats',
-                    users: {
-                        [userId]: { tokens: [tokenData] }
-                    }
-                });
-            } else {
-                const currentPats = patsDoc[0];
-                if (!currentPats.users) currentPats.users = {};
-                if (!currentPats.users[userId]) currentPats.users[userId] = { tokens: [] };
-                currentPats.users[userId].tokens.push(tokenData);
-                await dbAbstraction.update(
-                    datasetName,
-                    'metaData',
-                    { _id: 'dg_pats' },
-                    { users: currentPats.users }
-                );
-            }
         }
 
-        logger.info(`Added PAT for user ${userId} to ${allowedDatasets.length} dataset(s)`);
+        logger.info(`Stored PAT for user ${userId} in ${PAT_DB}.${PAT_COLLECTION}`);
 
         res.json({
             token: fullToken,
@@ -154,57 +146,31 @@ router.post('/generate', async (req, res) => {
 });
 
 /**
- * List all tokens for current user (deduped by token_id; one token = all datasets)
+ * List all tokens for current user.
  * @route GET /api/pats
  */
 router.get('/', async (req, res) => {
     try {
         const userId = req.user;
         const dbAbstraction = new DbAbstraction();
-        const dbs = await dbAbstraction.listDatabases();
-        const databases = (dbs || []).map(d => d.name).filter(name => !sysDbs.includes(name));
-        const seen = new Set();
-        const allTokens = [];
+        const userDoc = await getUserTokenDoc(dbAbstraction, userId);
+        const tokens = (userDoc && userDoc.tokens) || [];
 
-        for (const dbName of databases) {
-            try {
-                const patsDoc = await dbAbstraction.find(
-                    dbName,
-                    'metaData',
-                    { _id: 'dg_pats' },
-                    {}
-                );
-                if (patsDoc && patsDoc.length > 0 && patsDoc[0].users && patsDoc[0].users[userId]) {
-                    const tokens = patsDoc[0].users[userId].tokens || [];
-                    tokens.forEach(t => {
-                        if (seen.has(t.token_id)) return;
-                        seen.add(t.token_id);
-                        allTokens.push({
-                            token_id: t.token_id,
-                            name: t.name,
-                            scopes: t.scopes,
-                            created_at: t.created_at,
-                            expires_at: t.expires_at,
-                            is_expired: t.expires_at && new Date(t.expires_at) < new Date(),
-                            dataset_name: 'All datasets (ACL)'
-                        });
-                    });
-                }
-            } catch (e) {
-                logger.error(e, `Error checking PATs in dataset ${dbName}`);
-            }
-        }
+        const result = tokens
+            .map(t => ({
+                token_id: t.token_id,
+                name: t.name,
+                scopes: t.scopes,
+                created_at: t.created_at,
+                expires_at: t.expires_at,
+                is_expired: t.expires_at && new Date(t.expires_at) < new Date(),
+                dataset_name: 'All datasets (ACL)'
+            }))
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-        allTokens.sort((a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-
-        res.json({
-            tokens: allTokens,
-            user: userId
-        });
+        res.json({ tokens: result, user: userId });
     } catch (error) {
-        logger.error(error, 'Error listing all PATs');
+        logger.error(error, 'Error listing PATs');
         res.status(500).json({
             error: 'Failed to list tokens',
             details: error.message
@@ -213,7 +179,7 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * Get details for a specific token (by token_id only)
+ * Get details for a specific token by token_id.
  * @route GET /api/pats/:tokenId
  */
 router.get('/:tokenId', async (req, res) => {
@@ -221,39 +187,25 @@ router.get('/:tokenId', async (req, res) => {
         const userId = req.user;
         const { tokenId } = req.params;
         const dbAbstraction = new DbAbstraction();
-        const dbs = await dbAbstraction.listDatabases();
-        const databases = (dbs || []).map(d => d.name).filter(name => !sysDbs.includes(name));
+        const userDoc = await getUserTokenDoc(dbAbstraction, userId);
+        const tokens = (userDoc && userDoc.tokens) || [];
+        const token = tokens.find(t => t.token_id === tokenId);
 
-        for (const dbName of databases) {
-            try {
-                const patsDoc = await dbAbstraction.find(
-                    dbName,
-                    'metaData',
-                    { _id: 'dg_pats' },
-                    {}
-                );
-                if (!patsDoc || !patsDoc[0].users || !patsDoc[0].users[userId]) continue;
-                const tokens = patsDoc[0].users[userId].tokens || [];
-                const token = tokens.find(t => t.token_id === tokenId);
-                if (token) {
-                    return res.json({
-                        token: {
-                            token_id: token.token_id,
-                            name: token.name,
-                            scopes: token.scopes,
-                            created_at: token.created_at,
-                            expires_at: token.expires_at,
-                            is_expired: token.expires_at && new Date(token.expires_at) < new Date()
-                        },
-                        scope: 'All datasets (ACL)'
-                    });
-                }
-            } catch (e) {
-                logger.error(e, `Error getting PAT in dataset ${dbName}`);
-            }
+        if (!token) {
+            return res.status(404).json({ error: 'Token not found' });
         }
 
-        return res.status(404).json({ error: 'Token not found' });
+        res.json({
+            token: {
+                token_id: token.token_id,
+                name: token.name,
+                scopes: token.scopes,
+                created_at: token.created_at,
+                expires_at: token.expires_at,
+                is_expired: token.expires_at && new Date(token.expires_at) < new Date()
+            },
+            scope: 'All datasets (ACL)'
+        });
     } catch (error) {
         logger.error(error, 'Error getting PAT details');
         res.status(500).json({
@@ -264,7 +216,7 @@ router.get('/:tokenId', async (req, res) => {
 });
 
 /**
- * Delete (revoke) a token from all datasets
+ * Delete (revoke) a token by token_id.
  * @route DELETE /api/pats/:tokenId
  */
 router.delete('/:tokenId', async (req, res) => {
@@ -272,41 +224,22 @@ router.delete('/:tokenId', async (req, res) => {
         const userId = req.user;
         const { tokenId } = req.params;
         const dbAbstraction = new DbAbstraction();
-        const dbs = await dbAbstraction.listDatabases();
-        const databases = (dbs || []).map(d => d.name).filter(name => !sysDbs.includes(name));
-        let removed = false;
+        const userDoc = await getUserTokenDoc(dbAbstraction, userId);
+        const tokens = (userDoc && userDoc.tokens) || [];
+        const updatedTokens = tokens.filter(t => t.token_id !== tokenId);
 
-        for (const dbName of databases) {
-            try {
-                const patsDoc = await dbAbstraction.find(
-                    dbName,
-                    'metaData',
-                    { _id: 'dg_pats' },
-                    {}
-                );
-                if (!patsDoc || patsDoc.length === 0 || !patsDoc[0].users || !patsDoc[0].users[userId]) continue;
-                const currentPats = patsDoc[0];
-                const tokens = currentPats.users[userId].tokens || [];
-                const updatedTokens = tokens.filter(t => t.token_id !== tokenId);
-                if (updatedTokens.length === tokens.length) continue;
-                removed = true;
-                currentPats.users[userId].tokens = updatedTokens;
-                await dbAbstraction.update(
-                    dbName,
-                    'metaData',
-                    { _id: 'dg_pats' },
-                    { users: currentPats.users }
-                );
-            } catch (e) {
-                logger.error(e, `Error deleting PAT in dataset ${dbName}`);
-            }
-        }
-
-        if (!removed) {
+        if (updatedTokens.length === tokens.length) {
             return res.status(404).json({ error: 'Token not found or already deleted' });
         }
 
-        logger.info(`Deleted PAT ${tokenId} for user ${userId} from all datasets`);
+        await dbAbstraction.update(
+            PAT_DB,
+            PAT_COLLECTION,
+            { _id: userId },
+            { tokens: updatedTokens }
+        );
+
+        logger.info(`Deleted PAT ${tokenId} for user ${userId}`);
 
         res.json({
             success: true,

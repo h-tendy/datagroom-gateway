@@ -1,9 +1,13 @@
 const DbAbstraction = require('./dbAbstraction');
-const jwt = require('jsonwebtoken');
 const Utils = require('./utils');
 const logger = require('./logger');
 
-async function aclCheck(dsName, dsView, dsUser, token = null, authMethod = 'jwt') {
+/**
+ * Check whether a user has access to a dataset.
+ * Authentication is handled upstream by the authenticate middleware which sets req.user.
+ * token and authMethod parameters are accepted for backward compatibility but ignored.
+ */
+async function aclCheck(dsName, dsView, dsUser, token = null, authMethod = null) {
     let dbAbstraction = new DbAbstraction();
     try {
         let aclConfig = await dbAbstraction.find(dsName, "metaData", { _id: "aclConfig" }, {});
@@ -14,31 +18,15 @@ async function aclCheck(dsName, dsView, dsUser, token = null, authMethod = 'jwt'
         if (!aclConfig.accessCtrl) {
             return true;
         }
-        logger.info(`ACL check for user: ${dsUser}, authMethod: ${authMethod}, dataset: ${dsName}`);
-
-        if (authMethod === 'pat' && dsUser) {
-            if (aclConfig.acl && aclConfig.acl.includes(dsUser)) {
-                logger.info(`User ${dsUser} granted access via PAT (dataset: ${dsName})`);
-                return true;
-            }
-            logger.warn(`User ${dsUser} denied access via PAT (dataset: ${dsName})`);
-            return false;
+        logger.info(`ACL check for user: ${dsUser}, dataset: ${dsName}`);
+        if (dsUser && aclConfig.acl && aclConfig.acl.includes(dsUser)) {
+            logger.info(`User ${dsUser} granted access to dataset: ${dsName}`);
+            return true;
         }
-
-        if (token) {
-            try {
-                const decode = jwt.verify(token, Utils.jwtSecret);
-                dsUser = decode.user;
-                if (aclConfig.acl && aclConfig.acl.includes(dsUser)) {
-                    logger.info(`User ${dsUser} granted access via JWT (dataset: ${dsName})`);
-                    return true;
-                }
-                logger.warn(`User ${dsUser} denied access via JWT (dataset: ${dsName})`);
-            } catch (e) {
-                logger.error(e, "Error verifying token in aclcheck");
-            }
+        if (!dsUser) {
+            logger.warn('No user provided in ACL check');
         } else {
-            logger.warn("Got no token in acl check");
+            logger.warn(`User ${dsUser} denied access to dataset: ${dsName}`);
         }
     } catch (e) {
         logger.error(e, "Exception in aclCheck");

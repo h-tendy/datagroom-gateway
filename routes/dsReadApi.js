@@ -24,19 +24,17 @@ router.post('/archive', async (req, res, next) => {
     logger.info(request, "Incoming request to archive dataset");
     try {
         const token = req.cookies.jwt;
-        const authMethod = req.authMethod || 'jwt';
-        const effectiveUser = req.user;
         let status = {};
         if (!request.sourceDataSetName || !request.archiveDataSetName || !request.filters) {
             status.error = new Error("One or more required parameters is missing");
         } else {
-            let sourceDsAccessAllowed = await AclCheck.aclCheck(request.sourceDataSetName, "default", effectiveUser, token, authMethod);
+            let sourceDsAccessAllowed = await AclCheck.aclCheck(request.sourceDataSetName, "default", req.params.dsUser, token);
             if (!sourceDsAccessAllowed) {
                 status.error = `${request.sourceDataSetName} dataset access denied`;
                 res.status(403).json(status);
                 return
             }
-            let archiveDsAccessAllowed = await AclCheck.aclCheck(request.archiveDataSetName, "default", effectiveUser, token, authMethod);
+            let archiveDsAccessAllowed = await AclCheck.aclCheck(request.archiveDataSetName, "default", req.params.dsUser, token);
             if (!archiveDsAccessAllowed) {
                 status.error = `${request.archiveDataSetName} dataset access denied`;
                 res.status(403).json(status);
@@ -106,9 +104,7 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
     logger.info(req.params, `Params In columns`);
     logger.info(req.query, `Query In columns`);
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -154,9 +150,7 @@ router.get('/view/columns/:dsName/:dsView/:dsUser', async (req, res, next) => {
 router.get('/view/otherTableAttrs/:dsName/:dsView/:dsUser', async (req, res, next) => {
     logger.info(req.params, "Params in otherTableAttrs GET");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return;
@@ -195,8 +189,6 @@ router.post('/view/otherTableAttrs/set', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in otherTableAttrs SET");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
     
     // Validate required parameters
     if (!request.dsName || !request.dsView || !request.dsUser) {
@@ -204,7 +196,7 @@ router.post('/view/otherTableAttrs/set', async (req, res, next) => {
         return;
     }
     
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ status: 'fail', message: "Permission denied" });
         return;
@@ -266,15 +258,13 @@ async function pager (req, res, collectionName) {
     logger.info(query, "In pager, query");
     logger.info(`In pager, collectionName: ${collectionName}`);
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
     }
     let onlyPerRowAccessCtrlQueried = false;
-    [query.filters, onlyPerRowAccessCtrlQueried] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, effectiveUser, query.filters);
+    [query.filters, onlyPerRowAccessCtrlQueried] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
     logger.info(query, "In pager, after enforcePerRow query");
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
 
@@ -314,22 +304,21 @@ router.get('/view/:dsName/:dsView/:dsUser', async (req, res, next) => {
 router.get('/view/:dsName/:dsView/:dsUser/:id', async (req, res, next) => {
     let dsName = req.params.dsName;
     let dsView = req.params.dsView;
+    let dsUser = req.params.dsUser;
     let _id = req.params.id;
-    if (!dsName || !dsView || !_id) {
+    if (!dsName || !dsView || !dsUser || !_id) {
         res.status(404).json({ "Error": "Invalid request" });
         return;
     }
     let token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    logger.info(`Got request for ${dsName} by ${effectiveUser} for id ${_id} and view ${dsView}`);
-    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, effectiveUser, token, authMethod);
+    logger.info(`Got request for ${dsName} by ${dsUser} for id ${_id} and view ${dsView}`);
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return;
     }
     let qFilters = [ {field: "_id", type: "eq", value: new ObjectId(_id)} ];
-    [qFilters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, effectiveUser, qFilters);
+    [qFilters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, qFilters);
     logger.info(qFilters, "In single-user query end-point, after enforcePerRow, qFilters");
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(qFilters, null, null);
     logger.info(filters, "In single-user query end-point, mongoFilters");
@@ -387,14 +376,12 @@ router.post('/deleteFromQuery/:dsName/:dsView/:dsUser', async (req, res, next) =
     logger.info(req.params, "Request params in deleteFromQuery:");
     logger.info(query, "Incoming query In deleteFromQuery");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
     }
-    [query.filters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, effectiveUser, query.filters);
+    [query.filters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
     logger.info(filters, "Mongo filters in deleteFromQuery");
     logger.info(sorters, "Mongo sorters in deleteFromQuery");
@@ -472,9 +459,7 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming Request in editSingleAttribute");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -483,7 +468,7 @@ router.post('/view/editSingleAttribute', async (req, res, next) => {
     try {
         // XXX: Do lots of validation.
         let response = {}
-        let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, effectiveUser, new ObjectId(request.selectorObj._id));
+        let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, request.dsUser, new ObjectId(request.selectorObj._id));
         // @ts-ignore
         if (recs.length == 1) {
             let isJiraAgileRow = isJiraAgileRec(recs[0])
@@ -601,9 +586,7 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
     let request = req.body;
     logger.info("Incoming request in insertOneDoc");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -614,9 +597,9 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
         let dbResponse = await dbAbstraction.insertOneUniquely(request.dsName, "data", request.selectorObj, request.doc);
         logger.info(dbResponse, 'DB response after insertOneUniquely');
         let response = {};
-        if (dbResponse.ok == 1 && dbResponse.upserted && dbResponse.upserted.length == 1) {
+        if (dbResponse.ok == 1 && dbResponse.upsertedId) {
             response.status = 'success';
-            response._id = dbResponse.upserted[0]._id;
+            response._id = dbResponse.upsertedId;
         } else {
             response.status = 'fail';
             // Assumes that selector definitely has the '_id' field. 
@@ -645,10 +628,10 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
 router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
     let request = req.body;
     logger.info("Incoming request in insertOrUpdateOneDoc");
+    //res.status(200).send({status: 'success'});
+    //return;
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -659,7 +642,7 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
         if (request.selectorObj._id) {
             request.selectorObj._id = dbAbstraction.getObjectId(request.selectorObj._id);
             request.doc._id = request.selectorObj._id;
-            let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, effectiveUser, request.selectorObj._id);
+            let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, request.dsUser, request.selectorObj._id);
             // @ts-ignore
             if (recs.length == 0) {
                 let response = { status: 'fail', error: 'Row not found!'}
@@ -700,14 +683,13 @@ router.post('/view/insertOrUpdateOneDoc', async (req, res, next) => {
 
 
 router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
+    // In this API, the request.query has filters directly. So, you have to use it accordingly.
     let request = req.body;
     let filters = request.query, sorters; 
     logger.info(req.params, "In downloadXlsx, req.params");
     logger.info(filters, "In downloadXlsx, query");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(req.params.dsName, req.params.dsView, req.params.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -722,10 +704,10 @@ router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
             return
         }
         let qFilters = [ {field: "_id", type: "eq", value: new ObjectId(filters[0].value)} ];
-        [qFilters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, effectiveUser, qFilters);
+        [qFilters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, qFilters);
         [mongoFilters, sorters] = MongoFilters.getMongoFiltersAndSorters(qFilters, null, null);
     } else {
-        [filters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, effectiveUser, filters);
+        [filters] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, filters);
         [mongoFilters, sorters] = MongoFilters.getMongoFiltersAndSorters(filters, null, null);
     }
     logger.info(mongoFilters, "In downloadxlsx : mongo filters");
@@ -733,8 +715,8 @@ router.post('/downloadXlsx/:dsName/:dsView/:dsUser', async (req, res, next) => {
     // @ts-ignore
     if (sorters.length)
         options.sort = sorters;
-    let fileName = `export_${req.params.dsName}_${req.params.dsView}_${effectiveUser}.xlsx`
-    await ExcelUtils.exportDataFromDbIntoXlsx(req.params.dsName, req.params.dsView, effectiveUser, fileName, mongoFilters, options);
+    let fileName = `export_${req.params.dsName}_${req.params.dsView}_${req.params.dsUser}.xlsx`
+    await ExcelUtils.exportDataFromDbIntoXlsx(req.params.dsName, req.params.dsView, req.params.dsUser, fileName, mongoFilters, options);
     try {
         let bits = fs.readFileSync(fileName);
         // convert binary data to base64 encoded string
@@ -751,7 +733,6 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
     let request = req.body;
     logger.info(req.params, "Params in dsList");
     logger.info(req.query, "Query in dsList");
-    const effectiveUser = req.user;
 
     let dbAbstraction = new DbAbstraction();
     let dbList = await dbAbstraction.listDatabases();
@@ -759,39 +740,26 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
     // _dg_metaData is an internal metadata/preferences DB, not a user dataset
     let sysDbs = ['admin', 'config', 'local', '_dg_metaData'];
     for (let i = 0; i < dbList.length; i++) {
-        try {
-            let j = sysDbs.indexOf(dbList[i].name);
-            if (j > -1)
-                continue;
+        let j = sysDbs.indexOf(dbList[i].name);
+        if (j > -1)
+            continue;
 
-            let aclConfig = await dbAbstraction.find(dbList[i].name, 'metaData', { _id: "aclConfig" });
-            aclConfig = aclConfig && aclConfig[0];
-            // Backward compat: old datasets may have aclConfig without .acl; PAT/dg_pats is optional and not read here
-            if (aclConfig && aclConfig.accessCtrl) {
-                const acl = aclConfig.acl;
-                if (!Array.isArray(acl) || !acl.includes(effectiveUser)) {
-                    continue;
-                }
-            }
-            pruned.push(dbList[i]);
-        } catch (e) {
-            logger.warn(e, `Skipping dataset ${dbList[i].name} in dsList (metadata error)`);
+        let aclConfig = await dbAbstraction.find(dbList[i].name, 'metaData', { _id: "aclConfig" });
+        aclConfig = aclConfig[0];
+        if (aclConfig && aclConfig.accessCtrl && !aclConfig.acl.includes(req.params.dsUser)) {
+            continue;
         }
+        pruned.push(dbList[i]);
     }
     for (let i = 0; i < pruned.length; i++) {
-        try {
-            let perms = await dbAbstraction.find(pruned[i].name, 'metaData', { _id: "perms" });
-            pruned[i].perms = (perms && perms[0]) ? perms[0] : {};
-        } catch (e) {
-            logger.warn(e, `Skipping perms for dataset ${pruned[i].name} in dsList`);
-            pruned[i].perms = {};
-        }
+        let perms = await dbAbstraction.find(pruned[i].name, 'metaData', { _id: "perms" });
+        pruned[i].perms = perms[0];
     }
 
     // Enrich each entry with pinned flag. Gracefully degrade if prefs DB is unavailable.
     let pinnedSet = new Set();
     try {
-        const pinnedDs = await UserPrefs.getPinnedDs(effectiveUser);
+        const pinnedDs = await UserPrefs.getPinnedDs(req.params.dsUser);
         pinnedDs.forEach(name => pinnedSet.add(name));
     } catch (e) {
         logger.warn(e, "Failed to load pinned datasets for user, continuing without pins");
@@ -807,13 +775,14 @@ router.get('/dsList/:dsUser', async (req, res, next) => {
 
 router.post("/dsList/:dsUser", async (req, res, next) => {
     let request = req.body;
-    const effectiveUser = req.user;
     if (!request.dsFilter) {
         res.status(403).json({ Error: "no filter given" });
         return;
     }
+    // Do somepreprocessing with the filter
     let incomingFilter = request.dsFilter;
     let charArr = incomingFilter.split("-");
+    //Make sure the filter is given in proper format like "A-G", "1-3" etc.
     if (charArr.length !== 2) {
         res
             .status(403)
@@ -840,35 +809,29 @@ router.post("/dsList/:dsUser", async (req, res, next) => {
     let pruned = [];
     let sysDbs = ["admin", "config", "local"];
     for (let i = 0; i < dbList.length; i++) {
-        try {
-            let j = sysDbs.indexOf(dbList[i].name);
-            if (j > -1) continue;
+        let j = sysDbs.indexOf(dbList[i].name);
+        // Get rid of system databases
+        if (j > -1) continue;
 
-            let aclConfig = await dbAbstraction.find(dbList[i].name, "metaData", {
-                _id: "aclConfig",
-            });
-            aclConfig = aclConfig && aclConfig[0];
-            if (aclConfig && aclConfig.accessCtrl) {
-                const acl = aclConfig.acl;
-                if (!Array.isArray(acl) || !acl.includes(effectiveUser)) {
-                    continue;
-                }
-            }
-            pruned.push(dbList[i]);
-        } catch (e) {
-            logger.warn(e, `Skipping dataset ${dbList[i].name} in dsList (filtered)`);
+        let aclConfig = await dbAbstraction.find(dbList[i].name, "metaData", {
+            _id: "aclConfig",
+        });
+        aclConfig = aclConfig[0];
+        // Get rid of dbs for which current user doesn't have access.
+        if (
+            aclConfig &&
+            aclConfig.accessCtrl &&
+            !aclConfig.acl.includes(req.params.dsUser)
+        ) {
+            continue;
         }
+        pruned.push(dbList[i]);
     }
     for (let i = 0; i < pruned.length; i++) {
-        try {
-            let perms = await dbAbstraction.find(pruned[i].name, "metaData", {
-                _id: "perms",
-            });
-            pruned[i].perms = (perms && perms[0]) ? perms[0] : {};
-        } catch (e) {
-            logger.warn(e, `Skipping perms for dataset ${pruned[i].name} in dsList (filtered)`);
-            pruned[i].perms = {};
-        }
+        let perms = await dbAbstraction.find(pruned[i].name, "metaData", {
+            _id: "perms",
+        });
+        pruned[i].perms = perms[0];
     }
     // return the databases list
     pruned.sort((a, b) => a.name.localeCompare(b.name));
@@ -879,9 +842,7 @@ router.post('/deleteDs', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteDs");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -913,10 +874,9 @@ router.post('/view/addColumn', async (req, res, next) => {
             return res.status(400).json({ error: "Missing required parameters" });
         }
 
+        // Check User Permissions
         const token = req.cookies.jwt;
-        const authMethod = req.authMethod || 'jwt';
-        const effectiveUser = req.user;
-        let allowed = await AclCheck.aclCheck(dsName, dsView, effectiveUser, token, authMethod);
+        let allowed = await AclCheck.aclCheck(dsName, dsView, dsUser, token);
         if (!allowed) {
             logger.warn(`Access Denied for user: ${dsUser}`);
             return res.status(403).json({ error: "Access Denied" });
@@ -1037,10 +997,9 @@ router.post('/view/addColumn', async (req, res, next) => {
 router.post('/view/deleteColumn', async (req, res) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteColumn");
+    
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         return res.status(403).json({ "Error": "access_denied" });
     }
@@ -1141,9 +1100,7 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteOneDoc");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -1156,7 +1113,7 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
         // First get a copy of the object we are deleting. 
         if (request.selectorObj._id) {
             let _id = dbAbstraction.getObjectId(request.selectorObj._id);
-            let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, effectiveUser, _id);
+            let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, request.dsUser, _id);
             // @ts-ignore
             if (recs.length == 0) {
                 res.status(200).send({ status: 'fail', error: 'Row not found!'});
@@ -1185,10 +1142,10 @@ router.post('/view/deleteOneDoc', async (req, res, next) => {
 router.post('/view/deleteManyDocs', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteManyDocs");
+    //res.status(200).send({status: 'success'});
+    //return;
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -1200,7 +1157,7 @@ router.post('/view/deleteManyDocs', async (req, res, next) => {
         for (let i = 0; i < request.objects.length; i++) {
             // First get a copy of the object we are deleting. 
             let _id = dbAbstraction.getObjectId(request.objects[i]);
-            let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, effectiveUser, _id);
+            let recs = await PerRowAcessCheck.checkAccessForSpecificRow(request.dsName, request.dsView, request.dsUser, _id);
             // @ts-ignore
             if (recs.length == 0)
                 continue;
@@ -1227,9 +1184,7 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in setViewDefinitions");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ status: 'fail', message: "Permission denied" });
         return
@@ -1324,9 +1279,7 @@ router.post('/view/refreshJira', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in refreshJira");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -1364,9 +1317,7 @@ router.post('/view/addFilter', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in addFilter");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -1412,9 +1363,7 @@ router.post('/view/editFilter', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in editFilter");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -1458,9 +1407,7 @@ router.post('/view/deleteFilter', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in deleteFilter");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -1508,9 +1455,7 @@ router.post('/doBulkEdit', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in doBulkEdit");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         logger.warn(`${request.dsUser} doesn't have access to do bulk edit`);
         res.status(403).json({ "Error": "access_denied" });
@@ -1810,9 +1755,7 @@ router.post('/createDsFromDs', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in createDsFromDs");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.fromDsName, "", effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.fromDsName, "", request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ status: 'fail', message: "Permission denied" });
         return
@@ -1860,8 +1803,8 @@ router.post('/createDsFromDs', async (req, res, next) => {
         // Change owner to current user...
         await dbAbstraction.update(request.toDsName, "metaData", { _id: "perms" }, { owner: request.dsUser });
         let aclConfig = await dbAbstraction.find(request.toDsName, "metaData", { _id: `aclConfig` }, {} );
-        aclConfig = aclConfig && aclConfig[0];
-        if (aclConfig && Array.isArray(aclConfig.acl) && !aclConfig.acl.includes(request.dsUser)) {
+        aclConfig = aclConfig[0];
+        if (aclConfig && !aclConfig.acl.includes(request.dsUser)) {
             aclConfig.acl.push(request.dsUser);
             dbResponse = await dbAbstraction.update(request.toDsName, "metaData", { _id: "aclConfig" }, { ...aclConfig });
         }
@@ -1890,9 +1833,7 @@ router.post('/getProjectsMetadata', async (req, res, next) => {
     let request = req.body
     logger.info(request, 'Incoming request in getProjectsMetadata')
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -1909,9 +1850,7 @@ router.post('/getProjectsMetaDataForProject', async (req, res, next) => {
     let request = req.body
     logger.info(request, 'Incoming request in getProjectsMetaDataForProject')
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -1933,9 +1872,7 @@ router.post('/getDefaultTypeFieldsAndValues', async (req, res, next) => {
     let request = req.body
     logger.info(request, 'Incoming request in getDefaultTypeFieldsAndValues');
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -1952,9 +1889,7 @@ router.post('/getDefaultTypeFieldsAndValuesForProject', async (req, res, next) =
     let request = req.body
     logger.info(request, 'Incoming request in getDefaultTypeFieldsAndValuesForProject');
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -1976,9 +1911,7 @@ router.post('/view/convertToJira', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in convertToJira");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -2033,9 +1966,7 @@ router.post('/view/addJiraRow', async (req, res, next) => {
     let request = req.body;
     logger.info(request, "Incoming request in addJiraRow");
     const token = req.cookies.jwt;
-    const authMethod = req.authMethod || 'jwt';
-    const effectiveUser = req.user;
-    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, effectiveUser, token, authMethod);
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
     if (!allowed) {
         res.status(403).json({ "Error": "access_denied" });
         return
@@ -2083,9 +2014,9 @@ router.post('/view/addJiraRow', async (req, res, next) => {
         let dbAbstraction = new DbAbstraction();
         let dbResponse = await dbAbstraction.insertOneUniquely(request.dsName, "data", selectorObj, fullRec);
         logger.info(dbResponse, 'insertOneUniquely db response in addJiraRow');
-        if (dbResponse.ok == 1 && dbResponse.upserted && dbResponse.upserted.length == 1) {
+        if (dbResponse.ok == 1 && dbResponse.upsertedId) {
             response.status = 'success';
-            response._id = dbResponse.upserted[0]._id;
+            response._id = dbResponse.upsertedId;
             response.record = fullRec
             response.key = jiraResponse.key
         } else {
