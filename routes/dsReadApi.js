@@ -394,7 +394,7 @@ async function pager (req, res, collectionName) {
         return
     }
     let onlyPerRowAccessCtrlQueried = false;
-    [query.filters, onlyPerRowAccessCtrlQueried] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters);
+    [query.filters, onlyPerRowAccessCtrlQueried] = await PerRowAcessCheck.enforcePerRowAcessCtrl(req.params.dsName, req.params.dsView, req.params.dsUser, query.filters, collectionName);
     logger.info(query, "In pager, after enforcePerRow query");
     let [filters, sorters] = MongoFilters.getMongoFiltersAndSorters(query.filters, query.sorters, query.chronology);
 
