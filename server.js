@@ -21,6 +21,9 @@ const AclCheck = require('./acl');
 const logger = require('./logger');
 const { v4: uuidv4 } = require('uuid');
 const requestContext = require('./contextManager');
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+const swaggerOptions = require('./swaggerConfig');
 
 dotenv.config({ path: './.env' })
 
@@ -136,6 +139,8 @@ app.use(session({
 
 Utils.execCmdExecutor('mkdir uploads');
 
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
 app.use((req, res, next) => {
     const requestId = uuidv4();
     req.requestId = requestId;
@@ -146,8 +151,55 @@ app.use((req, res, next) => {
     });
 });
 
+/**
+ * @swagger
+ * /login:
+ *   post:
+ *     summary: Authenticate user and obtain a JWT cookie
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, password]
+ *             properties:
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login result (ok=true along with user object token on success, error string on failure)
+ */
 app.route('/login').post(loginAuthenticateForReact);
+
+/**
+ * @swagger
+ * /sessionCheck:
+ *   get:
+ *     summary: Verify the current JWT session is still valid
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Session is valid
+ *       401:
+ *         description: Token missing or invalid
+ */
 app.route('/sessionCheck').get(sessionCheck);
+
+/**
+ * @swagger
+ * /logout:
+ *   get:
+ *     summary: Clear the JWT cookie and log out
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ */
 app.route('/logout').get(logout);
 
 // ========================================
@@ -233,9 +285,25 @@ const authenticate = async (req, res, next) => {
 
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        // Only treat as PAT when token looks like one (dgpat_xxx_yyy)
+        const [scheme, token] = authHeader.split(' ');
+        
+        if (scheme !== 'Bearer') {
+            delete req.user;
+            logger.warn('Invalid authentication scheme: %s', scheme);
+            res.status(401).json({ error: 'Invalid authentication scheme' });
+            return;
+        }
+
+        if (!token) {
+            delete req.user;
+            logger.warn('Bearer token missing');
+            res.status(401).json({ error: 'Bearer token missing' });
+            return;
+        }
+
+        // Hierarchical token checking: PAT -> JWT -> Unknown
         if (token.startsWith('dgpat_')) {
+            // PAT authentication
             const patData = await verifyPAT(token);
             if (patData) {
                 req.user = patData.user_id;
@@ -247,6 +315,20 @@ const authenticate = async (req, res, next) => {
             logger.warn('PAT authentication failed');
             res.status(401).json({ error: 'Invalid or expired access token' });
             return;
+        } else {
+            // Try JWT Bearer token authentication
+            try {
+                const decoded = jwt.verify(token, Utils.jwtSecret);
+                req.user = decoded.user;
+                logger.info(`JWT Bearer auth successful for user: ${req.user}`);
+                next();
+                return;
+            } catch (err) {
+                // JWT verification failed - unknown or invalid token
+                logger.warn(`Unknown or invalid Bearer token format: ${token.substring(0, 20)}...`);
+                logger.debug({ err }, 'Bearer token verification failed');
+                // Fall through to cookie JWT check
+            }
         }
     }
 
@@ -326,6 +408,8 @@ app.use((req, res, next) => {
     })
     next();
 })
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const fileUpload = require('./routes/upload');
 app.use('/upload', fileUpload);

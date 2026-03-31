@@ -14,7 +14,7 @@ async function checkAccessForSpecificRow(dsName, dsView, dsUser, _id) {
     return recs;
 }
 
-async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
+async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters, collection = "data") {
     let dbAbstraction = new DbAbstraction();
     let onlyPerRowAccessCtrlQueried = false;
     try {
@@ -42,12 +42,21 @@ async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters) {
                 }
             }
             if (!found) {
-                filters.push({ field: perRowAccessConfig.column, type: 'like', value: `\\b${dsUser}\\b|\\*`})
+                if (collection == "editlog") {
+                    filters.push({ field: "user", type: 'like', value: `\\b${dsUser}\\b|\\*`})
+                } else {
+                    filters.push({ field: perRowAccessConfig.column, type: 'like', value: `\\b${dsUser}\\b|\\*`})
+                }
             }
         } else {
             filters = [];
-            filters.push({ field: perRowAccessConfig.column, type: 'like', value: `\\b${dsUser}\\b|\\*`});
-            onlyPerRowAccessCtrlQueried = true;
+            if (collection == "editlog") {
+                filters.push({ field: "user", type: 'like', value: `\\b${dsUser}\\b|\\*`});
+                onlyPerRowAccessCtrlQueried = true;
+            } else {
+                filters.push({ field: perRowAccessConfig.column, type: 'like', value: `\\b${dsUser}\\b|\\*`});
+                onlyPerRowAccessCtrlQueried = true;
+            }
         }
     } catch (e) {
         logger.error(e, "Exception in perRowAccessCheck");

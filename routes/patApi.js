@@ -10,31 +10,7 @@ const PAT_DB = '_dg_metaData';
 const PAT_COLLECTION = 'accessTokens';
 
 // Maximum number of active PATs allowed per user. Increase this value to allow more tokens.
-const MAX_PATS_PER_USER = 1;
-
-/**
- * Get list of dataset names the user has ACL access to.
- * Used only to validate the user has at least one accessible dataset before issuing a token.
- */
-async function getDatasetsForUser(dbAbstraction, userId) {
-    const dbs = await dbAbstraction.listDatabases();
-    const names = Utils.getDbsExcludingSysDbs(dbs);
-    const allowed = [];
-    for (const dbName of names) {
-        try {
-            const aclConfig = await dbAbstraction.find(dbName, 'metaData', { _id: 'aclConfig' }, {});
-            const config = aclConfig && aclConfig[0];
-            if (!config || !config.accessCtrl) {
-                allowed.push(dbName);
-            } else if (config.acl && config.acl.includes(userId)) {
-                allowed.push(dbName);
-            }
-        } catch (e) {
-            logger.error(e, `Error checking ACL for dataset ${dbName}`);
-        }
-    }
-    return allowed;
-}
+const MAX_PATS_PER_USER = 7;
 
 /**
  * Read the accessTokens document for a user from _dg_metaData.
@@ -49,9 +25,115 @@ async function getUserTokenDoc(dbAbstraction, userId) {
 }
 
 /**
+ * Generate token data object with hash and metadata.
+ * @param {string} name - User-friendly token name
+ * @param {number} expiresInDays - Days until expiration (0 = never)
+ * @returns {object} { fullToken, tokenData }
+ */
+function generateTokenData(name, expiresInDays) {
+    const visiblePrefix = crypto.randomBytes(6).toString('hex');
+    const secretPortion = crypto.randomBytes(20).toString('hex');
+    const fullToken = `dgpat_${visiblePrefix}_${secretPortion}`;
+    const tokenHash = crypto.createHash('sha256')
+        .update(fullToken)
+        .digest('hex');
+
+    let expiresAt = null;
+    if (expiresInDays && expiresInDays > 0) {
+        expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + parseInt(expiresInDays));
+    }
+
+    const tokenData = {
+        token_id: uuidv4(),
+        name: name.trim(),
+        token_hash: tokenHash,
+        scopes: ['dg_access'],
+        created_at: new Date(),
+        expires_at: expiresAt
+    };
+
+    return { fullToken, tokenData, visiblePrefix };
+}
+
+/**
  * Generate a new Personal Access Token.
  * Token grants access to ALL datasets under the user's ACL (no dataset selection).
  * Stored once in _dg_metaData.accessTokens keyed by userId.
+ *
+ * @swagger
+ * /api/pats/generate:
+ *   post:
+ *     summary: Generate a new Personal Access Token (PAT)
+ *     description: Creates a new PAT for the authenticated user. The token grants access to all datasets under the user's ACL. The full token is shown only once upon creation.
+ *     tags: [PAT]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: User-friendly token name (max 100 characters)
+ *                 example: "My API Token"
+ *               expiresInDays:
+ *                 type: number
+ *                 description: Days until expiration (0 or omit for never expires)
+ *                 example: 90
+ *     responses:
+ *       200:
+ *         description: Token generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                   description: The full token (shown only once - copy it now!)
+ *                   example: "dgpat_a1b2c3d4e5f6_0123456789abcdef01234567"
+ *                 token_id:
+ *                   type: string
+ *                   description: Unique token identifier (UUID)
+ *                 token_prefix:
+ *                   type: string
+ *                   description: Visible prefix for identifying the token
+ *                   example: "dgpat_a1b2c3d4e5f6"
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *                   description: Token creation timestamp
+ *                 expires_at:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                   description: Token expiration timestamp (null if never expires)
+ *                 scope:
+ *                   type: string
+ *                   description: Token scope
+ *                   example: "All datasets (ACL)"
+ *                 message:
+ *                   type: string
+ *                   description: Important reminder message
+ *       400:
+ *         description: Invalid request or maximum tokens reached
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "You have reached the maximum of 7 personal access token(s)."
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       500:
+ *         description: Server error
  *
  * @route POST /api/pats/generate
  * @body {string} name - User-friendly token name
@@ -70,12 +152,6 @@ router.post('/generate', async (req, res) => {
         }
 
         const dbAbstraction = new DbAbstraction();
-        const allowedDatasets = await getDatasetsForUser(dbAbstraction, userId);
-        if (allowedDatasets.length === 0) {
-            return res.status(400).json({
-                error: 'You have no dataset access. Add yourself to at least one dataset ACL before creating a token.'
-            });
-        }
 
         const userDoc = await getUserTokenDoc(dbAbstraction, userId);
         const existingTokens = (userDoc && userDoc.tokens) || [];
@@ -85,45 +161,18 @@ router.post('/generate', async (req, res) => {
             });
         }
 
-        const visiblePrefix = crypto.randomBytes(6).toString('hex');
-        const secretPortion = crypto.randomBytes(20).toString('hex');
-        const fullToken = `dgpat_${visiblePrefix}_${secretPortion}`;
-        const tokenHash = crypto.createHash('sha256')
-            .update(fullToken)
-            .digest('hex');
+        const { fullToken, tokenData, visiblePrefix } = generateTokenData(name, expiresInDays);
 
-        logger.info(`Generated token hash: ${tokenHash.substring(0, 10)}... for user ${userId}`);
-
-        let expiresAt = null;
-        if (expiresInDays && expiresInDays > 0) {
-            expiresAt = new Date();
-            expiresAt.setDate(expiresAt.getDate() + parseInt(expiresInDays));
-        }
-
-        const tokenData = {
-            token_id: uuidv4(),
-            name: name.trim(),
-            token_hash: tokenHash,
-            scopes: ['dg_access'],
-            created_at: new Date(),
-            expires_at: expiresAt
-        };
+        logger.info(`Generated token hash: ${tokenData.token_hash.substring(0, 10)}... for user ${userId}`);
 
         const updatedTokens = [...existingTokens, tokenData];
 
-        if (!userDoc) {
-            await dbAbstraction.insertOne(PAT_DB, PAT_COLLECTION, {
-                _id: userId,
-                tokens: updatedTokens
-            });
-        } else {
-            await dbAbstraction.update(
-                PAT_DB,
-                PAT_COLLECTION,
-                { _id: userId },
-                { tokens: updatedTokens }
-            );
-        }
+        await dbAbstraction.update(
+            PAT_DB,
+            PAT_COLLECTION,
+            { _id: userId },
+            { tokens: updatedTokens }
+        );
 
         logger.info(`Stored PAT for user ${userId} in ${PAT_DB}.${PAT_COLLECTION}`);
 
@@ -132,7 +181,7 @@ router.post('/generate', async (req, res) => {
             token_id: tokenData.token_id,
             token_prefix: `dgpat_${visiblePrefix}`,
             created_at: tokenData.created_at,
-            expires_at: expiresAt,
+            expires_at: tokenData.expires_at,
             scope: 'All datasets (ACL)',
             message: 'IMPORTANT: Copy this token now. You will not be able to see it again!'
         });
@@ -147,6 +196,63 @@ router.post('/generate', async (req, res) => {
 
 /**
  * List all tokens for current user.
+ * 
+ * @swagger
+ * /api/pats:
+ *   get:
+ *     summary: List all Personal Access Tokens for the current user
+ *     description: Returns a list of all PATs (active and expired) for the authenticated user, sorted by creation date (newest first).
+ *     tags: [PAT]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: List of tokens retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 tokens:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       token_id:
+ *                         type: string
+ *                         description: Unique token identifier
+ *                       name:
+ *                         type: string
+ *                         description: User-friendly token name
+ *                       scopes:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         description: Token scopes
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                         description: Token creation timestamp
+ *                       expires_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                         description: Token expiration timestamp
+ *                       is_expired:
+ *                         type: boolean
+ *                         description: Whether the token has expired
+ *                       dataset_name:
+ *                         type: string
+ *                         description: Dataset scope
+ *                         example: "All datasets (ACL)"
+ *                 user:
+ *                   type: string
+ *                   description: Current user ID
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       500:
+ *         description: Server error
+ * 
  * @route GET /api/pats
  */
 router.get('/', async (req, res) => {
@@ -180,6 +286,75 @@ router.get('/', async (req, res) => {
 
 /**
  * Get details for a specific token by token_id.
+ * 
+ * @swagger
+ * /api/pats/{tokenId}:
+ *   get:
+ *     summary: Get details for a specific Personal Access Token
+ *     description: Returns detailed information about a specific PAT identified by its token_id.
+ *     tags: [PAT]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tokenId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The unique token identifier (UUID)
+ *     responses:
+ *       200:
+ *         description: Token details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: object
+ *                   properties:
+ *                     token_id:
+ *                       type: string
+ *                       description: Unique token identifier
+ *                     name:
+ *                       type: string
+ *                       description: User-friendly token name
+ *                     scopes:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       description: Token scopes
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                       description: Token creation timestamp
+ *                     expires_at:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
+ *                       description: Token expiration timestamp
+ *                     is_expired:
+ *                       type: boolean
+ *                       description: Whether the token has expired
+ *                 scope:
+ *                   type: string
+ *                   description: Dataset scope
+ *                   example: "All datasets (ACL)"
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       404:
+ *         description: Token not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Token not found"
+ *       500:
+ *         description: Server error
+ * 
  * @route GET /api/pats/:tokenId
  */
 router.get('/:tokenId', async (req, res) => {
@@ -217,6 +392,64 @@ router.get('/:tokenId', async (req, res) => {
 
 /**
  * Delete (revoke) a token by token_id.
+ * 
+ * @swagger
+ * /api/pats/{tokenId}:
+ *   delete:
+ *     summary: Delete (revoke) a Personal Access Token
+ *     description: Permanently revokes a PAT identified by its token_id. The token can no longer be used for authentication after deletion.
+ *     tags: [PAT]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tokenId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The unique token identifier (UUID) to delete
+ *     responses:
+ *       200:
+ *         description: Token deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Token deleted successfully"
+ *                 token_id:
+ *                   type: string
+ *                   description: The deleted token's ID
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       404:
+ *         description: Token not found or already deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Token not found or already deleted"
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Failed to delete token"
+ *                 details:
+ *                   type: string
+ * 
  * @route DELETE /api/pats/:tokenId
  */
 router.delete('/:tokenId', async (req, res) => {

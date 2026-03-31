@@ -5,9 +5,9 @@ const logger = require('./logger');
 /**
  * Check whether a user has access to a dataset.
  * Authentication is handled upstream by the authenticate middleware which sets req.user.
- * token and authMethod parameters are accepted for backward compatibility but ignored.
+ * token parameter is accepted for backward compatibility but ignored.
  */
-async function aclCheck(dsName, dsView, dsUser, token = null, authMethod = null) {
+async function aclCheck(dsName, dsView, dsUser, token = null) {
     let dbAbstraction = new DbAbstraction();
     try {
         let aclConfig = await dbAbstraction.find(dsName, "metaData", { _id: "aclConfig" }, {});
