@@ -400,6 +400,23 @@ const basicAuth = (req, res, next) => {
 // Attach the authentication middleware to all routes except /login
 app.use(/^(?!\/login).*$/, authenticate);
 
+// Always use the server-verified identity (req.user set by authenticate middleware)
+// instead of trusting the client-supplied :dsUser URL parameter.
+app.param('dsUser', (req, res, next, _dsUser) => {
+    logger.info(`[MIDDLEWARE] Client sent dsUser in URL: "${_dsUser}", replacing with authenticated user: "${req.user}"`);
+    req.params.dsUser = req.user;
+    next();
+});
+
+// Same for POST/PUT routes that carry dsUser in the request body.
+app.use((req, res, next) => {
+    if (req.body && req.body.dsUser !== undefined) {
+        logger.info(`[MIDDLEWARE] Client sent dsUser in body: "${req.body.dsUser}", replacing with authenticated user: "${req.user}"`);
+        req.body.dsUser = req.user;
+    }
+    next();
+});
+
 app.use((req, res, next) => {
     const startTime = Date.now();
     res.on('finish', () => {
