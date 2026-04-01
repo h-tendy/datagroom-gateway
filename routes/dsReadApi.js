@@ -19,24 +19,6 @@ const UserPrefs = require('../userPrefs');
 
 let host = JiraSettings.host;
 
-// Always use the server-verified identity (req.user set by authenticate middleware)
-// instead of trusting the client-supplied :dsUser URL parameter.
-router.param('dsUser', (req, res, next, _dsUser) => {
-    logger.info(`[MIDDLEWARE] Client sent dsUser in URL: "${_dsUser}", replacing with authenticated user: "${req.user}"`);
-    req.params.dsUser = req.user;
-    next();
-});
-
-// Same for POST/PUT routes that carry dsUser in the request body.
-router.use((req, res, next) => {
-    if (req.body && req.body.dsUser !== undefined) {
-        logger.info(`[MIDDLEWARE] Client sent dsUser in body: "${req.body.dsUser}", replacing with authenticated user: "${req.user}"`);
-        req.body.dsUser = req.user;
-    }
-    next();
-});
-
-
 /**
  * @swagger
  * /ds/archive:
