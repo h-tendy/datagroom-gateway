@@ -33,6 +33,12 @@ const swaggerOptions = {
                     scheme: 'basic',
                     description: 'Basic authentication (e.g. abcd/abcd)',
                 },
+                patAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'PAT',
+                    description: 'Personal Access Token (PAT) authentication. Format: dgpat_<prefix>_<secret>. Include as "Authorization: Bearer <token>" header. PAT grants access to all datasets under the user\'s ACL.',
+                },
             },
             schemas: {
                 DatasetIdentifier: {
@@ -122,6 +128,7 @@ const swaggerOptions = {
         security: [
             { cookieAuth: [] },
             { basicAuth: [] },
+            { patAuth: [] },
         ],
     },
     apis: ['./server.js', './routes/*.js'],
