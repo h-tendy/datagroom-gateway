@@ -188,6 +188,108 @@ class DbAbstraction {
             throw err;
         }
     }
+
+    /**
+     * Bulk upsert documents — insert new docs or update existing ones based on selectorObj.
+     * @param {string} dbName - Database name
+     * @param {string} tableName - Collection name
+     * @param {Array<Object>} selectorObjs - Array of selector objects (matched by index with docs)
+     * @param {Array<Object>} docs - Array of documents to upsert
+     * @param {Object} options - Options object
+     * @param {boolean} options.insertOnly - If true, fails for existing docs; if false, updates them (default: false)
+     * @returns {Promise<{ok: number, inserted: Array, updated: Array, failures: Array}>}
+     */
+    async upsertMany(dbName, tableName, selectorObjs, docs, options = {}) {
+        const { insertOnly = false } = options;
+        try {
+            if (!this.isConnected) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+
+            // Validate arrays are same length
+            if (selectorObjs.length !== docs.length) {
+                return { ok: 0, error: 'selectorObjs and docs arrays must be same length' };
+            }
+
+            // Check for _id in selectors
+            for (let i = 0; i < selectorObjs.length; i++) {
+                if (selectorObjs[i]._id) {
+                    return { ok: 0, error: `selectorObjs[${i}] must not have _id` };
+                }
+            }
+
+            // Build bulkWrite operations
+            const bulkOps = selectorObjs.map((selector, index) => ({
+                updateOne: {
+                    filter: selector,
+                    update: insertOnly ? { $setOnInsert: docs[index] } : { $set: docs[index] },
+                    upsert: true
+                }
+            }));
+
+            // Execute bulk operation with ordered: false to continue on errors
+            const result = await collection.bulkWrite(bulkOps, { ordered: false });
+
+            // Build inserted, updated, and failures arrays
+            const inserted = [];
+            const updated = [];
+            const failures = [];
+
+            // Track which indices were upserted (new inserts)
+            const upsertedIndices = new Set();
+            if (result.upsertedIds) {
+                for (const [indexStr, id] of Object.entries(result.upsertedIds)) {
+                    const index = parseInt(indexStr);
+                    upsertedIndices.add(index);
+                    inserted.push({
+                        index,
+                        _id: id,
+                        selectorObj: selectorObjs[index]
+                    });
+                }
+            }
+
+            // Process documents that already existed (matched)
+            for (let i = 0; i < selectorObjs.length; i++) {
+                if (!upsertedIndices.has(i)) {
+                    // This doc already existed, find its _id
+                    const existingDoc = await collection.findOne(selectorObjs[i], { projection: { _id: 1 } });
+                    if (insertOnly) {
+                        // Insert-only mode: existing docs are failures
+                        failures.push({
+                            index: i,
+                            selectorObj: selectorObjs[i],
+                            error: 'Document with matching key already exists',
+                            existingId: existingDoc ? existingDoc._id : null
+                        });
+                    } else {
+                        // Upsert mode: existing docs were updated successfully
+                        updated.push({
+                            index: i,
+                            _id: existingDoc ? existingDoc._id : null,
+                            selectorObj: selectorObjs[i]
+                        });
+                    }
+                }
+            }
+
+            return {
+                ok: 1,
+                total: selectorObjs.length,
+                insertedCount: inserted.length,
+                updatedCount: updated.length,
+                failCount: failures.length,
+                inserted,
+                updated,
+                failures
+            };
+        } catch (err) {
+            logger.error(err, `upsertMany error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
+            throw err;
+        }
+    }
+
     async update (dbName, tableName, selector, updateObj) {
         try {
             if (! this.isConnected ) await this.connect();
