@@ -18,6 +18,7 @@ const swaggerOptions = {
             { name: 'Upload', description: 'Excel file upload and dataset creation' },
             // { name: 'Upload CSV', description: 'CSV file upload and dataset creation' },
             { name: 'Attachments', description: 'File attachment upload, serving, and deletion' },
+            { name: 'PAT', description: 'Personal Access Token (PAT) management - generate, list, view, and revoke API tokens' },
         ],
         components: {
             securitySchemes: {
@@ -31,6 +32,12 @@ const swaggerOptions = {
                     type: 'http',
                     scheme: 'basic',
                     description: 'Basic authentication (e.g. abcd/abcd)',
+                },
+                patAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'PAT',
+                    description: 'Personal Access Token (PAT) authentication. Format: dgpat_<prefix>_<secret>. Include as "Authorization: Bearer <token>" header. PAT grants access to all datasets under the user\'s ACL.',
                 },
             },
             schemas: {
@@ -121,6 +128,7 @@ const swaggerOptions = {
         security: [
             { cookieAuth: [] },
             { basicAuth: [] },
+            { patAuth: [] },
         ],
     },
     apis: ['./server.js', './routes/*.js'],

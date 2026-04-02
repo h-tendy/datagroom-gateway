@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const passport = require('passport');
 const path = require('path');
 const compression = require('compression');
+const crypto = require('crypto');
 const LdapStrategy = require('passport-ldapauth').Strategy;
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
@@ -201,7 +202,63 @@ app.route('/sessionCheck').get(sessionCheck);
  */
 app.route('/logout').get(logout);
 
-// Define a middleware function to authenticate request
+// ========================================
+// PAT VERIFICATION FUNCTION
+// ========================================
+/**
+ * Verify a Personal Access Token.
+ * Tokens are stored once per user in _dg_metaData.accessTokens (_id = userId).
+ * @param {string} token - Full token string (dgpat_abc123def456_...)
+ * @returns {object|null} {user_id, token_id, scopes} or null if invalid
+ */
+async function verifyPAT(token) {
+    try {
+        const tokenHash = crypto.createHash('sha256')
+            .update(token)
+            .digest('hex');
+        logger.info(`Verifying PAT with hash: ${tokenHash.substring(0, 10)}...`);
+        const dbAbstraction = new DbAbstraction();
+        const userDocs = await dbAbstraction.find(
+            '_dg_metaData',
+            'accessTokens',
+            { 'tokens.token_hash': tokenHash },
+            {}
+        );
+        if (!userDocs || userDocs.length === 0) {
+            logger.warn('PAT not found');
+            return null;
+        }
+        const userId = userDocs[0]._id;
+        const tokens = userDocs[0].tokens || [];
+        const tokenData = tokens.find(t => t.token_hash === tokenHash);
+        if (!tokenData) {
+            logger.warn('PAT not found in user document');
+            return null;
+        }
+        if (tokenData.expires_at) {
+            const expiryDate = new Date(tokenData.expires_at);
+            if (expiryDate < new Date()) {
+                logger.warn(`Token expired for user ${userId} (expired: ${expiryDate})`);
+                return null;
+            }
+        }
+        logger.info(`Successfully verified PAT for user ${userId}`);
+        return {
+            user_id: userId,
+            token_id: tokenData.token_id,
+            scopes: tokenData.scopes || ['dg_access']
+        };
+    } catch (e) {
+        logger.error(e, "Error in verifyPAT");
+        return null;
+    }
+}
+
+// ========================================
+// AUTHENTICATE MIDDLEWARE
+// Supports: JWT cookies, PAT Bearer tokens (dgpat_*), Basic Auth
+// Bearer JWT is not handled here; UI sends JWT via cookie, which is checked below.
+// ========================================
 const authenticate = async (req, res, next) => {
     /**
      * If the URL starts with /attachments/,
@@ -225,6 +282,56 @@ const authenticate = async (req, res, next) => {
             }
         }
     }
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const [scheme, token] = authHeader.split(' ');
+        
+        if (scheme !== 'Bearer') {
+            delete req.user;
+            logger.warn('Invalid authentication scheme: %s', scheme);
+            res.status(401).json({ error: 'Invalid authentication scheme' });
+            return;
+        }
+
+        if (!token) {
+            delete req.user;
+            logger.warn('Bearer token missing');
+            res.status(401).json({ error: 'Bearer token missing' });
+            return;
+        }
+
+        // Hierarchical token checking: PAT -> JWT -> Unknown
+        if (token.startsWith('dgpat_')) {
+            // PAT authentication
+            const patData = await verifyPAT(token);
+            if (patData) {
+                req.user = patData.user_id;
+                logger.info(`PAT auth successful for user: ${req.user}`);
+                next();
+                return;
+            }
+            delete req.user;
+            logger.warn('PAT authentication failed');
+            res.status(401).json({ error: 'Invalid or expired access token' });
+            return;
+        } else {
+            // Try JWT Bearer token authentication
+            try {
+                const decoded = jwt.verify(token, Utils.jwtSecret);
+                req.user = decoded.user;
+                logger.info(`JWT Bearer auth successful for user: ${req.user}`);
+                next();
+                return;
+            } catch (err) {
+                // JWT verification failed - unknown or invalid token
+                logger.warn(`Unknown or invalid Bearer token format: ${token.substring(0, 20)}...`);
+                logger.debug({ err }, 'Bearer token verification failed');
+                // Fall through to cookie JWT check
+            }
+        }
+    }
+
     const token = req.cookies.jwt;
     if (!token) {
         // If jwt token is not available kick in the basic authentication
@@ -235,8 +342,9 @@ const authenticate = async (req, res, next) => {
             req.user = decoded.user;
             next();
         } catch (err) {
-            logger.error({ err}, "Error in authenticate middleware")
-            res.cookie('originalUrl', req.originalUrl, { httpOnly: true, path: '/', secure: isSecure, });
+            delete req.user;
+            logger.error({ err }, "Error in authenticate middleware");
+            res.cookie('originalUrl', req.originalUrl, { httpOnly: true, path: '/', secure: isSecure });
             res.redirect('/login');
             return;
         }
@@ -292,6 +400,23 @@ const basicAuth = (req, res, next) => {
 // Attach the authentication middleware to all routes except /login
 app.use(/^(?!\/login).*$/, authenticate);
 
+// Always use the server-verified identity (req.user set by authenticate middleware)
+// instead of trusting the client-supplied :dsUser URL parameter.
+app.param('dsUser', (req, res, next, _dsUser) => {
+    logger.info(`[MIDDLEWARE] Client sent dsUser in URL: "${_dsUser}", replacing with authenticated user: "${req.user}"`);
+    req.params.dsUser = req.user;
+    next();
+});
+
+// Same for POST/PUT routes that carry dsUser in the request body.
+app.use((req, res, next) => {
+    if (req.body && req.body.dsUser !== undefined) {
+        logger.info(`[MIDDLEWARE] Client sent dsUser in body: "${req.body.dsUser}", replacing with authenticated user: "${req.user}"`);
+        req.body.dsUser = req.user;
+    }
+    next();
+});
+
 app.use((req, res, next) => {
     const startTime = Date.now();
     res.on('finish', () => {
@@ -308,6 +433,8 @@ app.use('/upload', fileUpload);
 const dsReadApi = require('./routes/dsReadApi');
 const { unlock, options } = require('./routes/upload');
 app.use('/ds', dsReadApi);
+const patRoutes = require('./routes/patApi');
+app.use('/api/pats', patRoutes);
 const csvUpload = require('./routes/uploadCsv');
 app.use('/uploadCsv', csvUpload);
 

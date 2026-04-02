@@ -1,34 +1,32 @@
 const DbAbstraction = require('./dbAbstraction');
-const jwt = require('jsonwebtoken');
 const Utils = require('./utils');
 const logger = require('./logger');
 
+/**
+ * Check whether a user has access to a dataset.
+ * Authentication is handled upstream by the authenticate middleware which sets req.user.
+ * token parameter is accepted for backward compatibility but ignored.
+ */
 async function aclCheck(dsName, dsView, dsUser, token = null) {
     let dbAbstraction = new DbAbstraction();
     try {
-        let aclConfig = await dbAbstraction.find(dsName, "metaData", { _id: `aclConfig` }, {} );
+        let aclConfig = await dbAbstraction.find(dsName, "metaData", { _id: "aclConfig" }, {});
         aclConfig = aclConfig[0];
-        if (!aclConfig) {     
-            return true
+        if (!aclConfig) {
+            return true;
         }
         if (!aclConfig.accessCtrl) {
-            return true
+            return true;
         }
-        logger.info(`User is: , ${dsUser} in aclCheck`);
-        if (token) {
-            try {
-                const decode = jwt.verify(token, Utils.jwtSecret)
-                dsUser = decode.user;
-                if (aclConfig.acl.includes(dsUser)) {
-                    return true
-                } else {
-                    logger.warn(`User ${dsUser} does not have access`);
-                }
-            } catch (e) {
-                logger.error(e, "Error verifying token in aclcheck");
-            }
+        logger.info(`ACL check for user: ${dsUser}, dataset: ${dsName}`);
+        if (dsUser && aclConfig.acl && aclConfig.acl.includes(dsUser)) {
+            logger.info(`User ${dsUser} granted access to dataset: ${dsName}`);
+            return true;
+        }
+        if (!dsUser) {
+            logger.warn('No user provided in ACL check');
         } else {
-            logger.warn("Got no token in acl check");
+            logger.warn(`User ${dsUser} denied access to dataset: ${dsName}`);
         }
     } catch (e) {
         logger.error(e, "Exception in aclCheck");
