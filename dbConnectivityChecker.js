@@ -77,7 +77,7 @@ class DbConnectivityChecker {
                 await this.client.close(true);
                 logger.warn("MongoDB Connectivity: Client is closing the connection");
                 this.resetConnectionState();
-                DbConnectivityChecker._instace = null;
+                DbConnectivityChecker._instance = null;
             } catch(err) {
                 logger.error(err, "MongoDB connectivity: Exception while closing the client connection to MongoDB");
             }

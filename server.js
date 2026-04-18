@@ -440,6 +440,19 @@ app.use('/uploadCsv', csvUpload);
 
 Utils.execCmdExecutor('mkdir attachments');
 const attachmentsDir = path.resolve(__dirname, './attachments');
+
+// For .md attachment files: serve the SPA on browser navigation so the React
+// MarkdownViewer component handles rendering. Programmatic fetch() requests
+// from the viewer include an X-Raw-Content header and bypass this to get the
+// raw file from express.static below.
+app.use('/attachments', (req, res, next) => {
+    if (req.path.endsWith('.md') && !req.headers['x-raw-content'] &&
+        req.headers.accept && req.headers.accept.includes('text/html')) {
+        return res.sendFile('./index.html', { root: reactuiDir });
+    }
+    next();
+});
+
 app.use('/attachments', express.static(attachmentsDir));
 const uploadAttachments = require('./routes/uploadAttachments');
 app.use('/uploadAttachments', uploadAttachments);
