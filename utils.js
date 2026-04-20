@@ -71,10 +71,10 @@ function getRecFromJiraIssue(issue) {
   rec.summary = issue.fields.summary;
   rec.type = issue.fields.issuetype.name;
   rec.jiraSummary = `${rec.summary}\n(${rec.key})`
-  rec.assignee = issue.fields.assignee ? issue.fields.assignee.name : "NotSet";
+  rec.assignee = issue.fields.assignee && issue.fields.assignee.name ? issue.fields.assignee.name : "NotSet";
   rec.status = issue.fields.status.name;
   rec.priority = issue.fields.priority.name;
-  rec.reporter = issue.fields.reporter.name;
+  rec.reporter = issue.fields.reporter && issue.fields.reporter.name ? issue.fields.reporter.name : "NotSet";
   if (issue.fields.votes)
     rec.votes = issue.fields.votes.votes;
   rec.updated = issue.fields.updated.split('T')[0];
