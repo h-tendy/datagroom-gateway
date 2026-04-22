@@ -1121,6 +1121,170 @@ router.post('/view/insertOneDoc', async (req, res, next) => {
 
 /**
  * @swagger
+ * /ds/view/upsertBulkDocs:
+ *   post:
+ *     summary: Bulk upsert documents — insert new docs or update existing ones based on selectorObj
+ *     tags: [Datasets]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dsName, dsView, dsUser, selectorObjs, docs]
+ *             properties:
+ *               dsName: { type: string, description: Dataset name }
+ *               dsView: { type: string, default: default, description: View name }
+ *               dsUser: { type: string, description: Username }
+ *               selectorObjs:
+ *                 type: array
+ *                 items: { type: object }
+ *                 description: Array of key selector objects (matched by index with docs)
+ *               docs:
+ *                 type: array
+ *                 items: { type: object }
+ *                 description: Array of documents to upsert (matched by index with selectorObjs)
+ *               insertOnly:
+ *                 type: boolean
+ *                 default: false
+ *                 description: If true, fails for existing docs; if false, updates them
+ *     responses:
+ *       200:
+ *         description: Bulk upsert result with inserted, updated, and failures
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, enum: [success, partial, fail] }
+ *                 total: { type: number }
+ *                 insertedCount: { type: number }
+ *                 updatedCount: { type: number }
+ *                 failCount: { type: number }
+ *                 inserted:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id: { type: string }
+ *                       selectorObj: { type: object }
+ *                 updated:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id: { type: string }
+ *                       selectorObj: { type: object }
+ *                 failures:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       selectorObj: { type: object }
+ *                       error: { type: string }
+ *                       existingId: { type: string }
+ *       400:
+ *         description: Validation error
+ *       403:
+ *         description: Access denied
+ */
+router.post('/view/upsertBulkDocs', async (req, res, next) => {
+    let request = req.body;
+    logger.info("Incoming request in upsertBulkDocs");
+    
+    // Validate required fields
+    if (!request.dsName || !request.dsView || !request.dsUser) {
+        res.status(400).json({ status: 'fail', error: 'Missing required fields: dsName, dsView, dsUser' });
+        return;
+    }
+    if (!Array.isArray(request.selectorObjs) || !Array.isArray(request.docs)) {
+        res.status(400).json({ status: 'fail', error: 'selectorObjs and docs must be arrays' });
+        return;
+    }
+    if (request.selectorObjs.length !== request.docs.length) {
+        res.status(400).json({ status: 'fail', error: 'selectorObjs and docs arrays must be same length' });
+        return;
+    }
+    if (request.selectorObjs.length === 0) {
+        res.status(400).json({ status: 'fail', error: 'selectorObjs and docs arrays cannot be empty' });
+        return;
+    }
+
+    const token = req.cookies.jwt;
+    let allowed = await AclCheck.aclCheck(request.dsName, request.dsView, request.dsUser, token);
+    if (!allowed) {
+        res.status(403).json({ "Error": "access_denied" });
+        return;
+    }
+
+    let dbAbstraction = new DbAbstraction();
+    try {
+        const insertOnly = request.insertOnly === true;
+        let dbResponse = await dbAbstraction.upsertMany(request.dsName, "data", request.selectorObjs, request.docs, { insertOnly });
+        logger.info(dbResponse, 'DB response after upsertMany');
+
+        if (dbResponse.ok !== 1) {
+            res.status(400).json({ status: 'fail', error: dbResponse.error || 'Bulk upsert failed' });
+            return;
+        }
+
+        // Determine overall status
+        let status;
+        const successCount = dbResponse.insertedCount + dbResponse.updatedCount;
+        if (dbResponse.failCount === 0) {
+            status = 'success';
+        } else if (successCount === 0) {
+            status = 'fail';
+        } else {
+            status = 'partial';
+        }
+
+        // Create editlog entries for inserted docs
+        for (const item of dbResponse.inserted) {
+            let editLogEntry = {
+                opr: "insert",
+                selector: JSON.stringify(item.selectorObj, null, 4),
+                doc: JSON.stringify(request.docs[item.index], null, 4),
+                user: request.dsUser,
+                date: Date(),
+                status: 'success'
+            };
+            await dbAbstraction.insertOne(request.dsName, "editlog", editLogEntry);
+        }
+
+        // Create editlog entries for updated docs
+        for (const item of dbResponse.updated) {
+            let editLogEntry = {
+                opr: "update",
+                selector: JSON.stringify(item.selectorObj, null, 4),
+                doc: JSON.stringify(request.docs[item.index], null, 4),
+                user: request.dsUser,
+                date: Date(),
+                status: 'success'
+            };
+            await dbAbstraction.insertOne(request.dsName, "editlog", editLogEntry);
+        }
+
+        let response = {
+            status,
+            total: dbResponse.total,
+            insertedCount: dbResponse.insertedCount,
+            updatedCount: dbResponse.updatedCount,
+            failCount: dbResponse.failCount,
+            inserted: dbResponse.inserted.map(s => ({ _id: s._id, selectorObj: s.selectorObj })),
+            updated: dbResponse.updated.map(s => ({ _id: s._id, selectorObj: s.selectorObj })),
+            failures: dbResponse.failures.map(f => ({ selectorObj: f.selectorObj, error: f.error, existingId: f.existingId }))
+        };
+
+        res.status(200).send(response);
+    } catch (e) {
+        logger.error(e, "Exception in upsertBulkDocs");
+        res.status(415).send({ status: 'fail', error: e.message || 'Server error' });
+    }
+});
+
+/**
+ * @swagger
  * /ds/view/insertOrUpdateOneDoc:
  *   post:
  *     summary: Upsert a document — insert if not exists, update if exists
