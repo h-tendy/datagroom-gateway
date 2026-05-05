@@ -40,6 +40,15 @@ const customLogMethod = function (args, method) {
 // Create a wrapper function that automatically adds requestId
 function createLoggerMethod(originalMethod) {
     return function(logData, message) {
+        // Normalize Error instances so non-enumerable message/stack are preserved
+        // when the wrapper later spreads logData into a new object.
+        if (logData instanceof Error) {
+            logData = {
+                err: logData.message,
+                stack: logData.stack,
+                code: logData.code
+            };
+        }
         const requestId = requestContext.getRequestId();
         if (requestId) {
             // If logData is an object, add requestId to it
