@@ -130,12 +130,44 @@ if (!disableAD) {
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+const sessionStore = new session.MemoryStore();
 app.use(session({
+    store: sessionStore,
     secret: 'Super Secret',
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
     cookie: { httpOnly: true, maxAge: 2419200000, secure: true } /// maxAge in milliseconds
 }));
+
+const sessionMonitorIntervalMs = 30000; // 5 minutes
+let prevSessionCount = 0;
+setInterval(() => {
+    const sessionCount = sessionStore.sessions ? Object.keys(sessionStore.sessions).length : 0;
+    const mem = process.memoryUsage();
+    const toMB = (bytes) => Math.round(bytes / 1024 / 1024);
+    logger.info({
+        sessionCount,
+        sessionsAddedSinceLast: sessionCount - prevSessionCount,
+        rssMB: toMB(mem.rss),
+        heapTotalMB: toMB(mem.heapTotal),
+        heapUsedMB: toMB(mem.heapUsed),
+        externalMB: toMB(mem.external)
+    }, "Session store and memory usage");
+    prevSessionCount = sessionCount; // unref() so that this interval doesn't keep the process alive if everything else is done
+}, sessionMonitorIntervalMs).unref();
+
+app.get('/debug/sessionCount', (req, res) => {
+    const sessionCount = sessionStore.sessions ? Object.keys(sessionStore.sessions).length : 0;
+    const mem = process.memoryUsage();
+    res.status(200).json({
+        sessionCount,
+        rssMB: Math.round(mem.rss / 1024 / 1024),
+        heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+        heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+        externalMB: Math.round(mem.external / 1024 / 1024)
+    });
+});
 
 Utils.execCmdExecutor('mkdir uploads');
 
