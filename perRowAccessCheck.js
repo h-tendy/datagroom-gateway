@@ -14,6 +14,29 @@ async function checkAccessForSpecificRow(dsName, dsView, dsUser, _id) {
     return recs;
 }
 
+// Batched checkAccessForSpecificRow: returns a Set of the id strings the user may access.
+// Malformed _ids are skipped (treated as not accessible).
+async function checkAccessForSpecificRows(dsName, dsView, dsUser, ids) {
+    let dbAbstraction = new DbAbstraction();
+    let allowed = new Set();
+    let objectIds = [];
+    for (const id of ids) {
+        try {
+            objectIds.push(dbAbstraction.getObjectId(id));
+        } catch (e) {
+            logger.error(e, `checkAccessForSpecificRows: invalid _id ${id}`);
+        }
+    }
+    if (objectIds.length === 0) return allowed;
+    // Enforcing on an empty filter set yields just the access-column constraint (or nothing).
+    let [accessQFilters] = await enforcePerRowAcessCtrl(dsName, dsView, dsUser, []);
+    let [accessFilters] = MongoFilters.getMongoFiltersAndSorters(accessQFilters, null, null);
+    let query = { ...accessFilters, _id: { $in: objectIds } };
+    let recs = await dbAbstraction.find(dsName, "data", query, { projection: { _id: 1 } });
+    for (const rec of recs) allowed.add(String(rec._id));
+    return allowed;
+}
+
 async function enforcePerRowAcessCtrl(dsName, dsView, dsUser, filters, collection = "data") {
     let dbAbstraction = new DbAbstraction();
     let onlyPerRowAccessCtrlQueried = false;
@@ -125,6 +148,7 @@ async function checkIfUserCanCopyDs (dsName, dsUser) {
 
 module.exports = {
     checkAccessForSpecificRow,
+    checkAccessForSpecificRows,
     enforcePerRowAcessCtrl,
     checkIfUserCanEditPerRowAccessConfig,
     checkIfUserCanCopyDs
