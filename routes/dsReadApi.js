@@ -1968,6 +1968,11 @@ router.post('/view/setViewDefinitions', async (req, res, next) => {
         res.status(403).json({ status: 'fail', message: "Permission denied" });
         return
     }
+    if (!Array.isArray(request.viewDefs) || request.viewDefs.length === 0) {
+        logger.warn({dsName: request.dsName, dsView: request.dsView}, "Invalid viewDefs format, expected a non-empty array");
+        res.status(400).json({ status: 'fail', message: "ViewDefs must be a non-empty array" });
+        return;
+    }
     try {
         // XXX: Do lots of validation.
         let [ok, message] = await PerRowAcessCheck.checkIfUserCanEditPerRowAccessConfig(request.dsName, request.dsView, request.dsUser, request.perRowAccessConfig);

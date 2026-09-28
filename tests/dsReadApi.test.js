@@ -837,3 +837,68 @@ describe('dsReadApi - /pinDs and dsList pinned flag', function () {
         });
     });
 });
+
+describe('dsReadApi - POST /ds/view/setViewDefinitions viewDefs validation', function () {
+    const PerRowAcessCheck = require('../perRowAccessCheck');
+    let app;
+    let mockDbAbstraction;
+    
+    beforeEach(function () {
+        app = express();
+        app.use(express.json());
+        app.use(cookieParser());
+        app.use('/ds', dsReadApiRouter);
+
+        logger.info = jest.fn();
+        logger.warn = jest.fn();
+        logger.error = jest.fn();
+
+        AclCheck.aclCheck = jest.fn().mockResolvedValue(true);
+        jest.spyOn(PerRowAcessCheck, 'checkIfUserCanEditPerRowAccessConfig').mockResolvedValue([true, '']);
+
+        mockDbAbstraction = {
+            update: jest.fn().mockResolvedValue({}),
+            removeOneWithValidId: jest.fn().mockResolvedValue({}),
+            find: jest.fn().mockResolvedValue([]),
+        };
+
+        DbAbstraction.mockImplementation(() => mockDbAbstraction);
+    });
+
+    afterEach(function () {
+        jest.restoreAllMocks();
+        jest.resetAllMocks();
+    });
+
+    //First case is the exact payload that wiped cicdBuildUsability (28/09/2026 15:24:19)
+    test.each([
+        ['missing', {dsName: 'cicdBuildUsability', dsView: 'default', filter: 'R9_3_0'}],
+        ['null', {dsName:'ds', dsView:'default', viewDefs:null}],
+        ['object', {dsName:'ds', dsView:'default', viewDefs:{}}],
+        ['empty array', {dsName:'ds', dsView:'default', viewDefs:[]}]
+    ])('rejects %s viewDefs with 400 and writes nothing', async function (_label, body) {
+        const response = await request(app).post('/ds/view/setViewDefinitions').send(body);
+        expect(response.status).toBe(400);
+        expect(response.body.status).toBe('fail');
+        expect(mockDbAbstraction.update).not.toHaveBeenCalled();
+        expect(mockDbAbstraction.removeOneWithValidId).not.toHaveBeenCalled();
+    });
+
+    test('accepts a non-empty viewDefs array and saves it as ColumnAttrs', async function () {
+        const viewDefs = [{field: 'Date', title: 'Date'}];
+        const response = await request(app).post('/ds/view/setViewDefinitions').send({
+            dsName: 'ds',
+            dsView: 'default',
+            dsUser: 'alice',
+            viewDefs: viewDefs
+        });
+
+        expect(response.status).toBe(200);
+        expect(mockDbAbstraction.update).toHaveBeenCalledWith(
+            'ds',
+            'metaData',
+            { _id: 'view_default' },
+            { columnAttrs: viewDefs }
+        );
+    });
+});
