@@ -171,6 +171,20 @@ class DbAbstraction {
             throw err;
         }
     }
+    async insertMany (dbName, tableName, docs) {
+        try {
+            if (!docs || docs.length === 0) return { ok: 1, insertedCount: 0, insertedIds: {} };
+            if (! this.isConnected ) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+            let ret = await collection.insertMany(docs, { ordered: false });
+            return { ok: ret.acknowledged ? 1 : 0, insertedCount: ret.insertedCount, insertedIds: ret.insertedIds };
+        } catch (err) {
+            logger.error(err, `insertMany error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
+            throw err;
+        }
+    }
     async insertOneUniquely (dbName, tableName, selector, setObj) {
         try {
             if (! this.isConnected ) await this.connect();
@@ -188,6 +202,159 @@ class DbAbstraction {
             throw err;
         }
     }
+
+    /**
+     * Bulk upsert documents — insert new docs or update existing ones based on selectorObj.
+     * @param {string} dbName - Database name
+     * @param {string} tableName - Collection name
+     * @param {Array<Object>} selectorObjs - Array of selector objects (matched by index with docs)
+     * @param {Array<Object>} docs - Array of documents to upsert
+     * @param {Object} options - Options object
+     * @param {boolean} options.insertOnly - If true, fails for existing docs; if false, updates them (default: false)
+     * @returns {Promise<{ok: number, inserted: Array, updated: Array, failures: Array}>}
+     */
+    async upsertMany(dbName, tableName, selectorObjs, docs, options = {}) {
+        const { insertOnly = false } = options;
+        try {
+            if (!this.isConnected) await this.connect();
+            let db = this.client.db(dbName);
+            let collection = db.collection(tableName);
+
+            if (selectorObjs.length !== docs.length) {
+                return { ok: 0, error: 'selectorObjs and docs arrays must be same length' };
+            }
+
+            // An `_id` marks an update-by-identity entry (convert it to ObjectId); drop `_id` from
+            // the doc payload so no row is ever inserted with a custom _id.
+            const idBased = new Array(selectorObjs.length).fill(false);
+            for (let i = 0; i < selectorObjs.length; i++) {
+                if (selectorObjs[i]._id) {
+                    selectorObjs[i]._id = this.getObjectId(selectorObjs[i]._id);
+                    idBased[i] = true;
+                }
+                if (docs[i] && docs[i]._id !== undefined) {
+                    delete docs[i]._id;
+                }
+            }
+
+            const bulkOps = selectorObjs.map((selector, index) => ({
+                updateOne: {
+                    filter: selector,
+                    update: insertOnly ? { $setOnInsert: docs[index] } : { $set: docs[index] },
+                    upsert: !idBased[index]
+                }
+            }));
+
+            const result = await collection.bulkWrite(bulkOps, { ordered: true });
+
+            const inserted = [];
+            const updated = [];
+            const failures = [];
+
+            const upsertedIndices = new Set();
+            if (result.upsertedIds) {
+                for (const [indexStr, id] of Object.entries(result.upsertedIds)) {
+                    const index = parseInt(indexStr);
+                    upsertedIndices.add(index);
+                    inserted.push({
+                        index,
+                        _id: id,
+                        selectorObj: selectorObjs[index]
+                    });
+                }
+            }
+
+            const pendingIndices = [];
+            for (let i = 0; i < selectorObjs.length; i++) {
+                if (!upsertedIndices.has(i)) pendingIndices.push(i);
+            }
+
+            if (pendingIndices.length > 0) {
+                // Project the selector fields too so natural-key results can be matched back.
+                const projection = { _id: 1 };
+                for (const i of pendingIndices) {
+                    for (const key of Object.keys(selectorObjs[i])) projection[key] = 1;
+                }
+                const orConditions = pendingIndices.map(i => selectorObjs[i]);
+                const existingDocs = await collection.find({ $or: orConditions }, { projection }).toArray();
+
+                const byId = new Map();
+                for (const doc of existingDocs) byId.set(String(doc._id), doc);
+
+                for (const i of pendingIndices) {
+                    const existingDoc = idBased[i]
+                        ? byId.get(String(selectorObjs[i]._id))
+                        : existingDocs.find(doc => this._docMatchesSelector(doc, selectorObjs[i]));
+                    if (insertOnly) {
+                        if (existingDoc) {
+                            failures.push({
+                                index: i,
+                                selectorObj: selectorObjs[i],
+                                error: 'Document with matching key already exists',
+                                existingId: existingDoc._id
+                            });
+                        } else {
+                            // Neither matched nor upserted: the insert did not happen.
+                            failures.push({
+                                index: i,
+                                selectorObj: selectorObjs[i],
+                                error: idBased[i] ? 'Row not found!' : 'Insert did not happen'
+                            });
+                        }
+                    } else if (existingDoc) {
+                        updated.push({
+                            index: i,
+                            _id: existingDoc._id,
+                            selectorObj: selectorObjs[i]
+                        });
+                    } else {
+                        // No row to update, and (for _id-based) no insert is allowed.
+                        failures.push({
+                            index: i,
+                            selectorObj: selectorObjs[i],
+                            error: idBased[i] ? 'Row not found!' : 'Update/insert did not happen'
+                        });
+                    }
+                }
+            }
+
+            return {
+                ok: 1,
+                total: selectorObjs.length,
+                insertedCount: inserted.length,
+                updatedCount: updated.length,
+                failCount: failures.length,
+                inserted,
+                updated,
+                failures
+            };
+        } catch (err) {
+            logger.error(err, `upsertMany error for ${dbName}.${tableName}`);
+            this.handleDbErrors(err);
+            throw err;
+        }
+    }
+
+    /**
+     * Returns true if `doc` satisfies every field-equality in `selector`.
+     * Handles ObjectId (and other BSON types exposing `.equals`) and falls back to a
+     * structural compare for nested objects/arrays. Assumes equality-style selectors.
+     */
+    _docMatchesSelector(doc, selector) {
+        for (const key of Object.keys(selector)) {
+            const sv = selector[key];
+            const dv = doc[key];
+            if (sv && typeof sv === 'object' && typeof sv.equals === 'function') {
+                if (!(dv && typeof dv.equals === 'function' && sv.equals(dv))) return false;
+            } else if (sv !== null && typeof sv === 'object') {
+                if (JSON.stringify(sv) !== JSON.stringify(dv)) return false;
+            } else if (dv !== sv) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     async update (dbName, tableName, selector, updateObj) {
         try {
             if (! this.isConnected ) await this.connect();
